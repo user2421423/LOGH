@@ -1413,6 +1413,10 @@ button.blocked:disabled {
   opacity: 0.82;
   cursor: not-allowed;
 }
+.cost-item.short {
+  color: #ff5a4a;
+  font-weight: 800;
+}
 button small.why {
   color: #f2b48a;
   font-weight: 700;

@@ -141,8 +141,12 @@ function phaseReason() {
   return game.over ? 'Operation over' : game.phase !== game.player ? 'Enemy turn' : null;
 }
 // A button that explains itself: when the order is unavailable its reason replaces the cost line.
+// A lack of funds is shown by the cost itself, with the missing resources in red.
+const isShortfall = why => /^Need \d+ more /.test(why || '');
 function act(attrs, label, why, detail = '', cls = '') {
-  return `<button class="${cls}${why ? ' blocked' : ''}" ${attrs} ${why ? `disabled title="${esc(why)}"` : ''}>${label}${why ? `<small class="why">${esc(why)}</small>` : detail ? `<small>${detail}</small>` : ''}</button>`;
+  const note =
+    why && !isShortfall(why) ? `<small class="why">${esc(why)}</small>` : detail ? `<small>${detail}</small>` : '';
+  return `<button class="${cls}${why ? ' blocked' : ''}" ${attrs} ${why ? `disabled${isShortfall(why) ? '' : ` title="${esc(why)}"`}` : ''}>${label}${note}</button>`;
 }
 function fireStatus(u) {
   if (u.attacked) return 'Already fired';
@@ -159,13 +163,15 @@ function resource(icon, label, title, value, perTurn) {
   return `<div class="resource" title="${title}${rate}">${ICONS.use(icon, 'res-icon')}<span class="label">${label}</span><b>${count(value)} ${perTurn == null ? '' : `<small>+${perTurn}/turn</small>`}</b></div>`;
 }
 // Costs render as WC4 resource tokens; zero amounts are omitted unless all is set.
+// Prices (not balances, which pass all) turn red for each resource the player cannot cover.
 function costHTML(c, all = false) {
-  const parts = [
-    ['credits', c.credits],
-    ['industry', c.industry],
-    ['research', c.science],
-  ].filter(([, v]) => v != null && (all || v > 0));
-  return `<span class="cost-line">${parts.map(([k, v]) => `<span class="cost-item">${ICONS.use(k, 'cost-ico')}${count(v)}</span>`).join('')}</span>`;
+  const have = game?.economy?.[game.player] || {},
+    parts = [
+      ['credits', c.credits, 'credits'],
+      ['industry', c.industry, 'industry'],
+      ['research', c.science, 'science'],
+    ].filter(([, v]) => v != null && (all || v > 0));
+  return `<span class="cost-line">${parts.map(([k, v, f]) => `<span class="cost-item${!all && v > (have[f] || 0) ? ' short' : ''}">${ICONS.use(k, 'cost-ico')}${count(v)}</span>`).join('')}</span>`;
 }
 function statRow(u, t) {
   const range = rangeText(u);
@@ -251,6 +257,8 @@ function panel() {
         : s
           ? E.tile(game, s.c, s.r)
           : null;
+  // A selected fleet gets the whole panel; hex details, the station directory and dispatches show otherwise.
+  if (u) return main;
   return (
     main +
     `<section class="section-divider"><span class="label">${selectedTile ? 'Hex ' + selectedTile.c + ', ' + selectedTile.r : 'Theater intelligence'}</span><p class="description">${selectedTile ? terrainDescription(selectedTile) : 'Iserlohn, Vermilion, and Fezzan form three crossings through the gravity rifts.'}</p><label class="label" for="station-select">Station directory</label><select class="select unit-select" id="station-select"><option value="">Inspect station…</option>${game.stations.map(s => `<option value="${s.id}">${s.name} · ${E.FACTIONS[s.owner].short}</option>`).join('')}</select></section><section class="section-divider dispatches"><span class="label">Command dispatches</span>${game.log
