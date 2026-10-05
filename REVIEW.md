@@ -29,7 +29,25 @@ minified one-line code that is hard to maintain.
 Fixed by this version (present in the earlier live snapshot): the flagship sprite's 180° rotation, and the
 torpedo escort's "20% evasion" text, which really meant 10%. The torpedo class was removed.
 
-## Descriptions that don't match the code
+## Fixes applied on this branch
+
+All six bugs are fixed, plus two text and label corrections. The project tests pass (`engine.test.cjs` 22/22, including 5 new tests; `ui-smoke.cjs` PASS).
+Four of the new tests fail on the unfixed engine; the fifth is a guard that the station-shield bonus is kept.
+
+| # | Fix | Verified by |
+|---|---|---|
+| 1 | `power()` grants the marine-pod bonus against a Battle Line target, or against a station only when no garrison is the target. `preview()` keeps the +55% on the station-shield share when a frigate hits a garrisoned station. | 3 new engine tests |
+| 2 | `beginTurn()` prefers Kircheis's +2 aura when several admirals are in range. | New engine test |
+| 3 | `repair()` and `reinforce()` require `isReady`, so confused fleets can't use them. | New engine test |
+| 4 | The AI no longer collects income at the start of its turn 1 (`game.js` `endTurn`), matching the player. The engine API is unchanged. | Browser: AI has 430 credits on turn 1 |
+| 5 | `render()` restores canvas focus if the map had it, so keyboard play keeps working after every action. | Browser: three Arrow/Enter moves in a row |
+| 6 | Escape in the Field manual opened from the start screen returns to setup. | Browser |
+| — | Mittermeyer and Attenborough text now says "refresh actions twice per turn". | Code |
+| — | The footer shows "not saved" when the last `localStorage` write failed. | Browser, with `setItem` forced to throw |
+
+Not changed (design decisions for the author): admiral aura morale stacking and the command-arrays aura wording.
+
+## Descriptions that don't match the code (as found)
 
 - **Mittermeyer and Attenborough: "refresh actions after two kills".** The code allows **two refreshes** per turn (`cap = 2`); it does not require two kills.
 - **The +8% damage aura from command arrays.** It comes from *any* admiral, regardless of comms research; the research only widens the radius.
