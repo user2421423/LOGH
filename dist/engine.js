@@ -1023,40 +1023,93 @@
     );
     return g;
   }
+  // Enemy high command, run once at the start of each AI turn before its fleets act:
+  // repair, save for dreadnoughts, upgrade rear shipyards, reinforce, then build stacked fleets. No fleet cap.
   function aiProduction(g) {
     const side = g.phase,
-      e = funds(g, side);
-    if (g.mode === 'conquest' && g.turn % 3 === 0) {
-      const k = ['laser', 'armor', 'warp', 'comms'][Math.floor(random(g) * 4)];
-      research(g, k);
+      e = funds(g, side),
+      foes = g.units.filter(u => u.hp > 0 && u.side !== side),
+      own = () => g.units.filter(u => u.hp > 0 && u.side === side),
+      front = p => Math.min(...foes.map(u => distance(u, p)), 99),
+      nearFriendlyStation = u => g.stations.some(s => s.owner === side && distance(s, u) <= 1),
+      plan = ((g.ai ||= {})[side] ||= { saving: false });
+    const bases = g.stations.filter(s => s.owner === side).sort((a, b) => front(a) - front(b));
+    const yard3 = bases.filter(s => s.tier >= 3);
+    const flagPrice = price('flagship');
+
+    // 1. Repair badly damaged fleets resting at a friendly station (this spends their turn).
+    for (const u of own()
+      .filter(u => u.hp / maxHP(u) < 0.55 && nearFriendlyStation(u))
+      .sort((a, b) => a.hp / maxHP(a) - b.hp / maxHP(b))) {
+      if (e.credits - repairCost(u) >= 60) repair(g, u.id);
     }
-    const fleetCount = g.units.filter(u => u.hp > 0 && u.side === side).length;
-    const max = g.mode === 'iserlohn' ? 12 : 24;
-    if (fleetCount >= max) return;
-    const bases = g.stations
-      .filter(s => s.owner === side)
-      .sort((a, b) => {
-        const foes = g.units.filter(u => u.hp > 0 && u.side !== side);
-        const score = s => Math.min(...foes.map(u => distance(u, s)), 99);
-        return score(a) - score(b);
-      });
-    for (const s of bases) {
-      if (g.units.filter(u => u.hp > 0 && u.side === side).length >= max) break;
-      const menu =
-        s.tier >= 3
-          ? ['battleship', 'siege', 'missile', 'heavy', 'frigate', 'corvette']
-          : s.tier === 2
-            ? ['missile', 'heavy', 'destroyer', 'corvette']
-            : ['beam', 'light', 'frigate', 'corvette'];
-      const preferred = menu[Math.floor(random(g) * Math.min(menu.length, 3))];
-      const order = [preferred, ...menu.filter(x => x !== preferred)];
-      for (const type of order) {
-        if (canBuy(g, s, type, 1)) {
-          recruit(g, s.id, type, 1);
-          break;
-        }
+
+    // 2. Decide whether to save for a dreadnought (at most two alive, needs a tier-3 shipyard).
+    const flagships = own().filter(u => u.type === 'flagship').length;
+    if (!yard3.length || flagships >= 2) plan.saving = false;
+    else if (!plan.saving && g.turn >= 3 && random(g) < 0.35) plan.saving = true;
+    if (plan.saving) {
+      const yard = yard3.find(s => canBuy(g, s, 'flagship', 1));
+      if (yard) {
+        recruit(g, yard.id, 'flagship', 1);
+        plan.saving = false;
       }
     }
+    // While saving, keep the dreadnought fund untouched; otherwise hold a small emergency reserve.
+    const reserve = plan.saving ? Math.min(e.credits, flagPrice.credits) : 60;
+    const reserveInd = plan.saving ? Math.min(e.industry, flagPrice.industry) : 0;
+    const spendable = () => Math.max(0, e.credits - reserve);
+    const affordable = c => c.credits <= spendable() && e.industry - (c.industry || 0) >= reserveInd;
+
+    // 3. Research every third turn when the treasury can spare it.
+    if (g.mode === 'conquest' && g.turn % 3 === 0 && !plan.saving) {
+      const k = ['laser', 'armor', 'warp', 'comms'][Math.floor(random(g) * 4)];
+      if (affordable(researchCost(g, side, k))) research(g, k);
+    }
+
+    // 4. Upgrade one rear shipyard per turn when there is surplus.
+    if (!plan.saving && g.turn >= 2) {
+      const yard = bases.filter(s => s.tier < 3).sort((a, b) => front(b) - front(a) || a.tier - b.tier)[0];
+      if (yard && spendable() - upgradeCost(yard).credits >= 250 && affordable(upgradeCost(yard))) upgrade(g, yard.id);
+    }
+
+    // 5. Reinforce healthy Battle Line and Artillery fleets parked at a friendly station.
+    for (const u of own()
+      .filter(
+        u =>
+          u.stack < 3 &&
+          !u.moved &&
+          !u.attacked &&
+          TYPES[u.type].branch !== 'Escort' &&
+          u.hp / maxHP(u) >= 0.7 &&
+          nearFriendlyStation(u),
+      )
+      .sort((a, b) => TYPES[b.type].cost - TYPES[a.type].cost)) {
+      if (affordable(reinforceCost(u.type)) && spendable() - reinforceCost(u.type).credits >= 150) reinforce(g, u.id);
+    }
+
+    // 6. Build: front-line shipyards first; stack up when the budget allows.
+    bases.forEach((s, i) => {
+      const menu =
+        s.tier >= 3
+          ? ['battleship', 'siege', 'heavy', 'missile', 'frigate', 'corvette']
+          : s.tier === 2
+            ? ['heavy', 'missile', 'destroyer', 'corvette']
+            : ['light', 'beam', 'frigate', 'corvette'];
+      const preferred = menu[Math.floor(random(g) * Math.min(menu.length, 3))];
+      const share = i === bases.length - 1 ? 1 : 0.6;
+      for (const type of [preferred, ...menu.filter(x => x !== preferred)]) {
+        let built = false;
+        for (let n = 3; n >= 1 && !built; n--) {
+          const c = price(type, n);
+          // Single hulls may use the whole budget; stacks only this shipyard's share of it.
+          if (!canBuy(g, s, type, n) || !affordable(c) || (n > 1 && c.credits > spendable() * share)) continue;
+          recruit(g, s.id, type, n);
+          built = true;
+        }
+        if (built) break;
+      }
+    });
   }
   function aiOrder(g, id) {
     const u = g.units.find(u => u.id === id);
