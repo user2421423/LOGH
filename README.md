@@ -6,6 +6,16 @@ This contains the complete published game, including the new Empire and Alliance
 
 https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `.github/workflows/pages.yml` after the tests pass.
 
+## WC4-style controls and HUD
+
+- **One-click attacks:** click (or press Enter on) a red hex to fire immediately. Hover first to see the expected damage and counter-fire.
+- **Undo move:** a fleet that has moved but not fired can be sent back with the **Undo move** button or **Z**. Any attack, purchase or other order locks in earlier moves.
+- **Resources:** Credits (hex coin with the Imperial crest or FPA star), Industry (gear and ingot), Research (microchip), **Plasma Energy** (stations produce it; Battle Line and Artillery hulls cost it) and **Command Medals** (+1 per fleet destroyed, +3 per station captured; spent to appoint admirals).
+- **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and gold laurel pins mark admirals.
+- **Overlays:** green hexes for moves, red hexes with crosshairs for targets, and a pulsing teal outline on the selected hex.
+
+Saves from earlier versions are not loaded (rules version 4).
+
 ## Run the game
 
 1. Extract this ZIP.

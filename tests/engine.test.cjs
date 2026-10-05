@@ -43,7 +43,7 @@ function blank() {
   g.phase = 'alliance';
   g.over = null;
   g.nextId = 1;
-  g.economy.alliance = { credits: 5000, industry: 5000, science: 5000 };
+  g.economy.alliance = { credits: 5000, industry: 5000, science: 5000, energy: 5000, medals: 50 };
   return g;
 }
 function station(g, c, r, owner = 'alliance', shield = 150, tier = 3) {
@@ -309,41 +309,16 @@ test('Scenario wins on fortress occupation and loses after the deadline', () => 
   assert.equal(E.checkVictory(h).winner, 'empire');
 });
 
-test('Old campaigns migrate hulls once while preserving damage, admirals, stacks and actions', () => {
-  const g = blank();
-  delete g.rulesVersion;
-  const originals = [
-    ['torpedo', 'frigate', 160],
-    ['boarding', 'frigate', 210],
-    ['vanguard', 'destroyer', 200],
-    ['transport', 'destroyer', 310],
-    ['battery', 'siege', 280],
-    ['siege', 'siege', 225],
-  ];
-  originals.forEach(([old, type, hp], i) => {
-    const u = E.newUnit(g, type, 'alliance', i, 3, 2, 'yang');
-    u.type = old;
-    u.hp = Math.round(hp * 1.7) / 2;
-    u.moved = true;
-    u.attacked = false;
-  });
-  const result = E.migrateSave(g);
-  assert.equal(result.rulesVersion, 3);
-  result.units.forEach((u, i) => {
-    assert.equal(u.type, originals[i][1]);
-    assert(Math.abs(u.hp / E.maxHP(u) - 0.5) < 0.005);
-    assert.equal(u.stack, 2);
-    assert.equal(u.admiral, 'yang');
-    assert(u.moved && !u.attacked);
-  });
-  const once = JSON.stringify(result);
-  assert.equal(JSON.stringify(E.migrateSave(result)), once);
-  const dead = blank();
-  delete dead.rulesVersion;
-  const lost = E.newUnit(dead, 'siege', 'alliance', 2, 2);
-  lost.type = 'battery';
-  lost.hp = 0;
-  assert.equal(E.migrateSave(dead).units[0].hp, 0);
+test('Saves from earlier rules versions are rejected; current saves load unchanged', () => {
+  const g = E.createGame('alliance', 'normal', 'conquest', 9);
+  const once = JSON.stringify(g);
+  assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
+  for (const v of [undefined, 2, 3]) {
+    const old = JSON.parse(once);
+    if (v === undefined) delete old.rulesVersion;
+    else old.rulesVersion = v;
+    assert.equal(E.migrateSave(old), null);
+  }
 });
 test('Frigate marine-pod bonus applies to Battle Line and undefended stations, not to escorts on a station', () => {
   const g = blank(),
@@ -401,4 +376,47 @@ test('Confused fleets cannot repair or reinforce', () => {
   assert(!E.reinforce(g, u.id).ok);
   u.morale = 0;
   assert(E.repair(g, u.id).ok);
+});
+test('Heavy hulls cost plasma energy; escorts do not', () => {
+  const g = blank(),
+    s = station(g, 2, 2);
+  g.economy.alliance.energy = 0;
+  assert.equal(E.price('corvette').energy, 0);
+  assert(E.price('heavy', 2).energy > E.price('heavy').energy);
+  assert(!E.canBuy(g, s, 'heavy'));
+  assert(E.recruit(g, s.id, 'corvette').ok);
+  g.turn++;
+  g.economy.alliance.energy = E.price('heavy').energy;
+  assert(E.recruit(g, s.id, 'heavy').ok);
+  assert.equal(g.economy.alliance.energy, 0);
+});
+test('Stations produce energy each turn, and upgrades raise it', () => {
+  const g = blank(),
+    s = station(g, 2, 2);
+  s.energy = 4;
+  const before = g.economy.alliance.energy;
+  E.beginTurn(g, 'alliance');
+  assert.equal(g.economy.alliance.energy, before + 4);
+  assert(E.upgrade(g, g.stations[0].id).ok);
+  assert.equal(g.stations[0].energy, 1);
+});
+test('Command Medals are earned for kills and captures and spent on admirals', () => {
+  const g = blank();
+  g.economy.alliance.medals = 0;
+  const a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3),
+    v = E.newUnit(g, 'corvette', 'empire', 3, 2);
+  v.hp = 1;
+  assert(E.attack(g, a.id, 3, 2).destroyed);
+  assert.equal(g.economy.alliance.medals, E.MEDALS.kill);
+  assert(!E.assign(g, a.id, 'fischer').ok);
+  const s = station(g, 5, 5, 'empire', 0),
+    c = E.newUnit(g, 'corvette', 'alliance', 5, 4);
+  assert(E.move(g, c.id, 5, 5).captured);
+  assert.equal(g.economy.alliance.medals, E.MEDALS.kill + E.MEDALS.capture);
+  assert.equal(E.ADMIRALS.yang.medals, 4);
+  assert.equal(E.ADMIRALS.fischer.medals, 3);
+  assert(E.assign(g, c.id, 'fischer').ok);
+  assert.equal(g.economy.alliance.medals, E.MEDALS.kill + E.MEDALS.capture - 3);
+  assert(!E.assign(g, a.id, 'yang').ok);
+  assert(!s.shield);
 });
