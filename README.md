@@ -1,18 +1,69 @@
-# Galactic Command · Hex Conquest
+# Galactic Command — complete site source
 
-Unofficial Legend of the Galactic Heroes fan game — World Conqueror 4–style hex tactics in a single static page.
-Live: https://galactic-command.aveev5-pankaj.chatgpt.site
+This contains the complete published game, including the new Empire and Alliance artwork, ten ship classes, updated combat rules, and saved-campaign migration.
 
-## Run locally
-Any static server works, e.g. `python3 -m http.server` and open http://localhost:8000.
+## Run the game
+
+1. Extract this ZIP.
+2. Open a terminal in the extracted `galactic-command` folder.
+3. Run:
+
+```sh
+python3 -m http.server 8000 --directory dist
+```
+
+4. Open http://localhost:8000 in your browser.
+5. Press Ctrl+C in the terminal to stop the server.
+
+There are no npm dependencies, build steps, API keys, or external services required to play. The game runs entirely in the browser. Python is used only to serve the files locally. Any other static web server works too.
+
+You can also try opening `dist/index.html` directly in your browser. Serving the folder as above is recommended for consistent browser handling of assets and saved games.
 
 ## Files
-- `engine.js` — deterministic rules (units, combat, AI, economy, victory). No DOM; also loadable from Node (`require('./engine.js')`).
-- `game.js` — UI, canvas renderer, input, dialogs, `localStorage` save (`galactic-command-hex-v2`).
-- `art.js` — sprite-atlas source rectangles and drawing helpers.
-- `style.css`, `battlefield.css` — base styles and the battlefield HUD overrides.
-- `assets/` — sprite atlases (see `ASSETS.md`).
 
-See `REVIEW.md` for the code review.
+- `dist/index.html` — entry page
+- `dist/engine.js` — game rules, unit roster, combat, AI, economy, and save migration
+- `dist/game.js` — interface, controls, battlefield rendering, and browser saves
+- `dist/art.js` — artwork loading and sprite definitions
+- `dist/style.css`, `dist/battlefield.css` — interface styling
+- `dist/assets/empire-fleet.png` — white/gold Imperial ships
+- `dist/assets/alliance-fleet.png` — olive/teal Alliance ships
+- `dist/assets/fleet-atlas.png` — stations, fortresses, and capitals
+- `dist/assets/terrain-atlas.png` — terrain and effects
+- `dist/assets/admiral-atlas.png` — admiral portraits
+- `tests/engine.test.cjs` — gameplay tests
+- `tests/ui-smoke.cjs` — interface smoke checks
+- `ASSETS.md` — artwork notes, sprite mappings, and generation prompts
+- `.openai/hosting.json` — existing Sites deployment configuration
+
+## Edit or host elsewhere
+
+Edit the files in `dist/`, then refresh the browser. To host the game elsewhere, upload the entire contents of `dist/` while preserving the `assets/` folder. The `.openai/hosting.json` project ID refers to the original Site; it is not needed by other static hosts.
+
+## Optional tests
+
+With Node.js installed, run from this folder:
+
+```sh
+node --test tests/engine.test.cjs
+node tests/ui-smoke.cjs
+```
+
+## Saved games
+
+Progress lives in the browser's local storage under `galactic-command-hex-v2`. This package includes the code to migrate older campaigns, but it does not include your browser's save data. The hosted Site and localhost use separate save storage.
+
+## Source snapshot
+
+Published source commit: 9fe16dc9205f02ddf6e32ddb9c83ae01dedac584
+Packaged: 5 October 2026
+
+Unofficial Legend of the Galactic Heroes fan game with WC4-inspired rules and original generated artwork.
+
+## Screenshot
 
 ![Battlefield](screenshot.png)
+
+## Code review
+
+See [REVIEW.md](REVIEW.md).
