@@ -13,10 +13,14 @@ https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `
 - **Resources:** Credits (gold $ coin), Industry (gear and ingot) and Research (microchip).
 - **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and admirals appear as framed portraits with rank stars above their fleets.
 - **Combat juice:** synthesized weapon sounds per hull class and faction (🔊 button mutes), floating damage with red **CRIT!** numbers, blue station-defense tags, **MORALE ↓ / CONFUSED / LOW SUPPLY** alerts, and camera shake on heavy hits.
-- **Thor's Hammer:** shielded fortresses (Iserlohn, Geiersburg) fire their main gun each turn at the strongest enemy fleet within 2 hexes. Break the shields to silence them.
+- **Fortress main guns:** select your own Iserlohn (Thor's Hammer) or Geiersburg and click a red hex to strike an enemy fleet within 3 hexes for 40% of its hull. Two-turn recharge; silenced while shields are down. Nothing fires automatically.
+- **Station buildings:** every station has a Shipyard (larger hulls, +10 industry per level), a Research station (+8 research per level) and an Air base, each upgradable to level 3.
+- **Air wings:** Fighter, Bomber and Strategic Bomber wings from air bases. They ignore terrain, cannot capture, are immune to artillery, only take return fire from escorts and fighters, and need a friendly air base within 3 hexes.
+- **Conquest start dates:** the standard frontier plus Astarte, the Amritsar offensive, the Lippstadt War (rebel stations and garrisons) and Operation Ragnarök.
+- **Scenarios:** Assault on Iserlohn, Battle of Astarte, Hold Amritsar and Battle of Vermilion, each with one objective, a turn limit and a saved 1–3 star rating.
 - **Economy:** both sides start with 300 credits and 250/turn. Escorts give the most firepower per credit, flagships the most per hex at about two turns of income; extra stacks cost 85% of a hull, field reinforcement a full hull, repairs a fifth of the fleet's price.
 
-Saves from earlier versions are not loaded (rules version 5).
+Saves from earlier versions are not loaded (rules version 6).
 
 ## Run the game
 

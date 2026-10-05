@@ -81,8 +81,38 @@ function newGame() {
 }
 function startMenu() {
   const saved = getSave();
-  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div><div class="setup-row"><div><label for="mode-select">Operation</label><select class="select" id="mode-select"><option value="conquest" ${setup.mode === 'conquest' ? 'selected' : ''}>Galactic conquest · 17 × 11 hexes</option><option value="iserlohn" ${setup.mode === 'iserlohn' ? 'selected' : ''}>Assault on Iserlohn · 18-turn scenario</option></select></div><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select"><option value="easy" ${setup.difficulty === 'easy' ? 'selected' : ''}>Cadet · extra resources, weaker enemy economy</option><option value="normal" ${setup.difficulty === 'normal' ? 'selected' : ''}>Admiral · equal economic rules</option><option value="hard" ${setup.difficulty === 'hard' ? 'selected' : ''}>Fleet Marshal · enemy income +20%</option></select></div></div><div class="badge-row"><span class="badge">10 ship classes</span><span class="badge">8 admirals</span><span class="badge">4 research lines</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div><button class="primary" data-action="start">Launch operation</button>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
+  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div><div class="setup-row"><div><label for="mode-select">Operation</label><select class="select" id="mode-select">${modeOptions()}</select>${modeNote()}</div><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select"><option value="easy" ${setup.difficulty === 'easy' ? 'selected' : ''}>Cadet · extra resources, weaker enemy economy</option><option value="normal" ${setup.difficulty === 'normal' ? 'selected' : ''}>Admiral · equal economic rules</option><option value="hard" ${setup.difficulty === 'hard' ? 'selected' : ''}>Fleet Marshal · enemy income +20%</option></select></div></div><div class="badge-row"><span class="badge">10 ship classes</span><span class="badge">8 admirals</span><span class="badge">4 research lines</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div><button class="primary" data-action="start">Launch operation</button>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
   focusDialog();
+}
+function bestStars() {
+  try {
+    return JSON.parse(localStorage.getItem('galactic-command-stars')) || {};
+  } catch (e) {
+    return {};
+  }
+}
+function starText(n) {
+  return '★'.repeat(n) + '☆'.repeat(3 - n);
+}
+function modeOptions() {
+  const best = bestStars(),
+    sel = v => (setup.mode === v || (v === 'conquest:frontier' && setup.mode === 'conquest') ? 'selected' : '');
+  const eras = Object.entries(E.ERAS)
+    .map(([k, e]) => `<option value="conquest:${k}" ${sel('conquest:' + k)}>${e.name} · ${e.year}</option>`)
+    .join('');
+  const scens = Object.entries(E.SCENARIOS)
+    .map(
+      ([k, sc]) =>
+        `<option value="${k}" ${sel(k)}>${sc.name} · ${sc.objective.turns} turns${best[k] ? ' · ' + starText(best[k]) : ''}</option>`,
+    )
+    .join('');
+  return `<optgroup label="Conquest · 17 × 11 galaxy">${eras}</optgroup><optgroup label="Scenarios">${scens}</optgroup>`;
+}
+function modeNote() {
+  const sc = E.SCENARIOS[setup.mode],
+    era = E.ERAS[String(setup.mode).split(':')[1] || (setup.mode === 'conquest' ? 'frontier' : '')];
+  const text = sc ? `${sc.desc}${sc.side ? ` Played as the ${E.FACTIONS[sc.side].name}.` : ''}` : era ? era.desc : '';
+  return text ? `<p class="mode-note">${text}</p>` : '';
 }
 function render() {
   const mapFocused = !!canvas && document.activeElement === canvas;
@@ -90,7 +120,7 @@ function render() {
   const e = game.economy[game.player],
     inc = E.income(game, game.player),
     stations = game.stations.filter(s => s.owner === game.player).length;
-  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research', e.science, inc.science)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research" ${!interactive() ? 'disabled' : ''}>Research</button><button class="small" data-action="admirals" ${!interactive() ? 'disabled' : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${game.mode === 'iserlohn' ? 'Assault on Iserlohn' : 'The galactic frontier'}</h2></div><p class="objective">${game.mode === 'iserlohn' ? 'Capture Iserlohn by turn 18. Breach its shields, then occupy the station.' : `Capture ${game.player === 'alliance' ? 'Odin' : 'Heinessen'} while holding your own capital.`}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="Return the last moved fleet to where it started (Z)">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
+  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research', e.science, inc.science)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research" ${!interactive() ? 'disabled' : ''}>Research</button><button class="small" data-action="admirals" ${!interactive() ? 'disabled' : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${E.modeTitle(game)}</h2></div><p class="objective">${E.objectiveText(game)}${game.objective && game.mode !== 'conquest' ? ` <b>Turn ${game.turn} / ${game.objective.turns}</b>` : ''}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="Return the last moved fleet to where it started (Z)">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
   canvas = $('map');
   ctx = canvas.getContext('2d');
   attachMap();
@@ -117,8 +147,13 @@ function statRow(u, t) {
 function updateSelection() {
   const u = selectedUnit();
   readyCache = u && u.side === game.player ? E.reachable(game, u) : new Map();
+  const st = selectedStation();
   targetCache = new Set(
-    u && u.side === game.player && !u.attacked && u.morale > -3 ? E.targets(game, u).map(E.key) : [],
+    u && u.side === game.player && !u.attacked && u.morale > -3
+      ? E.targets(game, u).map(E.key)
+      : st && st.owner === game.player && interactive()
+        ? E.fortressTargets(game, st).map(E.key)
+        : [],
   );
   $('side').innerHTML =
     '<button class="drawer-close small" data-action="details" aria-label="Close fleet orders">×</button>' + panel();
@@ -165,10 +200,19 @@ function panel() {
       ours = u.side === game.player,
       st = E.stationAt(game, u),
       a = E.ADMIRALS[u.admiral];
-    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${t.branch}</span><span class="chip" style="color:${E.FACTIONS[u.side].color}">${E.FACTIONS[u.side].short}</span></div>${ART.ship(u.type, 'panel-ship', u.side)}<h2 class="unit-name">${a && u.type === 'flagship' ? a.hull : t.name}</h2><p class="description">${a && u.type === 'flagship' ? t.name + ' · ' : ''}${t.desc}</p><div class="hp-row">${ICONS.hp(u.hp, E.maxHP(u), 'hp-ring-lg')}<span>Hull integrity</span><span class="mono">${Math.ceil(u.hp)} / ${E.maxHP(u)}</span></div><div class="stat-grid"><div><span class="label">${ICONS.use('atk')} Attack</span><b>${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</b></div><div><span class="label">${ICONS.use('def')} Armor</span><b>${t.armor}</b></div><div><span class="label">${ICONS.use('mov')} Move</span><b>${E.movement(game, u)}</b></div><div><span class="label">${ICONS.use('rng')} Range</span><b>${t.min === t.max ? t.max : t.min + '–' + t.max}</b></div><div><span class="label">Stack</span><b>${u.stack}/${t.elite ? 1 : 3}</b></div><div><span class="label">Veteran</span><b>${u.xp}/5</b></div></div><div class="status-line"><span class="status ${u.moved ? 'spent' : 'ready'}">${u.moved ? 'Moved' : 'Move ready'}</span><span class="status ${u.attacked ? 'spent' : 'ready'}">${u.attacked ? 'Fired' : 'Fire ready'}</span><span class="status">${moraleName(u.morale)}</span></div>${a ? `<div class="admiral-card">${ART.portrait(u.admiral)}<b>★ ${a.name}</b><p>${a.skill} · ${a.desc}</p></div>` : ''}${ours ? `<div class="actions">${!a ? '<button data-action="assign">Assign admiral <small>Choose officer</small></button>' : ''}${a?.trait === 'magician' ? `<button data-action="confuse" ${!interactive() || u.confusionCD > 0 ? 'disabled' : ''}>Confusion <small>${u.confusionCD ? 'Ready in ' + u.confusionCD + ' turns' : '−2 morale · 2 hex radius'}</small></button>` : ''}<button data-action="reinforce" ${!interactive() || t.elite || u.stack >= 3 || u.moved || u.attacked ? 'disabled' : ''}>Add a stack <small>${costHTML(E.reinforceCost(u.type))}</small></button><button data-action="repair" ${!interactive() || u.moved || u.attacked || u.hp >= E.maxHP(u) ? 'disabled' : ''}>Repair fleet <small>+35% HP · ${costHTML({ credits: E.repairCost(u) })}</small></button><button data-action="wait" ${!interactive() || u.attacked ? 'disabled' : ''}>Hold position <small>Finish this fleet’s turn</small></button></div><p class="description" style="font-size:11px">Repair and stacking require a friendly station within 1 hex and consume this fleet’s turn.</p>` : ''}${st ? `<div class="section-divider"><span class="label">Station beneath fleet</span><div class="station-buttons"><button data-station="${st.id}">${st.name} · Tier ${st.tier}</button>${st.owner === game.player ? `<button data-shop="${st.id}" ${!interactive() ? 'disabled' : ''}>Shipyard</button>` : ''}</div></div>` : ''}</section>`;
+    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${t.branch}</span><span class="chip" style="color:${E.FACTIONS[u.side].color}">${E.FACTIONS[u.side].short}</span></div>${ART.ship(u.type, 'panel-ship', artSide(u))}<h2 class="unit-name">${a && u.type === 'flagship' ? a.hull : t.name}</h2><p class="description">${a && u.type === 'flagship' ? t.name + ' · ' : ''}${t.desc}</p><div class="hp-row">${ICONS.hp(u.hp, E.maxHP(u), 'hp-ring-lg')}<span>Hull integrity</span><span class="mono">${Math.ceil(u.hp)} / ${E.maxHP(u)}</span></div><div class="stat-grid"><div><span class="label">${ICONS.use('atk')} Attack</span><b>${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</b></div><div><span class="label">${ICONS.use('def')} Armor</span><b>${t.armor}</b></div><div><span class="label">${ICONS.use('mov')} Move</span><b>${E.movement(game, u)}</b></div><div><span class="label">${ICONS.use('rng')} Range</span><b>${t.min === t.max ? t.max : t.min + '–' + t.max}</b></div><div><span class="label">Stack</span><b>${u.stack}/${t.elite ? 1 : 3}</b></div><div><span class="label">Veteran</span><b>${u.xp}/5</b></div></div><div class="status-line"><span class="status ${u.moved ? 'spent' : 'ready'}">${u.moved ? 'Moved' : 'Move ready'}</span><span class="status ${u.attacked ? 'spent' : 'ready'}">${u.attacked ? 'Fired' : 'Fire ready'}</span><span class="status">${moraleName(u.morale)}</span></div>${a ? `<div class="admiral-card">${ART.portrait(u.admiral)}<b>★ ${a.name}</b><p>${a.skill} · ${a.desc}</p></div>` : ''}${ours ? `<div class="actions">${!a ? '<button data-action="assign">Assign admiral <small>Choose officer</small></button>' : ''}${a?.trait === 'magician' ? `<button data-action="confuse" ${!interactive() || u.confusionCD > 0 ? 'disabled' : ''}>Confusion <small>${u.confusionCD ? 'Ready in ' + u.confusionCD + ' turns' : '−2 morale · 2 hex radius'}</small></button>` : ''}<button data-action="reinforce" ${!interactive() || t.elite || u.stack >= 3 || u.moved || u.attacked ? 'disabled' : ''}>Add a stack <small>${costHTML(E.reinforceCost(u.type))}</small></button><button data-action="repair" ${!interactive() || u.moved || u.attacked || u.hp >= E.maxHP(u) ? 'disabled' : ''}>Repair fleet <small>+35% HP · ${costHTML({ credits: E.repairCost(u) })}</small></button><button data-action="wait" ${!interactive() || u.attacked ? 'disabled' : ''}>Hold position <small>Finish this fleet’s turn</small></button></div><p class="description" style="font-size:11px">Repair and stacking require a friendly station within 1 hex and consume this fleet’s turn.</p>` : ''}${st ? `<div class="section-divider"><span class="label">Station beneath fleet</span><div class="station-buttons"><button data-station="${st.id}">${st.name} · Tier ${st.tier}</button>${st.owner === game.player ? `<button data-shop="${st.id}" ${!interactive() ? 'disabled' : ''}>Shipyard</button>` : ''}</div></div>` : ''}</section>`;
   } else if (s) {
     const ours = s.owner === game.player;
-    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${s.capital ? 'Capital' : s.fort ? 'Orbital fortress' : 'Sector hub'}</span><span class="chip" style="color:${E.FACTIONS[s.owner].color}">${E.FACTIONS[s.owner].short}</span></div>${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station', 'panel-ship')}<h2 class="unit-name">${s.name}</h2><p class="description">${s.fort ? 'Fortress defenses protect this strategic corridor.' : s.capital ? 'The seat of government and a major industrial center.' : 'Capture and hold this station to fund your fleets.'}</p><div class="hp-row"><span>Station defenses</span><span class="mono">${Math.ceil(s.shield)} / ${s.maxShield}</span></div><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%;background:${E.FACTIONS[s.owner].color}"></i></div><div class="stat-grid"><div><span class="label">${ICONS.use('credits')} Credits</span><b>+${s.income}</b></div><div><span class="label">${ICONS.use('industry')} Industry</span><b>+${s.industry}</b></div><div><span class="label">${ICONS.use('research')} Research</span><b>+${s.science}</b></div></div><div class="info-strip">Shipyard tier ${s.tier} / 3<br>${s.tier === 3 ? 'All hull classes available' : s.tier === 2 ? 'Escorts, cruisers, and artillery cruisers' : 'Corvettes, frigates, light cruisers, and artillery frigates'}</div>${ours ? `<div class="actions"><button class="primary" data-shop="${s.id}" ${!interactive() || s.producedTurn === game.turn ? 'disabled' : ''}>${s.producedTurn === game.turn ? 'Production complete this turn' : 'Open shipyard'}<small>Build a fleet</small></button><button data-action="upgrade" ${!interactive() || s.tier >= 3 ? 'disabled' : ''}>Upgrade shipyard<small>${s.tier >= 3 ? 'Maximum tier' : costHTML(E.upgradeCost(s))}</small></button></div><p class="description">One fleet per station per turn. New fleets act next turn. Garrisons repair 8% hull here each turn.</p>` : '<p class="description">Reduce defenses to zero and eliminate any garrison, then enter with an Escort or Battle Line unit to capture. Artillery cannot capture stations.</p>'}</section>`;
+    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${s.capital ? 'Capital' : s.fort ? 'Orbital fortress' : 'Sector hub'}</span><span class="chip" style="color:${E.FACTIONS[s.owner].color}">${E.FACTIONS[s.owner].short}</span></div>${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station', 'panel-ship')}<h2 class="unit-name">${s.name}</h2><p class="description">${s.fort ? 'Fortress defenses protect this strategic corridor.' : s.capital ? 'The seat of government and a major industrial center.' : 'Capture and hold this station to fund your fleets.'}</p><div class="hp-row"><span>Station defenses</span><span class="mono">${Math.ceil(s.shield)} / ${s.maxShield}</span></div><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%;background:${E.FACTIONS[s.owner].color}"></i></div><div class="stat-grid"><div><span class="label">${ICONS.use('credits')} Credits</span><b>+${s.income}</b></div><div><span class="label">${ICONS.use('industry')} Industry</span><b>+${s.industry}</b></div><div><span class="label">${ICONS.use('research')} Research</span><b>+${s.science}</b></div></div>${fortressPanel(s)}<div class="buildings">${Object.entries(
+      E.BUILDINGS,
+    )
+      .map(([k, b]) => {
+        const l = E.buildingLevel(s, k);
+        return `<div class="building"><span class="label">${ICONS.use(k === 'shipyard' ? 'industry' : k === 'lab' ? 'research' : 'airbase')} ${b.name}</span><span class="level">${'▮'.repeat(l)}${'▯'.repeat(3 - l)}</span><small>${b.desc}</small>${ours ? `<button class="small" data-build="${k}" data-station-id="${s.id}" ${!interactive() || l >= 3 ? 'disabled' : ''}>${l >= 3 ? 'Maximum level' : (l ? 'Upgrade to ' : 'Build level ') + (l + 1)} <small>${l >= 3 ? '' : costHTML(E.buildCost(s, k))}</small></button>` : ''}</div>`;
+      })
+      .join(
+        '',
+      )}</div>${ours ? `<div class="actions"><button class="primary" data-shop="${s.id}" ${!interactive() || s.producedTurn === game.turn ? 'disabled' : ''}>${s.producedTurn === game.turn ? 'Production complete this turn' : 'Open shipyard'}<small>Build a fleet</small></button></div><p class="description">One fleet per station per turn. New fleets act next turn. Garrisons repair 8% hull here each turn.</p>` : '<p class="description">Reduce defenses to zero and eliminate any garrison, then enter with an Escort or Battle Line unit to capture. Artillery cannot capture stations.</p>'}</section>`;
   } else {
     main = `<section>${fleetPicker}<div class="empty-panel"><span class="eyebrow">Command the frontier</span><h3>Position.<br>Concentrate.<br>Break through.</h3><p class="description">Select a fleet to see its movement and attack range. Select a station to build new ships.</p><div class="info-strip">Green hexes move, red hexes attack with one click. Undo takes back a move until the fleet fires. A Battle Line kill can refresh both actions.</div><button data-action="next">Select a ready fleet</button></div></section>`;
   }
@@ -187,6 +231,20 @@ function panel() {
       .map(l => `<p class="dispatch"><b>T${l.turn}</b> ${esc(l.text)}</p>`)
       .join('')}</section>`
   );
+}
+function fortressPanel(s) {
+  if (!s.fort) return '';
+  const ours = s.owner === game.player,
+    ready = E.fortressReady(game, s),
+    status =
+      s.shield <= 0
+        ? 'Offline: shields down'
+        : (s.gunReady || 0) > game.turn
+          ? `Recharging · ready on turn ${s.gunReady}`
+          : ours
+            ? 'Ready to fire'
+            : 'Charged';
+  return `<div class="target-box fortress-gun"><span class="label">Fortress main gun</span><h3>${E.fortressName(s)}</h3><p>Range ${E.FORTRESS_GUN.range} · ${Math.round(E.FORTRESS_GUN.share * 100)}% of the target's hull · recharges for ${E.FORTRESS_GUN.recharge} turns. Silenced while shields are down.</p><p><b>${status}</b>${ours && ready && interactive() ? (targetCache.size ? ' — click a red hex to fire.' : ' — no enemy fleet in range.') : ''}</p></div>`;
 }
 function terrainDescription(t) {
   return t.terrain === 'nebula'
@@ -281,6 +339,7 @@ async function endTurn(force = false) {
   E.beginTurn(game, enemy, game.turn > 1);
   turnStartPopups(before, enemy);
   E.aiProduction(game);
+  (game.strikes || []).forEach((s, i) => strikeEffects(s, i * 0.5));
   render();
   if (game.strikes?.length) await pause(1100);
   const ids = game.units.filter(u => u.hp > 0 && u.side === enemy && !u.attacked).map(u => u.id);
@@ -321,7 +380,16 @@ async function endTurn(force = false) {
 }
 function resultDialog() {
   const win = game.over.winner === game.player;
-  modal.innerHTML = `<div class="overlay"><section class="dialog narrow" role="dialog" aria-modal="true" aria-label="Operation result"><div class="eyebrow">${win ? 'Operation successful' : game.over.winner === 'draw' ? 'Armistice' : 'Operation ended'}</div><h2>${win ? 'The galaxy remembers.' : game.over.winner === 'draw' ? 'A fragile peace.' : 'The fleet’s last order.'}</h2><p>${game.over.reason}</p><div class="result-numbers"><div><b>${game.turn}</b><small>Turns elapsed</small></div><div><b>${game.stations.filter(s => s.owner === game.player).length}</b><small>Stations held</small></div><div><b>${ownUnits().length}</b><small>Fleets remaining</small></div></div><div class="dialog-footer"><button data-action="close">Inspect battlefield</button><button class="primary" data-action="new">New operation</button></div></section></div>`;
+  if (win && game.mode !== 'conquest' && game.over.stars) {
+    const best = bestStars();
+    if ((best[game.mode] || 0) < game.over.stars) {
+      best[game.mode] = game.over.stars;
+      try {
+        localStorage.setItem('galactic-command-stars', JSON.stringify(best));
+      } catch (e) {}
+    }
+  }
+  modal.innerHTML = `<div class="overlay"><section class="dialog narrow" role="dialog" aria-modal="true" aria-label="Operation result"><div class="eyebrow">${win ? 'Operation successful' : game.over.winner === 'draw' ? 'Armistice' : 'Operation ended'}</div><h2>${win ? 'The galaxy remembers.' : game.over.winner === 'draw' ? 'A fragile peace.' : 'The fleet’s last order.'}</h2>${game.mode !== 'conquest' ? `<div class="star-rating" aria-label="${win ? game.over.stars : 0} of 3 stars">${starText(win ? game.over.stars || 1 : 0)}</div>` : ''}<p>${game.over.reason}</p><div class="result-numbers"><div><b>${game.turn}</b><small>Turns elapsed</small></div><div><b>${game.stations.filter(s => s.owner === game.player).length}</b><small>Stations held</small></div><div><b>${ownUnits().length}</b><small>Fleets remaining</small></div></div><div class="dialog-footer"><button data-action="close">Inspect battlefield</button><button class="primary" data-action="new">New operation</button></div></section></div>`;
   focusDialog();
 }
 function openShop(id, branch = shop.branch) {
@@ -330,7 +398,7 @@ function openShop(id, branch = shop.branch) {
   shop.station = id;
   shop.branch = branch;
   const free = E.recruitOptions(game, s, game.player);
-  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Shipyard"><div class="dialog-head"><div><div class="eyebrow">${E.FACTIONS[s.owner].name} · ${s.name} · Shipyard tier ${s.tier}</div><h2>Commission a fleet</h2><p>${costHTML({ credits: game.economy[game.player].credits, industry: game.economy[game.player].industry }, true)}</p></div><button class="small close" data-action="close">Close</button></div><div class="toolbar-row"><div class="tabs">${['Escort', 'Battle Line', 'Artillery'].map(b => `<button data-branch="${b}" class="${b === branch ? 'active' : ''}">${b}</button>`).join('')}</div><div><label for="stack-select">Fleet strength &nbsp;</label><select class="select" id="stack-select">${[1, 2, 3].map(n => `<option value="${n}" ${shop.stack === n ? 'selected' : ''}>${n} ${n === 1 ? 'stack' : 'stacks'}</option>`).join('')}</select></div></div>${s.producedTurn === game.turn ? '<div class="info-strip">This shipyard has completed production for this turn.</div>' : !free.length ? '<div class="info-strip">No free deployment hex. Move friendly fleets away from the station.</div>' : '<p class="description">One fleet per station per turn. Deployment uses the station hex, or a free adjacent hex. New fleets act next turn.</p>'}<div class="cards">${Object.entries(
+  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Shipyard"><div class="dialog-head"><div><div class="eyebrow">${E.FACTIONS[s.owner].name} · ${s.name} · Shipyard tier ${s.tier}</div><h2>Commission a fleet</h2><p>${costHTML({ credits: game.economy[game.player].credits, industry: game.economy[game.player].industry }, true)}</p></div><button class="small close" data-action="close">Close</button></div><div class="toolbar-row"><div class="tabs">${['Escort', 'Battle Line', 'Artillery', 'Air'].map(b => `<button data-branch="${b}" class="${b === branch ? 'active' : ''}">${b}</button>`).join('')}</div><div><label for="stack-select">Fleet strength &nbsp;</label><select class="select" id="stack-select">${[1, 2, 3].map(n => `<option value="${n}" ${shop.stack === n ? 'selected' : ''}>${n} ${n === 1 ? 'stack' : 'stacks'}</option>`).join('')}</select></div></div>${s.producedTurn === game.turn ? '<div class="info-strip">This shipyard has completed production for this turn.</div>' : !free.length ? '<div class="info-strip">No free deployment hex. Move friendly fleets away from the station.</div>' : '<p class="description">One fleet per station per turn. Deployment uses the station hex, or a free adjacent hex. New fleets act next turn.</p>'}<div class="cards">${Object.entries(
     E.TYPES,
   )
     .filter(([k, t]) => t.branch === branch)
@@ -338,7 +406,7 @@ function openShop(id, branch = shop.branch) {
       const n = t.elite ? 1 : shop.stack,
         p = E.price(k, n),
         can = E.canBuy(game, s, k, n);
-      return `<article class="unit-card ${s.tier < t.tier ? 'locked' : ''}">${ART.ship(k, 'catalog-ship', s.owner)}<span class="unit-code">${t.code} · Tier ${t.tier} · ×${n}</span><h3>${t.name}</h3>${t.weapon ? `<span class="weapon-focus">${t.weapon}</span>` : ''}<p>${t.desc}</p><div class="unit-spec"><span>HP ${Math.round(t.hp * (1 + 0.7 * (n - 1)))}</span><span>${ICONS.use('atk')}${Math.round(t.attack * (1 + 0.45 * (n - 1)))}</span><span>${ICONS.use('def')}${t.armor}</span><span>${ICONS.use('mov')}${t.move}</span><span>${ICONS.use('rng')}${t.min === t.max ? t.max : t.min + '–' + t.max}</span></div><div class="cost">${costHTML(p)}</div><button data-recruit="${k}" ${!can ? 'disabled' : ''}>${s.tier < t.tier ? 'Requires shipyard tier ' + t.tier : t.elite ? 'Commission fleet · 1 stack' : 'Commission fleet'}</button></article>`;
+      return `<article class="unit-card ${(t.air ? s.air || 0 : s.tier) < t.tier ? 'locked' : ''}">${ART.ship(k, 'catalog-ship', s.owner)}<span class="unit-code">${t.code} · Tier ${t.tier} · ×${n}</span><h3>${t.name}</h3>${t.weapon ? `<span class="weapon-focus">${t.weapon}</span>` : ''}<p>${t.desc}</p><div class="unit-spec"><span>HP ${Math.round(t.hp * (1 + 0.7 * (n - 1)))}</span><span>${ICONS.use('atk')}${Math.round(t.attack * (1 + 0.45 * (n - 1)))}</span><span>${ICONS.use('def')}${t.armor}</span><span>${ICONS.use('mov')}${t.move}</span><span>${ICONS.use('rng')}${t.min === t.max ? t.max : t.min + '–' + t.max}</span></div><div class="cost">${costHTML(p)}</div><button data-recruit="${k}" ${!can ? 'disabled' : ''}>${t.air && (s.air || 0) < t.tier ? 'Requires air base level ' + t.tier : !t.air && s.tier < t.tier ? 'Requires shipyard tier ' + t.tier : t.elite ? 'Commission fleet · 1 stack' : 'Commission fleet'}</button></article>`;
     })
     .join('')}</div></section></div>`;
   focusDialog();
@@ -366,14 +434,15 @@ function admiralDialog() {
   )
     .filter(([k, a]) => a.side === game.player)
     .map(([k, a]) => {
-      const assigned = game.units.find(v => v.hp > 0 && v.admiral === k);
-      return `<section class="officer">${ART.portrait(k, 'officer-portrait')}<span class="stars">${'★'.repeat(a.stars)}</span><h3>${a.name}</h3><span class="label">${a.role} · ${a.skill}</span><p>${a.desc}</p><button data-admiral="${k}" ${assigned || !eligible || game.economy[game.player].credits < a.cost ? 'disabled' : ''}>${assigned ? 'Assigned to ' + E.TYPES[assigned.type].short : eligible ? 'Assign · ' + costHTML({ credits: a.cost }) : costHTML({ credits: a.cost }) + ' · Select an unassigned fleet'}</button></section>`;
+      const assigned = game.units.find(v => v.hp > 0 && v.admiral === k),
+        fallen = (game.retired || []).includes(k);
+      return `<section class="officer">${ART.portrait(k, 'officer-portrait')}<span class="stars">${'★'.repeat(a.stars)}</span><h3>${a.name}</h3><span class="label">${a.role} · ${a.skill}</span><p>${a.desc}</p><button data-admiral="${k}" ${assigned || fallen || !eligible || game.economy[game.player].credits < a.cost ? 'disabled' : ''}>${fallen ? 'Fallen in this era' : assigned ? 'Assigned to ' + E.TYPES[assigned.type].short : eligible ? 'Assign · ' + costHTML({ credits: a.cost }) : costHTML({ credits: a.cost }) + ' · Select an unassigned fleet'}</button></section>`;
     })
     .join('')}</div></section></div>`;
   focusDialog();
 }
 function archiveDialog(branch = 'Escort') {
-  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Unit archive"><div class="dialog-head"><div><div class="eyebrow">Order of battle</div><h2>The fleet arsenal</h2><p>${E.FACTIONS[game.player].name} hulls. Values shown for one stack.</p></div><button class="small close" data-action="close">Close</button></div><div class="tabs">${['Escort', 'Battle Line', 'Artillery'].map(b => `<button data-archive-branch="${b}" class="${b === branch ? 'active' : ''}">${b}</button>`).join('')}</div><div class="cards">${Object.entries(
+  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Unit archive"><div class="dialog-head"><div><div class="eyebrow">Order of battle</div><h2>The fleet arsenal</h2><p>${E.FACTIONS[game.player].name} hulls. Values shown for one stack.</p></div><button class="small close" data-action="close">Close</button></div><div class="tabs">${['Escort', 'Battle Line', 'Artillery', 'Air'].map(b => `<button data-archive-branch="${b}" class="${b === branch ? 'active' : ''}">${b}</button>`).join('')}</div><div class="cards">${Object.entries(
     E.TYPES,
   )
     .filter(([k, t]) => t.branch === branch)
@@ -385,7 +454,7 @@ function archiveDialog(branch = 'Escort') {
   focusDialog();
 }
 function helpDialog() {
-  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Field manual"><div class="dialog-head"><div><div class="eyebrow">Field manual</div><h2>War on a hex grid</h2></div><button class="small close" data-action="help-close">Close</button></div><div class="help-grid"><div><b>Movement & firing</b><p>Every fleet can move once, then attack once per turn. Attacking spends its movement too. Select a fleet, click a green hex to move, and click a red hex to attack at once; hover a red hex to see the expected damage. Undo (Z) returns a fleet that moved but has not fired.</p></div><div><b>Capture stations</b><p>Destroy station defenses and remove its garrison, then move an Escort or Battle Line fleet onto the hex. Artillery cannot capture. Friendly stations produce resources and repair garrisons by 8% HP each turn.</p></div><div><b>Artillery & counter-fire</b><p>Artillery Frigates fire at range 1. Artillery Cruisers and Siege Cannons fire at exactly 2 hexes and cannot hit adjacent targets, so screen them with escorts. Artillery Cruisers splash enemies next to the target for 45% damage; Siege Cannons deal +100% station damage. All artillery attacks suppress enemy counter-fire. Escorts and Battle Line hulls exchange counter-fire when in range. Only Battleships and Dreadnoughts have range 2 in the Battle Line; all escorts and other cruisers have range 1.</p></div><div><b>Stacking & breakthroughs</b><p>Build 1–3-stack fleets. Each extra stack adds 70% HP and 45% attack. Add stacks near friendly stations. Battle Line kills refresh movement and fire once per turn; Mittermeyer and Attenborough allow two refreshes.</p></div><div><b>Admirals & morale</b><p>Attach officers to any fleet; specialty bonuses use their listed branch. High morale grants +25% damage; low −25%, diminished −50%. Confused fleets cannot act or retaliate. Two adjacent enemies lower morale; three diminish it. Yang’s Confusion reduces nearby enemy morale by 2.</p></div><div><b>Terrain & supply</b><p>Nebulae cost 2 movement and cause 2.5% attrition each turn. Asteroids cost 2 movement and reduce damage by 15%. Yang ignores terrain movement costs. Gravity rifts are impassable. Capture the three crossings to invade the other side.</p></div><div><b>Shipyards & research</b><p>Each station builds one fleet per turn. New units act next turn. Upgrade yards through tier 3 to unlock heavy hulls. Research applies immediately to your entire fleet. Artillery unlocks in order: Artillery Frigates at tier 1, Artillery Cruisers at tier 2, Siege Cannons at tier 3.</p></div><div><b>Fortresses & Thor's Hammer</b><p>Iserlohn and Geiersburg fire their main guns at the start of their owner's turn, hitting the strongest enemy fleet within 2 hexes for 30% of its hull and lowering its morale. Knock a fortress's shields to zero to silence the gun.</p></div><div><b>Economy</b><p>A turn's income buys roughly one cruiser. Escorts give the most firepower per credit; flagships are the strongest ships per hex but cost about two turns of income. Extra stacks cost 85% of a hull, reinforcing in the field costs a full hull, and repairs cost a fifth of the fleet's price.</p></div><div><b>Your objectives</b><p>Conquest: hold both capitals, or hold more stations at the 50-turn armistice. Iserlohn: capture the fortress within 18 turns. Difficulties change starting resources and enemy income, not the combat rules.</p></div></div><div class="info-strip">Controls: N cycles ready fleets · Click or Enter on a red hex attacks · Z undoes the last move · Escape clears the selection or closes a menu · Arrow keys move the hex cursor and Enter selects · Drag or WASD pans · Scroll / + / − zooms · 0 fits the map.</div><p style="font-size:12px">Unofficial fan game. Original code and alternate-history scenarios, using the requested ship-class mappings. Gameplay draws on <a href="https://apps.apple.com/sg/app/world-conqueror-4/id1258468290" target="_blank" rel="noopener noreferrer">EasyTech’s World Conqueror 4</a>; <a href="https://world-conqueror-4.fandom.com/wiki/Units" target="_blank" rel="noopener noreferrer">unit reference</a>. Numbers and some abilities are adapted for this game.</p></section></div>`;
+  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Field manual"><div class="dialog-head"><div><div class="eyebrow">Field manual</div><h2>War on a hex grid</h2></div><button class="small close" data-action="help-close">Close</button></div><div class="help-grid"><div><b>Movement & firing</b><p>Every fleet can move once, then attack once per turn. Attacking spends its movement too. Select a fleet, click a green hex to move, and click a red hex to attack at once; hover a red hex to see the expected damage. Undo (Z) returns a fleet that moved but has not fired.</p></div><div><b>Capture stations</b><p>Destroy station defenses and remove its garrison, then move an Escort or Battle Line fleet onto the hex. Artillery cannot capture. Friendly stations produce resources and repair garrisons by 8% HP each turn.</p></div><div><b>Artillery & counter-fire</b><p>Artillery Frigates fire at range 1. Artillery Cruisers and Siege Cannons fire at exactly 2 hexes and cannot hit adjacent targets, so screen them with escorts. Artillery Cruisers splash enemies next to the target for 45% damage; Siege Cannons deal +100% station damage. All artillery attacks suppress enemy counter-fire. Escorts and Battle Line hulls exchange counter-fire when in range. Only Battleships and Dreadnoughts have range 2 in the Battle Line; all escorts and other cruisers have range 1.</p></div><div><b>Stacking & breakthroughs</b><p>Build 1–3-stack fleets. Each extra stack adds 70% HP and 45% attack. Add stacks near friendly stations. Battle Line kills refresh movement and fire once per turn; Mittermeyer and Attenborough allow two refreshes.</p></div><div><b>Admirals & morale</b><p>Attach officers to any fleet; specialty bonuses use their listed branch. High morale grants +25% damage; low −25%, diminished −50%. Confused fleets cannot act or retaliate. Two adjacent enemies lower morale; three diminish it. Yang’s Confusion reduces nearby enemy morale by 2.</p></div><div><b>Terrain & supply</b><p>Nebulae cost 2 movement and cause 2.5% attrition each turn. Asteroids cost 2 movement and reduce damage by 15%. Yang ignores terrain movement costs. Gravity rifts are impassable. Capture the three crossings to invade the other side.</p></div><div><b>Shipyards & research</b><p>Each station builds one fleet per turn. New units act next turn. Upgrade yards through tier 3 to unlock heavy hulls. Research applies immediately to your entire fleet. Artillery unlocks in order: Artillery Frigates at tier 1, Artillery Cruisers at tier 2, Siege Cannons at tier 3.</p></div><div><b>Fortresses & Thor's Hammer</b><p>Iserlohn and Geiersburg carry main guns. Select your fortress and click a red hex to fire at an enemy fleet within 3 hexes for 40% of its hull and a morale hit. The gun then recharges for 2 turns and is silenced while the fortress shields are down. The enemy fires its fortresses the same way.</p></div><div><b>Station buildings</b><p>Every station has a Shipyard (unlocks larger hulls, +10 industry per level), a Research station (+8 research per level) and an Air base (air wings). Each upgrades to level 3 from the station panel.</p></div><div><b>Air wings</b><p>Air bases build Fighter wings (level 1), Bomber wings (level 2) and Strategic Bomber wings (level 3). Air wings ignore terrain and cannot capture. Fighters deal +60% to air, bombers +40% to Battle Line and Artillery hulls, strategic bombers +120% to station defenses. Only escorts and fighters return fire against air wings, escorts deal +50% to them, and artillery cannot target them. Wings lose 10% hull each turn they start more than 3 hexes from a friendly air base.</p></div><div><b>Start dates & scenarios</b><p>Conquest offers the standard frontier plus four start dates: Astarte, the Amritsar offensive, the Lippstadt War (rebel stations and garrisons on both sides) and Operation Ragnarök. Scenarios have one objective, a turn limit and a 1–3 star rating; your best rating is shown in the operation list.</p></div><div><b>Economy</b><p>A turn's income buys roughly one cruiser. Escorts give the most firepower per credit; flagships are the strongest ships per hex but cost about two turns of income. Extra stacks cost 85% of a hull, reinforcing in the field costs a full hull, and repairs cost a fifth of the fleet's price.</p></div><div><b>Your objectives</b><p>Conquest: hold both capitals, or hold more stations at the 50-turn armistice. Scenarios: complete the objective before the turn limit; finish faster, or with more fleets intact when holding, for more stars. Difficulties change starting resources and enemy income, not the combat rules.</p></div></div><div class="info-strip">Controls: N cycles ready fleets · Click or Enter on a red hex attacks · Z undoes the last move · Escape clears the selection or closes a menu · Arrow keys move the hex cursor and Enter selects · Drag or WASD pans · Scroll / + / − zooms · 0 fits the map.</div><p style="font-size:12px">Unofficial fan game. Original code and alternate-history scenarios, using the requested ship-class mappings. Gameplay draws on <a href="https://apps.apple.com/sg/app/world-conqueror-4/id1258468290" target="_blank" rel="noopener noreferrer">EasyTech’s World Conqueror 4</a>; <a href="https://world-conqueror-4.fandom.com/wiki/Units" target="_blank" rel="noopener noreferrer">unit reference</a>. Numbers and some abilities are adapted for this game.</p></section></div>`;
   focusDialog();
 }
 function menuDialog() {
@@ -447,8 +516,24 @@ function changeZoom(factor, anchor) {
     pan.y += anchor.y - (wy * newScale + offset.y);
   }
 }
+function fireFortressAt(s, p) {
+  const before = unitSnapshot(),
+    r = E.fireFortress(game, s.id, p.c, p.r);
+  if (!r.ok) {
+    toast(r.reason);
+    return;
+  }
+  strikeEffects(r);
+  moralePopups(before);
+  refreshAndSave();
+}
 function activateHex(p) {
   if (!p) return;
+  const fort = selectedStation();
+  if (fort && interactive() && targetCache.has(E.key(p))) {
+    fireFortressAt(fort, p);
+    return;
+  }
   const u = selectedUnit(),
     hit = E.unitAt(game, p),
     station = E.stationAt(game, p);
@@ -508,10 +593,14 @@ function attachMap() {
       const u = E.unitAt(game, hover),
         s = E.stationAt(game, hover),
         own = selectedUnit(),
+        fort = selectedStation(),
         pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null;
-      $('map-caption').textContent = pr
-        ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
-        : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
+      $('map-caption').textContent =
+        fort && u && targetCache.has(E.key(hover))
+          ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u)} damage`
+          : pr
+            ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
+            : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
     }
   };
   canvas.onpointerup = e => {
@@ -530,7 +619,16 @@ function attachMap() {
   };
   canvas.oncontextmenu = e => e.preventDefault();
 }
-const HEAVY_SHAKE = { siege: 10, battleship: 6, flagship: 7, missile: 4, heavy: 2.5, light: 1.5 };
+const HEAVY_SHAKE = {
+  siege: 10,
+  battleship: 6,
+  flagship: 7,
+  strategic: 6,
+  missile: 4,
+  bomber: 3,
+  heavy: 2.5,
+  light: 1.5,
+};
 function bump(amount) {
   if (!reducedMotion()) shake = Math.max(shake, amount);
 }
@@ -567,8 +665,7 @@ function turnStartPopups(before, side) {
   for (const u of game.units) {
     const b = before.get(u.id);
     if (!b || u.hp <= 0 || struck.has(u.id)) continue;
-    if (u.side === side && u.hp < b.hp && E.tile(game, u.c, u.r).terrain === 'nebula')
-      popup(u, `LOW SUPPLY −${Math.round(b.hp - u.hp)}`, '#f2b35c', { life: 2.1 });
+    if (u.side === side && u.hp < b.hp) popup(u, `LOW SUPPLY −${Math.round(b.hp - u.hp)}`, '#f2b35c', { life: 2.1 });
     if (u.morale < b.morale) popup(u, moraleLabel(u.morale), '#d9a6ff', { dy: 30, life: 2.1 });
   }
   (game.strikes || []).forEach((s, i) => strikeEffects(s, i * 0.5));
@@ -652,7 +749,12 @@ function frame(time) {
 let helpBack = 'game';
 document.addEventListener('change', e => {
   const id = e.target.id;
-  if (id === 'mode-select') setup.mode = e.target.value;
+  if (id === 'mode-select') {
+    setup.mode = e.target.value;
+    setup.difficulty = $('difficulty-select').value;
+    startMenu();
+    $('mode-select')?.focus();
+  }
   if (id === 'difficulty-select') setup.difficulty = e.target.value;
   if (id === 'fleet-select' && e.target.value) selectUnit(+e.target.value, true);
   if (id === 'station-select' && e.target.value) selectStation(+e.target.value, true);
@@ -682,6 +784,10 @@ document.addEventListener('click', e => {
   }
   if (d.branch) {
     openShop(shop.station, d.branch);
+    return;
+  }
+  if (d.build) {
+    doAction(() => E.build(game, +d.stationId, d.build));
     return;
   }
   if (d.archiveBranch) {
@@ -803,7 +909,7 @@ document.addEventListener('click', e => {
     }
     case 'upgrade': {
       const s = selectedStation();
-      if (s) doAction(() => E.upgrade(game, s.id));
+      if (s) doAction(() => E.build(game, s.id, 'shipyard'));
       break;
     }
     case 'wait': {
@@ -941,7 +1047,7 @@ function dockHTML() {
       a = E.ADMIRALS[u.admiral],
       ours = u.side === game.player,
       canUndo = ours && interactive() && undoStack.at(-1)?.unitId === u.id;
-    return `<div class="dock-visual">${ART.ship(u.type, '', u.side)}${a ? ART.portrait(u.admiral, 'dock-portrait') : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : 'A'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${u.attacked ? 'Orders complete' : moraleName(u.morale)}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? `<button class="small" data-action="confuse" ${!interactive() || u.confusionCD > 0 ? 'disabled' : ''}>Confusion${u.confusionCD ? ' · ' + u.confusionCD : ''}</button>` : ''}${ours ? `<button class="small ghost" data-action="wait" ${!interactive() || u.attacked ? 'disabled' : ''}>Hold position</button>` : ''}</div>`;
+    return `<div class="dock-visual">${ART.ship(u.type, '', artSide(u))}${a ? ART.portrait(u.admiral, 'dock-portrait') : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : u.side === 'alliance' ? 'A' : 'R'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${u.attacked ? 'Orders complete' : moraleName(u.morale)}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? `<button class="small" data-action="confuse" ${!interactive() || u.confusionCD > 0 ? 'disabled' : ''}>Confusion${u.confusionCD ? ' · ' + u.confusionCD : ''}</button>` : ''}${ours ? `<button class="small ghost" data-action="wait" ${!interactive() || u.attacked ? 'disabled' : ''}>Hold position</button>` : ''}</div>`;
   }
   if (s) {
     const ours = s.owner === game.player;
@@ -949,7 +1055,9 @@ function dockHTML() {
   }
   return `<div class="dock-idle"><span class="label">Fleet command</span><strong>Select a fleet or station</strong><p>Click a ship to move and attack. Click a station to build.</p></div><div class="dock-actions"><button class="small" data-action="next">Select a ready fleet</button><button class="small ghost" data-action="details">Fleet directory</button></div>`;
 }
+const artSide = u => u.art || (u.side === 'neutral' ? 'empire' : u.side);
 const PLATE = {
+  neutral: { light: '#7a7290', mid: '#3d3850', dark: '#1f1b2b', trim: '#c9c2d8', bar: '#b0a8c2' },
   empire: { light: '#3a4f8c', mid: '#16244f', dark: '#0a1430', trim: '#e6c56a', bar: '#d9b45a' },
   alliance: { light: '#a3333f', mid: '#5c1219', dark: '#33070c', trim: '#d3dbe2', bar: '#c4ccd3' },
 };
@@ -1351,11 +1459,19 @@ function draw(time, dt) {
     ctx.shadowBlur = 5;
     ctx.shadowOffsetY = 4;
     for (let i = Math.min(u.stack - 1, 2); i >= 0; i--)
-      ART.drawShip(ctx, u.type, u.side, (i ? i * 7 : 0) - 2, -6 - i * 8, size * (i ? 0.88 : 1), size * (i ? 0.88 : 1));
+      ART.drawShip(
+        ctx,
+        u.type,
+        artSide(u),
+        (i ? i * 7 : 0) - 2,
+        -6 - i * 8,
+        size * (i ? 0.88 : 1),
+        size * (i ? 0.88 : 1),
+      );
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     ctx.globalAlpha = 1;
-    if (!ART.ready[u.side]) outlinedText(t.code, 0, 3, 13, col, scale);
+    if (!t.air && !ART.ready[artSide(u)]) outlinedText(t.code, 0, 3, 13, col, scale);
     drawStackBars(u.stack, u.side, scale);
     if (!u.attacked && u.side === game.player && interactive()) {
       ctx.beginPath();

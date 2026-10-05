@@ -795,7 +795,67 @@ const ART = {
     return this.factionSprites[name]?.[index].mask || (name === 'fleet' ? this.masks[index] : null);
   },
   drawShip(context, type, side, x, y, width, height = width) {
+    if (side === 'neutral') side = 'empire';
+    if (this.airWings[type]) return this.drawAir(context, type, side, x, y, width);
     return this.draw(context, side, this.frames[type], x, y, width, height, side === 'alliance');
+  },
+  // Air wings have no sprite sheet: they are drawn as small vector formations in faction livery.
+  airWings: {
+    fighter: { count: 3, size: 0.2, span: 0.55 },
+    bomber: { count: 2, size: 0.28, span: 0.75 },
+    strategic: { count: 1, size: 0.46, span: 1.05 },
+  },
+  airLivery: {
+    empire: { body: '#f2ecdc', trim: '#c9a24a', dark: '#5b4a2a' },
+    alliance: { body: '#8a9659', trim: '#2f7377', dark: '#2a3320' },
+  },
+  drawAir(context, type, side, x, y, width) {
+    const w = this.airWings[type],
+      c = this.airLivery[side] || this.airLivery.empire,
+      L = width * w.size,
+      slots = [
+        [0, 0],
+        [-0.85, 0.75],
+        [0.75, 0.85],
+      ];
+    context.save();
+    context.translate(x, y);
+    if (side === 'alliance') context.scale(-1, 1);
+    for (let i = 0; i < w.count; i++) {
+      const [ox, oy] = w.count === 1 ? [0, 0] : slots[i];
+      context.save();
+      context.translate(ox * L, oy * L);
+      context.rotate(-0.6);
+      context.beginPath();
+      context.moveTo(L, 0);
+      context.lineTo(-L * 0.45, L * w.span);
+      context.lineTo(-L * 0.25, 0);
+      context.lineTo(-L * 0.45, -L * w.span);
+      context.closePath();
+      context.fillStyle = c.body;
+      context.fill();
+      context.lineWidth = Math.max(1, L * 0.06);
+      context.strokeStyle = c.dark;
+      context.stroke();
+      context.beginPath();
+      context.moveTo(L * 0.85, 0);
+      context.lineTo(-L * 0.2, 0);
+      context.strokeStyle = c.trim;
+      context.lineWidth = Math.max(1.2, L * 0.1);
+      context.stroke();
+      context.fillStyle = '#ffb35c';
+      context.shadowColor = '#ff8a3d';
+      context.shadowBlur = L * 0.4;
+      const engines = type === 'strategic' ? [-0.45, -0.15, 0.15, 0.45] : [0];
+      for (const e of engines) {
+        context.beginPath();
+        context.arc(-L * 0.3, e * L * w.span, Math.max(1, L * 0.08), 0, Math.PI * 2);
+        context.fill();
+      }
+      context.restore();
+    }
+    context.restore();
+    return true;
   },
   draw(context, name, index, x, y, width, height = width, flip = false) {
     const img = this.images[name];
@@ -832,6 +892,9 @@ const ART = {
     return `<span class="${name === 'portraits' ? 'portrait-art' : 'ship-art'} ${extra}" aria-hidden="true"><svg viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid ${name === 'portraits' ? 'slice' : 'meet'}" xmlns="http://www.w3.org/2000/svg">${def}<image href="${this.urls[name]}" width="${this.factionSprites[name] ? 1983 : 1254}" height="${this.factionSprites[name] ? 793 : 1254}" ${mask ? 'clip-path="url(#' + id + ')"' : ''}/></svg></span>`;
   },
   ship(type, extra = '', side = 'alliance') {
+    if (this.airWings[type])
+      return `<span class="ship-art air-art ${side} ${extra}" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="#ico-air-${type}"/></svg></span>`;
+    if (side === 'neutral') side = 'empire';
     const name = ['station', 'fortress', 'capital'].includes(type) ? 'fleet' : side;
     return this.svg(name, this.frames[type] ?? 13, extra);
   },

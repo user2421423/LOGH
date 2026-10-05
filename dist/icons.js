@@ -27,7 +27,17 @@ const ICONS = (() => {
         a = ((36 * i - 90) * Math.PI) / 180;
       return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
     }).join(' ');
+  // Delta-wing silhouette pointing up-right; coloured by the surrounding element's CSS color.
+  const jet = (x, y, s, span = 0.6) =>
+    `<g transform="translate(${x} ${y}) rotate(-35) scale(${s})"><path d="M10 0-4.5 ${10 * span}-2.5 0-4.5 ${-10 * span}Z" fill="currentColor" stroke="#1b1a14" stroke-width="1"/><path d="M8.5 0H-2" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.2"/><circle cx="-3" cy="0" r="1.1" fill="#ffb35c"/></g>`;
   const symbols = {
+    'air-fighter': jet(12, 13, 0.75) + jet(22, 20, 0.6) + jet(8, 23, 0.6),
+    'air-bomber': jet(12, 15, 0.95, 0.75) + jet(22, 22, 0.8, 0.75),
+    'air-strategic': jet(16, 17, 1.3, 1.05),
+    // Air base: runway with a parked interceptor.
+    airbase: `<path d="M4 25 14 7h4l10 18Z" fill="#3a4650" stroke="#c9d3da" stroke-width="1"/>
+      <path d="M16 9v14" stroke="#ffe066" stroke-width="1.4" stroke-dasharray="2.4 2"/>
+      <g color="#e9eef2">${jet(19, 13, 0.55)}</g>`,
     // WC4-style gold coin with an embossed dollar sign.
     credits: `<circle cx="16" cy="16.6" r="14" fill="#6b4208"/>
       <circle cx="16" cy="15.4" r="14" fill="url(#ig-gold)" stroke="#5c3a08" stroke-width="1"/>

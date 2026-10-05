@@ -64,8 +64,8 @@ function station(g, c, r, owner = 'alliance', shield = 150, tier = 3) {
   g.stations.push(s);
   return s;
 }
-test('All 10 requested classes exist and hex distance is symmetric', () => {
-  assert.equal(Object.keys(E.TYPES).length, 10);
+test('All 13 classes (10 hulls, 3 air wings) exist and hex distance is symmetric', () => {
+  assert.equal(Object.keys(E.TYPES).length, 13);
   assert.equal(E.distance({ c: 2, r: 2 }, { c: 2, r: 3 }), 1);
   for (let r = 0; r < 4; r++)
     for (let c = 0; c < 4; c++)
@@ -283,7 +283,7 @@ test('Initial maps have legal placements and no duplicate occupied hexes', () =>
     }
 });
 test('AI completes turns legally without resource underflow or stacked hexes', () => {
-  for (const mode of ['conquest', 'iserlohn']) {
+  for (const mode of ['conquest', 'iserlohn', 'conquest:lippstadt', 'vermilion']) {
     const g = E.createGame('alliance', 'normal', mode, 15);
     for (let turn = 0; turn < 8 && !g.over; turn++) {
       for (const side of ['alliance', 'empire']) {
@@ -316,7 +316,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3, 4]) {
+  for (const v of [undefined, 2, 3, 4, 5]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -407,23 +407,116 @@ test('Repairs cost a fifth of the fleet build price; reinforcing costs a full hu
   assert.equal(before - g.economy.alliance.credits, Math.round(E.price('flagship', 2).credits * 0.2));
   assert.deepEqual(E.reinforceCost('heavy'), { credits: E.TYPES.heavy.cost, industry: E.TYPES.heavy.industry });
 });
-test("Thor's Hammer fires from a shielded fortress at the strongest fleet in range", () => {
+test("Thor's Hammer is fired by its owner, never automatically, and recharges for two turns", () => {
   const g = blank(),
     fort = station(g, 4, 4, 'empire', 150);
   fort.fort = true;
   fort.name = 'Iserlohn';
-  const weak = E.newUnit(g, 'corvette', 'alliance', 4, 3),
-    strong = E.newUnit(g, 'flagship', 'alliance', 5, 4),
-    far = E.newUnit(g, 'battleship', 'alliance', 8, 8);
+  const near = E.newUnit(g, 'flagship', 'alliance', 5, 4),
+    far = E.newUnit(g, 'battleship', 'alliance', 8, 7);
   E.beginTurn(g, 'empire', false);
-  assert.equal(g.strikes.length, 1);
-  assert.equal(g.strikes[0].name, "Thor's Hammer");
-  assert.equal(g.strikes[0].id, strong.id);
-  assert.equal(strong.hp, E.maxHP(strong) - g.strikes[0].damage);
-  assert.equal(weak.hp, E.maxHP(weak));
-  assert.equal(far.hp, E.maxHP(far));
-  assert.equal(strong.morale, -1);
+  assert.equal(near.hp, E.maxHP(near));
+  assert.deepEqual(E.fortressTargets(g, fort).map(E.key), [E.key(near)]);
+  const shot = E.fireFortress(g, fort.id, near.c, near.r);
+  assert(shot.ok);
+  assert.equal(shot.name, "Thor's Hammer");
+  assert.equal(near.hp, E.maxHP(near) - shot.damage);
+  assert.equal(near.morale, -1);
+  assert(!E.fireFortress(g, fort.id, near.c, near.r).ok);
+  g.turn += 2;
+  assert(!E.fireFortress(g, fort.id, far.c, far.r).ok);
   fort.shield = 0;
-  E.beginTurn(g, 'empire', false);
-  assert.equal(g.strikes.length, 0);
+  assert(!E.fireFortress(g, fort.id, near.c, near.r).ok);
+  fort.shield = 100;
+  assert(E.fireFortress(g, fort.id, near.c, near.r).ok);
+});
+test('Station buildings upgrade to level 3 and raise industry and research', () => {
+  const g = blank(),
+    s = station(g, 2, 2);
+  s.tier = 1;
+  s.lab = 0;
+  s.air = 0;
+  const industry = s.industry,
+    science = s.science;
+  assert(E.build(g, s.id, 'shipyard').ok);
+  assert.equal(s.tier, 2);
+  assert.equal(s.industry, industry + 10);
+  assert(E.build(g, s.id, 'lab').ok);
+  assert.equal(s.lab, 1);
+  assert.equal(s.science, science + 8);
+  for (let i = 0; i < 3; i++) assert(E.build(g, s.id, 'air').ok);
+  assert.equal(s.air, 3);
+  assert(!E.build(g, s.id, 'air').ok);
+});
+test('Air wings: built at air bases, ignore terrain, immune to artillery, escorts return fire, need supply', () => {
+  assert.equal(Object.values(E.TYPES).filter(t => t.air).length, 3);
+  const g = blank(),
+    s = station(g, 2, 2);
+  s.air = 0;
+  assert(!E.canBuy(g, s, 'fighter'));
+  s.air = 1;
+  assert(E.canBuy(g, s, 'fighter'));
+  assert(!E.canBuy(g, s, 'bomber'));
+  const f = E.newUnit(g, 'fighter', 'alliance', 4, 4);
+  E.tile(g, 5, 4).terrain = 'nebula';
+  assert.equal(E.reachable(g, f).get('5,4'), 1);
+  assert(!E.canCapture(f));
+  const arty = E.newUnit(g, 'beam', 'empire', 4, 5);
+  assert.equal(E.preview(g, arty.id, f.c, f.r), null);
+  const bomber = E.newUnit(g, 'bomber', 'alliance', 6, 6),
+    heavy = E.newUnit(g, 'heavy', 'empire', 7, 6),
+    corvette = E.newUnit(g, 'corvette', 'empire', 6, 7);
+  assert.equal(E.preview(g, bomber.id, heavy.c, heavy.r).counterAllowed, false);
+  assert.equal(E.preview(g, bomber.id, corvette.c, corvette.r).counterAllowed, true);
+  const stray = E.newUnit(g, 'strategic', 'alliance', 8, 1);
+  E.beginTurn(g, 'alliance');
+  assert.equal(stray.hp, E.maxHP(stray) - Math.round(E.maxHP(stray) * 0.1));
+  assert.equal(f.hp, E.maxHP(f));
+});
+test('Every conquest start date and scenario starts legally and unfinished', () => {
+  const modes = [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)];
+  for (const mode of modes)
+    for (const side of ['empire', 'alliance']) {
+      const g = E.createGame(side, 'normal', mode, 12),
+        keys = new Set();
+      for (const u of g.units) {
+        assert(!keys.has(E.key(u)), mode + ' duplicate ' + E.key(u));
+        keys.add(E.key(u));
+        assert(E.tile(g, u.c, u.r), mode + ' off map ' + E.key(u));
+        assert.notEqual(E.tile(g, u.c, u.r).terrain, 'rift');
+        const st = E.stationAt(g, u);
+        assert(!st || st.owner === u.side, mode + ' unit on a foreign station ' + E.key(u));
+      }
+      assert.equal(E.checkVictory(g), null, mode);
+      if (E.SCENARIOS[mode]?.side) assert.equal(g.player, E.SCENARIOS[mode].side);
+    }
+  const lip = E.createGame('empire', 'normal', 'conquest:lippstadt', 3);
+  assert(lip.units.some(u => u.side === 'neutral'));
+  assert(lip.stations.some(s => s.owner === 'neutral' && s.name === 'Geiersburg'));
+});
+test('Scenario objectives award 1–3 stars by speed, or by fleets kept when holding', () => {
+  const a = E.createGame('alliance', 'normal', 'astarte', 5);
+  assert.equal(a.player, 'empire');
+  a.units.filter(u => u.side === 'alliance').forEach(u => (u.hp = 0));
+  a.turn = 7;
+  assert.equal(E.checkVictory(a).winner, 'empire');
+  assert.equal(a.over.stars, 3);
+  const v = E.createGame('empire', 'normal', 'vermilion', 5);
+  v.units.find(u => u.admiral === 'reinhard').hp = 0;
+  v.turn = 13;
+  assert.equal(E.checkVictory(v).winner, 'alliance');
+  assert.equal(v.over.stars, 1);
+  const h = E.createGame('alliance', 'normal', 'amritsar', 5);
+  h.turn = 13;
+  assert.equal(E.checkVictory(h).winner, 'alliance');
+  assert.equal(h.over.stars, 3);
+  const lost = E.createGame('alliance', 'normal', 'amritsar', 5);
+  lost.stations.find(s => s.name === 'Amritsar').owner = 'empire';
+  assert.equal(E.checkVictory(lost).winner, 'empire');
+});
+test('Admirals who have fallen by a start date cannot be appointed', () => {
+  const g = E.createGame('empire', 'normal', 'conquest:ragnarok', 5),
+    u = g.units.find(u => u.side === 'empire' && !u.admiral);
+  g.economy.empire.credits = 9999;
+  assert(!E.assign(g, u.id, 'kircheis').ok);
 });

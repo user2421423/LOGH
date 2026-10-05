@@ -211,6 +211,72 @@
       siege: 2,
       desc: 'Range 2 fortress cannon; cannot fire at adjacent targets. +100% station damage, 80% armor penetration, movement 1. Suppresses counter-fire.',
     },
+    fighter: {
+      name: 'Fighter Wing',
+      short: 'Fighter wing',
+      code: 'FW',
+      branch: 'Air',
+      wc: 'Fighter',
+      weapon: 'Spartanian / Walküre interceptors',
+      hp: 130,
+      attack: 46,
+      armor: 6,
+      move: 6,
+      min: 1,
+      max: 1,
+      cost: 110,
+      industry: 30,
+      tier: 1,
+      crit: 0.15,
+      pen: 0.3,
+      air: true,
+      antiAir: 1.6,
+      desc: 'Fast interceptors: +60% damage against air wings. Ignores terrain, cannot capture, and loses 10% hull each turn it starts more than 3 hexes from a friendly air base.',
+    },
+    bomber: {
+      name: 'Bomber Wing',
+      short: 'Bomber wing',
+      code: 'BW',
+      branch: 'Air',
+      wc: 'Bomber',
+      weapon: 'Anti-ship torpedo bombers',
+      hp: 150,
+      attack: 76,
+      armor: 8,
+      move: 5,
+      min: 1,
+      max: 1,
+      cost: 200,
+      industry: 55,
+      tier: 2,
+      crit: 0.15,
+      pen: 0.55,
+      air: true,
+      shipKiller: 1.4,
+      desc: 'Ship-killers: +40% damage against Battle Line and Artillery hulls. Only escorts and fighters can return fire. Needs a friendly air base within 3 hexes.',
+    },
+    strategic: {
+      name: 'Strategic Bomber Wing',
+      short: 'Strategic bomber',
+      code: 'SW',
+      branch: 'Air',
+      wc: 'Strategic Bomber',
+      weapon: 'Heavy fusion bomb racks',
+      hp: 190,
+      attack: 104,
+      armor: 10,
+      move: 5,
+      min: 1,
+      max: 1,
+      cost: 330,
+      industry: 95,
+      tier: 3,
+      crit: 0.2,
+      pen: 0.7,
+      air: true,
+      siege: 2.2,
+      desc: 'Heavy bombers: +120% damage against station defenses. Only escorts and fighters can return fire. Needs a friendly air base within 3 hexes.',
+    },
   };
   const ADMIRALS = {
     reinhard: {
@@ -386,7 +452,7 @@
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 5 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 6 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -421,10 +487,10 @@
     return n;
   }
   function terrainCost(g, u, t) {
-    return u.admiral === 'yang' ? 1 : t.terrain === 'nebula' || t.terrain === 'asteroid' ? 2 : 1;
+    return u.admiral === 'yang' || TYPES[u.type].air ? 1 : t.terrain === 'nebula' || t.terrain === 'asteroid' ? 2 : 1;
   }
   function canCapture(u) {
-    return TYPES[u.type].branch !== 'Artillery';
+    return TYPES[u.type].branch !== 'Artillery' && !TYPES[u.type].air;
   }
   function isReady(g, u) {
     return !g.over && g.phase === u.side && u.hp > 0 && u.morale > -3;
@@ -462,7 +528,9 @@
   function hostileTarget(g, u, p) {
     const target = unitAt(g, p),
       st = stationAt(g, p);
-    return target ? target.side !== u.side : !!st && st.owner !== u.side && st.shield > 0;
+    // Artillery cannot engage air wings.
+    if (target) return target.side !== u.side && !(TYPES[u.type].branch === 'Artillery' && TYPES[target.type].air);
+    return !!st && st.owner !== u.side && st.shield > 0;
   }
   function targets(g, u) {
     return g.tiles.filter(p => hostileTarget(g, u, p) && inRange(u, p));
@@ -512,11 +580,14 @@
     if (u.admiral === 'attenborough') attack *= 1.15;
     if (counter && u.admiral === 'yang') attack *= 1.65;
     if (t.boarding && (target ? victim.branch === 'Battle Line' : !!st)) attack *= 1.55;
+    if (victim?.air && t.antiAir) attack *= t.antiAir;
+    if (victim?.air && t.branch === 'Escort') attack *= 1.5;
+    if (t.shipKiller && (victim?.branch === 'Battle Line' || victim?.branch === 'Artillery')) attack *= t.shipKiller;
     const pen = clamp(t.pen + g.tech[u.side].laser * 0.1 + (u.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95);
     const armor = target ? victim.armor : 35;
     attack *= 100 / (100 + armor * (1 - pen) * 2);
     if (target) {
-      attack *= 1 - g.tech[target.side].armor * (t.branch === 'Artillery' ? 0.12 : 0.08);
+      attack *= 1 - (g.tech[target.side]?.armor || 0) * (t.branch === 'Artillery' ? 0.12 : 0.08);
       if (target.admiral === 'yang') attack *= 0.8;
       const terrain = tile(g, target.c, target.r).terrain;
       if (terrain === 'asteroid') attack *= 0.85;
@@ -543,7 +614,14 @@
             (d ? 0.8 : 1.45),
         )
       : 0;
-    const counter = !!d && !t.noCounter && d.morale > -3 && inRange(d, a);
+    // Air wings only draw return fire from escorts (point defense) and fighters.
+    const counter =
+      !!d &&
+      !t.noCounter &&
+      d.morale > -3 &&
+      inRange(d, a) &&
+      hostileTarget(g, d, a) &&
+      (!t.air || TYPES[d.type].branch === 'Escort' || !!TYPES[d.type].antiAir);
     const crit = clamp(t.crit + (a.admiral === 'reinhard' && t.branch === 'Battle Line' ? 0.3 : 0), 0, 0.85);
     return {
       unit: unitDmg,
@@ -671,7 +749,7 @@
       !!t &&
       s.owner === g.phase &&
       !g.over &&
-      s.tier >= t.tier &&
+      (t.air ? s.air || 0 : s.tier) >= t.tier &&
       (!t.elite || stack === 1) &&
       stack >= 1 &&
       stack <= 3 &&
@@ -736,26 +814,50 @@
     log(g, `${TYPES[u.type].short} repairs ${amount} HP.`, u.side);
     return { ok: true, amount };
   }
+  const BUILDINGS = {
+    shipyard: { name: 'Shipyard', field: 'tier', desc: 'Unlocks larger hulls and produces industry (+10 per level).' },
+    lab: { name: 'Research station', field: 'lab', desc: 'Produces research (+8 per level).' },
+    air: {
+      name: 'Air base',
+      field: 'air',
+      desc: 'Builds and supplies air wings: fighters at level 1, bombers at 2, strategic bombers at 3.',
+    },
+  };
+  function buildingLevel(s, kind) {
+    return s[BUILDINGS[kind].field] || 0;
+  }
+  function buildCost(s, kind) {
+    const l = buildingLevel(s, kind);
+    if (kind === 'shipyard') return { credits: 160 * l, industry: 40 * l };
+    if (kind === 'lab') return { credits: 110 * (l + 1), industry: 25 * (l + 1) };
+    return { credits: 140 * (l + 1), industry: 45 * (l + 1) };
+  }
   function upgradeCost(s) {
-    return { credits: 160 * s.tier, industry: 40 * s.tier };
+    return buildCost(s, 'shipyard');
+  }
+  function build(g, id, kind) {
+    const s = g.stations.find(s => s.id === id),
+      b = BUILDINGS[kind];
+    if (!s || !b || s.owner !== g.phase || g.over)
+      return { ok: false, reason: 'You can only build at your own stations.' };
+    if (buildingLevel(s, kind) >= 3) return { ok: false, reason: `${b.name} is already at maximum level.` };
+    const cost = buildCost(s, kind),
+      e = funds(g, s.owner);
+    if (e.credits < cost.credits || e.industry < cost.industry)
+      return { ok: false, reason: 'Insufficient credits or industry.' };
+    e.credits -= cost.credits;
+    e.industry -= cost.industry;
+    s[b.field] = buildingLevel(s, kind) + 1;
+    if (kind === 'shipyard') {
+      s.industry += 10;
+      s.maxShield += 60;
+      s.shield = Math.min(s.maxShield, s.shield + 60);
+    } else if (kind === 'lab') s.science += 8;
+    log(g, `${s.name}: ${b.name} upgraded to level ${s[b.field]}.`, s.owner);
+    return { ok: true };
   }
   function upgrade(g, id) {
-    const s = g.stations.find(s => s.id === id);
-    if (!s || s.owner !== g.phase || g.over || s.tier >= 3)
-      return { ok: false, reason: 'Shipyard is already maximum tier or not yours.' };
-    const cost = upgradeCost(s).credits,
-      e = funds(g, s.owner);
-    if (e.credits < cost || e.industry < upgradeCost(s).industry)
-      return { ok: false, reason: 'Insufficient credits or industry.' };
-    e.credits -= cost;
-    e.industry -= upgradeCost(s).industry;
-    s.tier++;
-    s.income += 15;
-    s.industry += 10;
-    s.maxShield += 60;
-    s.shield = Math.min(s.maxShield, s.shield + 60);
-    log(g, `${s.name} upgraded to tier ${s.tier}.`, s.owner);
-    return { ok: true };
+    return build(g, id, 'shipyard');
   }
   function researchCost(g, side, k) {
     const l = g.tech[side][k];
@@ -783,7 +885,8 @@
       a.side !== u.side ||
       u.admiral ||
       g.over ||
-      g.units.some(v => v.hp > 0 && v.admiral === admiral)
+      g.units.some(v => v.hp > 0 && v.admiral === admiral) ||
+      (g.retired || []).includes(admiral)
     )
       return { ok: false, reason: 'That admiral cannot be assigned to this fleet.' };
     if (funds(g, u.side).credits < a.cost) return { ok: false, reason: 'Insufficient credits.' };
@@ -834,78 +937,323 @@
       if (t.terrain === 'nebula') u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.025));
       const s = stationAt(g, u);
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
+      if (TYPES[u.type].air && !g.stations.some(s => s.owner === side && (s.air || 0) > 0 && distance(s, u) <= 3))
+        u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.1));
     }
-    fortressFire(g, side);
+    g.strikes = [];
     for (const s of g.stations) {
       if (s.owner === side) s.shield = Math.min(s.maxShield, s.shield + Math.round(s.maxShield * 0.12));
     }
     checkVictory(g);
   }
-  // A fortress with its shields up fires its main gun at the strongest enemy fleet within 2 hexes.
-  function fortressFire(g, side) {
-    g.strikes = [];
-    for (const s of g.stations) {
-      if (!s.fort || s.owner !== side || s.shield <= 0) continue;
-      const foe = g.units
-        .filter(u => u.hp > 0 && u.side !== side && distance(s, u) <= 2)
-        .sort((a, b) => b.hp - a.hp || a.id - b.id)[0];
-      if (!foe) continue;
-      const damage = Math.max(1, Math.round(maxHP(foe) * 0.3 * (1 - g.tech[foe.side].armor * 0.08)));
-      foe.hp = Math.max(0, foe.hp - damage);
-      foe.morale = Math.max(foe.admiral === 'reinhard' ? 0 : -3, foe.morale - 1);
-      const name = s.name === 'Iserlohn' ? "Thor's Hammer" : `${s.name} main cannon`;
-      g.strikes.push({
-        name,
-        from: { c: s.c, r: s.r },
-        to: { c: foe.c, r: foe.r },
-        id: foe.id,
-        damage,
-        destroyed: foe.hp <= 0,
-      });
-      log(g, `${name} strikes ${TYPES[foe.type].short} for ${damage}.`, side);
-      kill(g, foe, null);
-    }
-    return g.strikes;
+  // Fortress main guns (Thor's Hammer): fired by the owner, range 3, then two turns to recharge.
+  const FORTRESS_GUN = { range: 3, recharge: 2, share: 0.4 };
+  function fortressName(s) {
+    return s.name === 'Iserlohn' ? "Thor's Hammer" : `${s.name} main cannon`;
+  }
+  function fortressReady(g, s) {
+    return !!s?.fort && s.owner === g.phase && !g.over && s.shield > 0 && (s.gunReady || 0) <= g.turn;
+  }
+  function fortressDamage(g, foe) {
+    return Math.max(1, Math.round(maxHP(foe) * FORTRESS_GUN.share * (1 - (g.tech[foe.side]?.armor || 0) * 0.08)));
+  }
+  function fortressTargets(g, s) {
+    if (!fortressReady(g, s)) return [];
+    return g.units
+      .filter(u => u.hp > 0 && u.side !== s.owner && distance(s, u) <= FORTRESS_GUN.range)
+      .map(u => tile(g, u.c, u.r));
+  }
+  function fireFortress(g, id, c, r) {
+    const s = g.stations.find(s => s.id === id);
+    if (!fortressReady(g, s)) return { ok: false, reason: 'The fortress gun is not ready.' };
+    const foe = unitAt(g, { c, r });
+    if (!foe || foe.side === s.owner || distance(s, foe) > FORTRESS_GUN.range)
+      return { ok: false, reason: 'No enemy fleet within 3 hexes of the fortress.' };
+    const damage = fortressDamage(g, foe),
+      name = fortressName(s);
+    foe.hp = Math.max(0, foe.hp - damage);
+    foe.morale = Math.max(foe.admiral === 'reinhard' ? 0 : -3, foe.morale - 1);
+    s.gunReady = g.turn + FORTRESS_GUN.recharge;
+    log(g, `${name} strikes ${TYPES[foe.type].short} for ${damage}.`, s.owner);
+    const destroyed = foe.hp <= 0;
+    kill(g, foe, null);
+    checkVictory(g);
+    return { ok: true, name, from: { c: s.c, r: s.r }, to: { c, r }, id: foe.id, damage, destroyed };
   }
   function checkVictory(g) {
     if (g.over) return g.over;
-    if (g.mode === 'iserlohn') {
-      const s = g.stations.find(s => s.name === 'Iserlohn');
-      if (s.owner === g.player)
-        g.over = { winner: g.player, reason: 'Iserlohn Fortress has fallen. The corridor is open.' };
-      else if (!g.units.some(u => u.hp > 0 && u.side === g.player && canCapture(u)))
-        g.over = { winner: opponent(g.player), reason: 'No assault-capable fleets remain to capture the fortress.' };
-      else if (g.turn > 18)
-        g.over = { winner: opponent(g.player), reason: 'The fortress held until enemy reinforcements arrived.' };
-    } else {
-      for (const side of ['empire', 'alliance']) {
-        const capitals = g.stations.filter(s => s.capital);
-        if (capitals.every(s => s.owner === side))
-          g.over = { winner: side, reason: 'Both capitals are under one command. The war is over.' };
-        else if (!g.stations.some(s => s.owner === side) && !g.units.some(u => u.hp > 0 && u.side === side))
-          g.over = { winner: opponent(side), reason: 'The last enemy fleets and stations have fallen.' };
-      }
-      if (g.turn > 50 && !g.over) {
-        const a = g.stations.filter(s => s.owner === g.player).length,
-          b = g.stations.filter(s => s.owner === opponent(g.player)).length;
-        g.over = {
-          winner: a === b ? 'draw' : a > b ? g.player : opponent(g.player),
-          reason: `The 50-turn armistice: ${a} stations held against ${b}.`,
-        };
-      }
+    if (g.mode !== 'conquest') return scenarioVictory(g);
+    for (const side of ['empire', 'alliance']) {
+      const capitals = g.stations.filter(s => s.capital);
+      if (capitals.every(s => s.owner === side))
+        g.over = { winner: side, reason: 'Both capitals are under one command. The war is over.' };
+      else if (!g.stations.some(s => s.owner === side) && !g.units.some(u => u.hp > 0 && u.side === side))
+        g.over = { winner: opponent(side), reason: 'The last enemy fleets and stations have fallen.' };
+    }
+    if (g.turn > 50 && !g.over) {
+      const a = g.stations.filter(s => s.owner === g.player).length,
+        b = g.stations.filter(s => s.owner === opponent(g.player)).length;
+      g.over = {
+        winner: a === b ? 'draw' : a > b ? g.player : opponent(g.player),
+        reason: `The 50-turn armistice: ${a} stations held against ${b}.`,
+      };
     }
     return g.over;
   }
+  function scenarioVictory(g) {
+    const o = g.objective,
+      def = SCENARIOS[g.mode],
+      P = g.player,
+      foe = opponent(P),
+      alive = side => g.units.filter(u => u.hp > 0 && u.side === side),
+      byTurn = () => (g.turn <= o.stars[0] ? 3 : g.turn <= o.stars[1] ? 2 : 1),
+      win = (reason, stars) => (g.over = { winner: P, reason, stars }),
+      lose = reason => (g.over = { winner: foe, reason, stars: 0 }),
+      owned = n => g.stations.find(s => s.name === n)?.owner === P;
+    if (o.type === 'capture') {
+      if (o.stations.every(owned)) win(def.win, byTurn());
+      else if (!alive(P).some(canCapture)) lose('No assault-capable fleets remain.');
+    } else if (o.type === 'destroy') {
+      if (!alive(foe).length) win(def.win, byTurn());
+    } else if (o.type === 'kill') {
+      if (!g.units.some(u => u.hp > 0 && u.admiral === o.admiral)) win(def.win, byTurn());
+    } else if (o.type === 'hold') {
+      if (!o.stations.every(owned)) lose(`${o.stations.join(' and ')} has fallen.`);
+      else if (g.turn > o.turns) {
+        const kept = alive(P).length / Math.max(1, g.startFleets?.[P] || 1);
+        win(def.win, kept >= 0.7 ? 3 : kept >= 0.4 ? 2 : 1);
+      }
+    }
+    if (!g.over && !alive(P).length) lose('Your last fleet has been destroyed.');
+    if (!g.over && o.type !== 'hold' && g.turn > o.turns) lose(def.timeout);
+    return g.over;
+  }
+  function objectiveText(g) {
+    if (g.mode === 'conquest')
+      return `Capture ${g.player === 'alliance' ? 'Odin' : 'Heinessen'} while holding your own capital.`;
+    const o = g.objective,
+      stars = o.stars ? ` ★★★ by turn ${o.stars[0]}.` : ' ★★★ with 70% of your fleets intact.';
+    if (o.type === 'capture') return `Capture ${o.stations.join(' and ')} by turn ${o.turns}.${stars}`;
+    if (o.type === 'destroy') return `Destroy every enemy fleet by turn ${o.turns}.${stars}`;
+    if (o.type === 'kill') return `Destroy ${ADMIRALS[o.admiral].name}'s flagship by turn ${o.turns}.${stars}`;
+    return `Hold ${o.stations.join(' and ')} through turn ${o.turns}.${stars}`;
+  }
+  function modeTitle(g) {
+    return g.mode === 'conquest' ? ERAS[g.era || 'frontier'].name : SCENARIOS[g.mode].name;
+  }
+  // Conquest start dates on the shared 17 × 11 galaxy map.
+  const ERAS = {
+    frontier: {
+      name: 'The galactic frontier',
+      year: 'Standard',
+      desc: 'A balanced start: both powers mass at the three corridor crossings.',
+    },
+    astarte: {
+      name: 'Battle of Astarte',
+      year: 'UC 487 · RC 796',
+      desc: 'The Empire holds Iserlohn. Three Alliance fleets close in from beyond the corridor.',
+      owners: { Iserlohn: 'empire' },
+      units: [
+        ['empire', 'flagship', 6, 3, 1, 'reinhard'],
+        ['empire', 'heavy', 7, 1, 2, 'kircheis'],
+        ['empire', 'battleship', 6, 2, 1],
+        ['empire', 'light', 5, 3, 2],
+        ['empire', 'beam', 6, 4, 2],
+        ['empire', 'missile', 5, 2, 1],
+        ['empire', 'frigate', 8, 2, 1],
+        ['empire', 'siege', 3, 5, 1],
+        ['empire', 'destroyer', 4, 6, 1],
+        ['empire', 'corvette', 5, 7, 2],
+        ['alliance', 'flagship', 12, 8, 1, 'yang'],
+        ['alliance', 'light', 12, 9, 2],
+        ['alliance', 'heavy', 13, 7, 1],
+        ['alliance', 'heavy', 11, 4, 2],
+        ['alliance', 'battleship', 12, 5, 1],
+        ['alliance', 'beam', 12, 4, 2],
+        ['alliance', 'missile', 13, 5, 1],
+        ['alliance', 'heavy', 11, 1, 2],
+        ['alliance', 'light', 12, 1, 2],
+        ['alliance', 'corvette', 10, 2, 2],
+        ['alliance', 'destroyer', 10, 6, 1],
+        ['alliance', 'frigate', 14, 3, 1],
+      ],
+    },
+    amritsar: {
+      name: 'Amritsar offensive',
+      year: 'RC 796 · UC 487',
+      desc: 'The Alliance has overrun Iserlohn, Kempff and Vermilion, but its supply lines are stretched thin against the full Imperial counterattack.',
+      owners: { Iserlohn: 'alliance', Kempff: 'alliance', Vermilion: 'alliance' },
+      economy: { empire: [450, 160], alliance: [150, 80] },
+      units: [
+        ['empire', 'flagship', 2, 5, 1, 'reinhard'],
+        ['empire', 'heavy', 3, 4, 2, 'mittermeyer'],
+        ['empire', 'battleship', 3, 6, 2, 'reuenthal'],
+        ['empire', 'frigate', 2, 3, 2, 'kircheis'],
+        ['empire', 'heavy', 1, 7, 1],
+        ['empire', 'light', 4, 8, 2],
+        ['empire', 'beam', 2, 6, 2],
+        ['empire', 'missile', 1, 4, 1],
+        ['empire', 'siege', 0, 5, 1],
+        ['empire', 'corvette', 4, 1, 2],
+        ['empire', 'destroyer', 2, 8, 1],
+        ['alliance', 'flagship', 6, 6, 1, 'yang'],
+        ['alliance', 'heavy', 6, 4, 2, 'attenborough'],
+        ['alliance', 'light', 7, 5, 2, 'fischer'],
+        ['alliance', 'frigate', 8, 2, 1, 'schonkopf'],
+        ['alliance', 'heavy', 5, 5, 1],
+        ['alliance', 'beam', 7, 4, 2],
+        ['alliance', 'missile', 7, 6, 1],
+        ['alliance', 'corvette', 6, 7, 2],
+        ['alliance', 'destroyer', 9, 4, 1],
+        ['alliance', 'light', 9, 6, 1],
+        ['alliance', 'battleship', 10, 5, 1],
+      ],
+    },
+    lippstadt: {
+      name: 'Lippstadt War',
+      year: 'UC 488 · RC 797',
+      desc: 'Civil war on both sides. Lippstadt nobles hold Geiersburg and Valhalla; the Military Congress holds Rantemario and Doria. Crush the rebels before your rival does.',
+      owners: {
+        Iserlohn: 'alliance',
+        Geiersburg: 'neutral',
+        Valhalla: 'neutral',
+        Rantemario: 'neutral',
+        Doria: 'neutral',
+      },
+      units: [
+        ['neutral', 'battleship', 4, 2, 2, null, 'empire'],
+        ['neutral', 'heavy', 3, 2, 2, null, 'empire'],
+        ['neutral', 'light', 4, 1, 1, null, 'empire'],
+        ['neutral', 'beam', 5, 1, 2, null, 'empire'],
+        ['neutral', 'heavy', 3, 8, 2, null, 'empire'],
+        ['neutral', 'light', 2, 8, 1, null, 'empire'],
+        ['neutral', 'missile', 3, 9, 1, null, 'empire'],
+        ['neutral', 'heavy', 11, 7, 2, null, 'alliance'],
+        ['neutral', 'light', 12, 7, 1, null, 'alliance'],
+        ['neutral', 'beam', 11, 8, 1, null, 'alliance'],
+        ['neutral', 'heavy', 14, 9, 1, null, 'alliance'],
+        ['neutral', 'corvette', 13, 9, 2, null, 'alliance'],
+        ['empire', 'flagship', 2, 5, 1, 'reinhard'],
+        ['empire', 'heavy', 2, 4, 2, 'kircheis'],
+        ['empire', 'heavy', 5, 4, 2, 'mittermeyer'],
+        ['empire', 'battleship', 5, 6, 2, 'reuenthal'],
+        ['empire', 'light', 4, 5, 2],
+        ['empire', 'beam', 1, 6, 2],
+        ['empire', 'missile', 2, 6, 1],
+        ['empire', 'corvette', 6, 7, 2],
+        ['empire', 'destroyer', 6, 3, 1],
+        ['alliance', 'flagship', 8, 2, 1, 'yang'],
+        ['alliance', 'frigate', 9, 2, 2, 'schonkopf'],
+        ['alliance', 'heavy', 9, 3, 2, 'attenborough'],
+        ['alliance', 'light', 14, 5, 2, 'fischer'],
+        ['alliance', 'heavy', 15, 6, 1],
+        ['alliance', 'light', 13, 5, 2],
+        ['alliance', 'beam', 12, 4, 2],
+        ['alliance', 'missile', 14, 7, 1],
+        ['alliance', 'corvette', 12, 2, 2],
+        ['alliance', 'destroyer', 10, 4, 1],
+      ],
+    },
+    ragnarok: {
+      name: 'Operation Ragnarök',
+      year: 'UC 489 · RC 798',
+      desc: 'The Empire has seized Fezzan and pours through the second corridor while Yang holds Iserlohn. Kircheis has fallen.',
+      owners: { Iserlohn: 'alliance', Fezzan: 'empire' },
+      economy: { empire: [500, 180], alliance: [250, 90] },
+      retired: ['kircheis'],
+      units: [
+        ['empire', 'flagship', 7, 8, 1, 'reinhard'],
+        ['empire', 'heavy', 9, 8, 3, 'mittermeyer'],
+        ['empire', 'battleship', 6, 2, 3, 'reuenthal'],
+        ['empire', 'battleship', 7, 7, 2],
+        ['empire', 'heavy', 6, 3, 2],
+        ['empire', 'light', 7, 9, 2],
+        ['empire', 'light', 7, 1, 2],
+        ['empire', 'beam', 6, 8, 2],
+        ['empire', 'missile', 7, 10, 1],
+        ['empire', 'siege', 5, 2, 1],
+        ['empire', 'corvette', 9, 9, 2],
+        ['empire', 'destroyer', 6, 9, 2],
+        ['empire', 'frigate', 5, 8, 2],
+        ['alliance', 'flagship', 8, 2, 1, 'yang'],
+        ['alliance', 'frigate', 9, 2, 2, 'schonkopf'],
+        ['alliance', 'heavy', 9, 1, 2, 'attenborough'],
+        ['alliance', 'light', 10, 3, 2, 'fischer'],
+        ['alliance', 'heavy', 12, 7, 1],
+        ['alliance', 'light', 11, 6, 2],
+        ['alliance', 'beam', 13, 6, 1],
+        ['alliance', 'missile', 14, 6, 1],
+        ['alliance', 'corvette', 11, 8, 2],
+        ['alliance', 'destroyer', 12, 9, 1],
+        ['alliance', 'heavy', 15, 6, 1],
+      ],
+    },
+  };
+  // Scenarios: a fixed map, a single objective, a turn limit and a 1–3 star rating.
+  const SCENARIOS = {
+    iserlohn: {
+      name: 'Assault on Iserlohn',
+      side: null,
+      cols: 11,
+      rows: 9,
+      desc: 'Breach the fortress shields, eliminate the garrison, then occupy Iserlohn with an Escort or Battle Line fleet.',
+      objective: { type: 'capture', stations: ['Iserlohn'], turns: 18, stars: [10, 14] },
+      win: 'Iserlohn Fortress has fallen. The corridor is open.',
+      timeout: 'The fortress held until enemy reinforcements arrived.',
+    },
+    astarte: {
+      name: 'Battle of Astarte',
+      side: 'empire',
+      cols: 13,
+      rows: 9,
+      desc: 'Three Alliance fleets converge on Reinhard. Strike each before they can unite.',
+      objective: { type: 'destroy', turns: 14, stars: [8, 11] },
+      win: 'All three Alliance fleets are broken. Astarte is an Imperial triumph.',
+      timeout: 'The Alliance fleets regrouped and withdrew.',
+    },
+    amritsar: {
+      name: 'Hold Amritsar',
+      side: 'alliance',
+      cols: 12,
+      rows: 9,
+      desc: 'The Imperial counteroffensive falls on Amritsar. Hold the station until the evacuation is complete.',
+      objective: { type: 'hold', stations: ['Amritsar'], turns: 12 },
+      win: 'Amritsar held. The fleet withdraws in good order.',
+      timeout: 'Amritsar has fallen.',
+    },
+    vermilion: {
+      name: 'Battle of Vermilion',
+      side: 'alliance',
+      cols: 13,
+      rows: 9,
+      desc: 'Brünhild is within reach. Break through the Imperial screen and destroy Reinhard’s flagship before Mittermeyer arrives.',
+      objective: { type: 'kill', admiral: 'reinhard', turns: 15, stars: [9, 12] },
+      win: 'Brünhild is lost. The Imperial offensive collapses.',
+      timeout: 'Imperial reinforcements arrived. Brünhild escaped.',
+    },
+  };
+  // mode: 'conquest' or 'conquest:<era>' for a Conquest start date; a scenario id (or 'scenario:<id>') otherwise.
   function createGame(player = 'alliance', difficulty = 'normal', mode = 'conquest', seed = 246801) {
+    let era = null,
+      scen = null;
+    if (mode === 'conquest' || String(mode).startsWith('conquest:')) era = String(mode).split(':')[1] || 'frontier';
+    else scen = String(mode).replace('scenario:', '');
+    if (era && !ERAS[era]) era = 'frontier';
+    if (scen && !SCENARIOS[scen]) scen = 'iserlohn';
+    const def = scen ? SCENARIOS[scen] : null;
+    if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 5,
+      rulesVersion: 6,
       player,
       difficulty,
-      mode,
+      mode: era ? 'conquest' : scen,
+      era,
+      objective: def ? { ...def.objective } : null,
+      retired: (era && ERAS[era].retired) || [],
       seed,
-      cols: mode === 'iserlohn' ? 11 : 17,
-      rows: mode === 'iserlohn' ? 9 : 11,
+      cols: def ? def.cols : 17,
+      rows: def ? def.rows : 11,
       turn: 1,
       phase: player,
       nextId: 1,
@@ -913,26 +1261,41 @@
       units: [],
       stations: [],
       log: [],
+      strikes: [],
       economy: {
         empire: { credits: 300, industry: 120, science: 40 },
         alliance: { credits: 300, industry: 120, science: 40 },
       },
-      tech: { empire: { warp: 0, armor: 0, laser: 0, comms: 0 }, alliance: { warp: 0, armor: 0, laser: 0, comms: 0 } },
+      tech: {
+        empire: { warp: 0, armor: 0, laser: 0, comms: 0 },
+        alliance: { warp: 0, armor: 0, laser: 0, comms: 0 },
+        neutral: { warp: 0, armor: 0, laser: 0, comms: 0 },
+      },
       over: null,
       stats: {},
     };
+    const enemy = opponent(player);
     for (let r = 0; r < g.rows; r++)
       for (let c = 0; c < g.cols; c++) {
         const n = random(g);
         let terrain = n < 0.085 ? 'nebula' : n < 0.16 ? 'asteroid' : 'space';
-        if (mode === 'conquest' && c === 8 && ![2, 5, 8].includes(r)) terrain = 'rift';
+        if (era && c === 8 && ![2, 5, 8].includes(r)) terrain = 'rift';
         g.tiles.push({
           c,
           r,
           terrain,
-          owner: c < (g.cols - 1) / 2 - 1 ? 'empire' : c > (g.cols - 1) / 2 + 1 ? 'alliance' : 'neutral',
+          owner: era
+            ? c < (g.cols - 1) / 2 - 1
+              ? 'empire'
+              : c > (g.cols - 1) / 2 + 1
+                ? 'alliance'
+                : 'neutral'
+            : 'neutral',
         });
       }
+    function claim(p, owner) {
+      for (const t of [tile(g, p.c, p.r), ...adjacent(g, p)]) if (t.terrain !== 'rift') t.owner = owner;
+    }
     function station(name, c, r, owner, tier, capital = false, fort = false) {
       const s = {
         id: g.stations.length,
@@ -941,6 +1304,8 @@
         r,
         owner,
         tier,
+        lab: capital ? 1 : 0,
+        air: capital || fort ? 1 : 0,
         capital,
         fort,
         shield: fort ? 450 : capital ? 260 : 150,
@@ -955,7 +1320,16 @@
       tile(g, c, r).owner = owner;
       return s;
     }
-    if (mode === 'conquest') {
+    const place = ([side, type, c, r, stack = 1, admiral = null, art = null]) => {
+      const u = newUnit(g, type, side, c, r, stack, admiral);
+      if (art) u.art = art;
+      return u;
+    };
+    const setEconomy = eco => {
+      for (const [side, [credits, industry]] of Object.entries(eco || {}))
+        Object.assign(g.economy[side], { credits, industry });
+    };
+    if (era) {
       station('Odin', 1, 5, 'empire', 3, true);
       station('Valhalla', 3, 8, 'empire', 2);
       station('Geiersburg', 4, 2, 'empire', 2, false, true);
@@ -968,18 +1342,6 @@
       station('Amritsar', 13, 4, 'alliance', 2);
       station('Heinessen', 15, 6, 'alliance', 3, true);
       station('Doria', 14, 9, 'alliance', 1);
-      for (const side of ['empire', 'alliance']) {
-        const mirror = c => (side === 'empire' ? c : 16 - c);
-        newUnit(g, 'flagship', side, mirror(4), 5, 1, side === 'empire' ? 'reinhard' : 'yang');
-        newUnit(g, 'heavy', side, mirror(5), 3, 2, side === 'empire' ? 'mittermeyer' : 'attenborough');
-        newUnit(g, 'light', side, mirror(5), 7, 2);
-        newUnit(g, 'beam', side, mirror(4), 4, 2);
-        newUnit(g, 'siege', side, mirror(5), 1, 1);
-        newUnit(g, 'missile', side, mirror(3), 6, 1);
-        newUnit(g, 'frigate', side, mirror(6), 2, 1);
-        newUnit(g, 'corvette', side, mirror(6), 8, 2);
-        newUnit(g, 'destroyer', side, mirror(3), 9, 1);
-      }
       // The Alliance holds one extra hub; Imperial worlds yield more so both sides start with equal income.
       const ally = income(g, 'alliance'),
         imp = income(g, 'empire'),
@@ -989,8 +1351,28 @@
       kempff.income += Math.floor((ally.credits - imp.credits) / 2);
       kempff.industry += ally.industry - imp.industry;
       valhalla.science += ally.science - imp.science;
-    } else {
-      const enemy = opponent(player);
+      const spec = ERAS[era];
+      for (const [name, owner] of Object.entries(spec.owners || {})) {
+        const s = g.stations.find(s => s.name === name);
+        s.owner = owner;
+        claim(s, owner);
+      }
+      if (spec.units) spec.units.forEach(place);
+      else
+        for (const side of ['empire', 'alliance']) {
+          const mirror = c => (side === 'empire' ? c : 16 - c);
+          newUnit(g, 'flagship', side, mirror(4), 5, 1, side === 'empire' ? 'reinhard' : 'yang');
+          newUnit(g, 'heavy', side, mirror(5), 3, 2, side === 'empire' ? 'mittermeyer' : 'attenborough');
+          newUnit(g, 'light', side, mirror(5), 7, 2);
+          newUnit(g, 'beam', side, mirror(4), 4, 2);
+          newUnit(g, 'siege', side, mirror(5), 1, 1);
+          newUnit(g, 'missile', side, mirror(3), 6, 1);
+          newUnit(g, 'frigate', side, mirror(6), 2, 1);
+          newUnit(g, 'corvette', side, mirror(6), 8, 2);
+          newUnit(g, 'destroyer', side, mirror(3), 9, 1);
+        }
+      setEconomy(spec.economy);
+    } else if (scen === 'iserlohn') {
       g.tiles.forEach(t => (t.owner = t.c < 4 ? player : enemy));
       station('Forward Base', 1, 4, player, 3, true);
       station('Iserlohn', 8, 4, enemy, 3, false, true);
@@ -1008,19 +1390,98 @@
       newUnit(g, 'beam', enemy, 8, 3, 2);
       newUnit(g, 'missile', enemy, 8, 5, 1);
       g.economy[enemy] = { credits: 140, industry: 70, science: 0 };
+    } else if (scen === 'astarte') {
+      claim(station('Brünhild Anchorage', 1, 4, 'empire', 2, true), 'empire');
+      [
+        ['empire', 'flagship', 5, 4, 1, 'reinhard'],
+        ['empire', 'heavy', 5, 3, 2, 'kircheis'],
+        ['empire', 'battleship', 6, 5, 1],
+        ['empire', 'heavy', 4, 5, 1],
+        ['empire', 'light', 6, 3, 2],
+        ['empire', 'beam', 4, 4, 2],
+        ['empire', 'missile', 4, 3, 1],
+        ['empire', 'corvette', 5, 5, 2],
+        ['empire', 'destroyer', 3, 4, 1],
+        ['alliance', 'heavy', 8, 0, 2],
+        ['alliance', 'light', 9, 1, 2],
+        ['alliance', 'beam', 9, 0, 1],
+        ['alliance', 'corvette', 7, 1, 1],
+        ['alliance', 'heavy', 8, 8, 2],
+        ['alliance', 'light', 9, 7, 2],
+        ['alliance', 'missile', 9, 8, 1],
+        ['alliance', 'corvette', 7, 7, 1],
+        ['alliance', 'flagship', 12, 4, 1, 'yang'],
+        ['alliance', 'heavy', 11, 4, 2],
+        ['alliance', 'light', 11, 3, 1],
+        ['alliance', 'beam', 12, 5, 2],
+        ['alliance', 'frigate', 11, 5, 1],
+      ].forEach(place);
+      g.economy.alliance = { credits: 0, industry: 0, science: 0 };
+    } else if (scen === 'amritsar') {
+      const hold = station('Amritsar', 3, 4, 'alliance', 2, true);
+      hold.maxShield = hold.shield = 320;
+      claim(hold, 'alliance');
+      claim(station('Supply Depot', 0, 1, 'alliance', 1), 'alliance');
+      claim(station('Imperial Staging', 11, 4, 'empire', 2), 'empire');
+      [
+        ['alliance', 'flagship', 4, 4, 1, 'yang'],
+        ['alliance', 'heavy', 4, 3, 2, 'attenborough'],
+        ['alliance', 'light', 4, 5, 2, 'fischer'],
+        ['alliance', 'heavy', 3, 3, 1],
+        ['alliance', 'beam', 2, 4, 2],
+        ['alliance', 'missile', 2, 5, 1],
+        ['alliance', 'corvette', 5, 4, 2],
+        ['alliance', 'destroyer', 3, 5, 1],
+        ['alliance', 'frigate', 2, 3, 1],
+        ['empire', 'flagship', 10, 4, 1, 'reinhard'],
+        ['empire', 'heavy', 8, 3, 2, 'mittermeyer'],
+        ['empire', 'battleship', 8, 5, 2, 'reuenthal'],
+        ['empire', 'frigate', 9, 2, 2, 'kircheis'],
+        ['empire', 'heavy', 9, 6, 1],
+        ['empire', 'light', 8, 4, 2],
+        ['empire', 'missile', 10, 3, 1],
+        ['empire', 'siege', 10, 5, 1],
+        ['empire', 'corvette', 7, 2, 2],
+        ['empire', 'destroyer', 7, 6, 1],
+      ].forEach(place);
+      setEconomy({ alliance: [150, 60], empire: [200, 80] });
+    } else if (scen === 'vermilion') {
+      claim(station('Forward Base', 0, 4, 'alliance', 1, true), 'alliance');
+      claim(station('Vermilion Depot', 12, 4, 'empire', 2), 'empire');
+      [
+        ['alliance', 'flagship', 2, 4, 1, 'yang'],
+        ['alliance', 'heavy', 3, 3, 2, 'attenborough'],
+        ['alliance', 'light', 3, 5, 2, 'fischer'],
+        ['alliance', 'heavy', 2, 3, 1],
+        ['alliance', 'missile', 1, 4, 1],
+        ['alliance', 'beam', 2, 5, 2],
+        ['alliance', 'corvette', 4, 4, 2],
+        ['alliance', 'destroyer', 3, 4, 1],
+        ['alliance', 'frigate', 1, 3, 1],
+        ['empire', 'flagship', 11, 4, 1, 'reinhard'],
+        ['empire', 'heavy', 10, 3, 2],
+        ['empire', 'heavy', 10, 5, 2],
+        ['empire', 'battleship', 9, 4, 1],
+        ['empire', 'light', 9, 2, 2],
+        ['empire', 'light', 9, 6, 2],
+        ['empire', 'beam', 11, 3, 1],
+        ['empire', 'missile', 11, 5, 1],
+        ['empire', 'corvette', 8, 3, 1],
+        ['empire', 'corvette', 8, 5, 1],
+        ['empire', 'destroyer', 10, 4, 1],
+      ].forEach(place);
+      setEconomy({ alliance: [250, 90], empire: [220, 80] });
     }
     for (const u of g.units) tile(g, u.c, u.r).terrain = 'space';
     if (difficulty === 'easy') {
       g.economy[player].credits += 150;
       g.economy[player].industry += 50;
     }
-    log(
-      g,
-      mode === 'iserlohn'
-        ? 'Breach the fortress shields, eliminate the garrison, then occupy Iserlohn with an Escort or Battle Line fleet.'
-        : 'Secure the three central corridors. Capture the enemy capital while defending your own.',
-      player,
-    );
+    g.startFleets = {
+      empire: g.units.filter(u => u.side === 'empire').length,
+      alliance: g.units.filter(u => u.side === 'alliance').length,
+    };
+    log(g, era ? ERAS[era].desc : def.desc, player);
     return g;
   }
   // Enemy high command, run once at the start of each AI turn before its fleets act:
@@ -1036,6 +1497,18 @@
     const bases = g.stations.filter(s => s.owner === side).sort((a, b) => front(a) - front(b));
     const yard3 = bases.filter(s => s.tier >= 3);
     const flagPrice = price('flagship');
+
+    // 0. Fire every ready fortress main gun at the strongest enemy fleet in range (the UI animates g.strikes).
+    g.strikes = [];
+    for (const s of bases) {
+      const target = fortressTargets(g, s)
+        .map(p => unitAt(g, p))
+        .sort((a, b) => b.hp - a.hp || a.id - b.id)[0];
+      if (target) {
+        const shot = fireFortress(g, s.id, target.c, target.r);
+        if (shot.ok) g.strikes.push(shot);
+      }
+    }
 
     // 1. Repair badly damaged fleets resting at a friendly station (this spends their turn).
     for (const u of own()
@@ -1067,10 +1540,15 @@
       if (affordable(researchCost(g, side, k))) research(g, k);
     }
 
-    // 4. Upgrade one rear shipyard per turn when there is surplus.
+    // 4. Upgrade one building per turn when there is surplus: the lowest-level building at the safest station.
     if (!plan.saving && g.turn >= 2) {
-      const yard = bases.filter(s => s.tier < 3).sort((a, b) => front(b) - front(a) || a.tier - b.tier)[0];
-      if (yard && spendable() - upgradeCost(yard).credits >= 250 && affordable(upgradeCost(yard))) upgrade(g, yard.id);
+      const options = bases
+        .flatMap(s => ['shipyard', 'lab', 'air'].map(kind => ({ s, kind, level: buildingLevel(s, kind) })))
+        .filter(o => o.level < 3)
+        .sort((a, b) => a.level - b.level || front(b.s) - front(a.s) || random(g) - 0.5);
+      const pick = options[0];
+      if (pick && spendable() - buildCost(pick.s, pick.kind).credits >= 250 && affordable(buildCost(pick.s, pick.kind)))
+        build(g, pick.s.id, pick.kind);
     }
 
     // 5. Reinforce healthy Battle Line and Artillery fleets parked at a friendly station.
@@ -1090,12 +1568,14 @@
 
     // 6. Build: front-line shipyards first; stack up when the budget allows.
     bases.forEach((s, i) => {
-      const menu =
-        s.tier >= 3
-          ? ['battleship', 'siege', 'heavy', 'missile', 'frigate', 'corvette']
-          : s.tier === 2
-            ? ['heavy', 'missile', 'destroyer', 'corvette']
-            : ['light', 'beam', 'frigate', 'corvette'];
+      const ships =
+          s.tier >= 3
+            ? ['battleship', 'siege', 'heavy', 'missile', 'frigate', 'corvette']
+            : s.tier === 2
+              ? ['heavy', 'missile', 'destroyer', 'corvette']
+              : ['light', 'beam', 'frigate', 'corvette'],
+        air = ['strategic', 'bomber', 'fighter'].filter(k => (s.air || 0) >= TYPES[k].tier),
+        menu = [...ships.slice(0, 2), ...air.slice(0, 1), ...ships.slice(2), ...air.slice(1)];
       const preferred = menu[Math.floor(random(g) * Math.min(menu.length, 3))];
       const share = i === bases.length - 1 ? 1 : 0.6;
       for (const type of [preferred, ...menu.filter(x => x !== preferred)]) {
@@ -1153,6 +1633,9 @@
           sc -= danger * 28;
           sc -= Math.abs(nearestEnemy - TYPES[u.type].max) * 6;
         } else sc -= nearestEnemy * 2;
+        // Air wings stay within supply range of a friendly air base.
+        if (TYPES[u.type].air && !g.stations.some(s => s.owner === u.side && (s.air || 0) > 0 && distance(s, p) <= 3))
+          sc -= 80;
         u.c = p.c;
         u.r = p.r;
         const shot = choose();
@@ -1188,7 +1671,20 @@
     reinforceCost,
     repairCost,
     upgradeCost,
-    fortressFire,
+    BUILDINGS,
+    buildingLevel,
+    buildCost,
+    build,
+    FORTRESS_GUN,
+    fortressName,
+    fortressReady,
+    fortressDamage,
+    fortressTargets,
+    fireFortress,
+    ERAS,
+    SCENARIOS,
+    objectiveText,
+    modeTitle,
     TYPES,
     ADMIRALS,
     TECHS,

@@ -152,6 +152,9 @@ const SFX = (() => {
     beam: 'beam',
     missile: 'rockets',
     siege: 'siege',
+    fighter: 'laser',
+    bomber: 'rockets',
+    strategic: 'railgun',
   };
   // Browsers only start audio after a user gesture.
   if (typeof document !== 'undefined' && typeof window !== 'undefined' && window.addEventListener)
