@@ -18,9 +18,12 @@ https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `
 - **Air wings:** Fighter, Bomber and Strategic Bomber wings from air bases. They ignore terrain, cannot capture, are immune to artillery, only take return fire from escorts and fighters, and need a friendly air base within 3 hexes.
 - **Conquest start dates:** the standard frontier plus Astarte, the Amritsar offensive, the Lippstadt War (rebel stations and garrisons) and Operation Ragnarök.
 - **Scenarios:** Assault on Iserlohn, Battle of Astarte, Hold Amritsar and Battle of Vermilion, each with one objective, a turn limit and a saved 1–3 star rating.
+- **Branch technology trees:** Escort, Battle Line, Artillery and Aerospace each have Drives, Plating and Weapons upgrades plus a Doctrine with class abilities (Picket Screen, Breakthrough Doctrine, Fire Control with +1 artillery range, Carrier Operations with hit-and-run air wings).
+- **Admiral development:** XP from combat, five ranks (+6% fleet hull each), skill points for six upgradeable skills or branch star ratings, and five medals to earn and wear. Officer records are saved in the browser and carry between operations.
+- **Clear disabled orders:** unavailable buttons say why, e.g. "Need 30 more credits", "Already fired", "No friendly station nearby".
 - **Economy:** both sides start with 300 credits and 250/turn. Escorts give the most firepower per credit, flagships the most per hex at about two turns of income; extra stacks cost 85% of a hull, field reinforcement a full hull, repairs a fifth of the fleet's price.
 
-Saves from earlier versions are not loaded (rules version 6).
+Saves from earlier versions are not loaded (rules version 7).
 
 ## Run the game
 

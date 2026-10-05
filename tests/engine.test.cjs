@@ -248,12 +248,14 @@ test('Research charges resources and affects current units immediately', () => {
   const g = blank(),
     u = E.newUnit(g, 'heavy', 'alliance', 2, 2),
     old = E.movement(g, u);
-  assert(E.research(g, 'warp').ok);
+  assert(E.research(g, 'line', 'drives').ok);
   assert.equal(E.movement(g, u), old + 1);
-  assert.equal(g.tech.alliance.warp, 1);
-  E.research(g, 'warp');
-  E.research(g, 'warp');
-  assert(!E.research(g, 'warp').ok);
+  assert.equal(g.tech.alliance.line.drives, 1);
+  const escort = E.newUnit(g, 'corvette', 'alliance', 5, 5);
+  assert.equal(E.movement(g, escort), E.TYPES.corvette.move);
+  E.research(g, 'line', 'drives');
+  assert.equal(E.researchReason(g, 'alliance', 'line', 'drives'), 'Fully researched');
+  assert(!E.research(g, 'line', 'drives').ok);
 });
 test('Start of turn applies income, station regeneration, attrition, and resets actions', () => {
   const g = blank(),
@@ -519,4 +521,89 @@ test('Admirals who have fallen by a start date cannot be appointed', () => {
     u = g.units.find(u => u.side === 'empire' && !u.admiral);
   g.economy.empire.credits = 9999;
   assert(!E.assign(g, u.id, 'kircheis').ok);
+});
+test('Disabled orders report a specific reason', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'light', 'alliance', 4, 4);
+  u.hp -= 50;
+  assert.equal(E.repairReason(g, u), 'No friendly station nearby');
+  station(g, 4, 5);
+  g.economy.alliance.credits = 10;
+  assert.match(E.repairReason(g, u), /^Need \d+ more credits$/);
+  g.economy.alliance.credits = 5000;
+  assert.equal(E.repairReason(g, u), null);
+  u.attacked = true;
+  assert.equal(E.repairReason(g, u), 'Already fired');
+  assert.equal(E.attack(g, u.id, 5, 4).reason, 'Already fired');
+  u.attacked = false;
+  u.stack = 3;
+  assert.equal(E.reinforceReason(g, u), 'Already at 3 stacks');
+  const s = g.stations.at(-1);
+  s.tier = 1;
+  assert.equal(E.buyReason(g, s, 'battleship'), 'Requires shipyard tier 3');
+  g.economy.alliance.industry = 0;
+  assert.match(E.buyReason(g, s, 'corvette'), /more industry/);
+  assert.equal(
+    E.shortfall({ credits: 10, industry: 0 }, { credits: 40, industry: 5 }),
+    'Need 30 more credits and 5 more industry',
+  );
+});
+test('Branch doctrines unlock class abilities', () => {
+  const g = blank(),
+    arty = E.newUnit(g, 'missile', 'alliance', 2, 2);
+  assert.equal(E.rangeOf(g, arty).max, 2);
+  g.tech.alliance.artillery.doctrine = 2;
+  assert.equal(E.rangeOf(g, arty).max, 3);
+  assert.equal(E.airSupply(g, 'alliance'), 3);
+  g.tech.alliance.air.doctrine = 2;
+  assert.equal(E.airSupply(g, 'alliance'), 5);
+  const wing = E.newUnit(g, 'fighter', 'alliance', 6, 6),
+    foe = E.newUnit(g, 'corvette', 'empire', 7, 6);
+  assert(E.attack(g, wing.id, foe.c, foe.r).ok);
+  assert(!wing.moved && wing.attacked);
+  assert(E.reachable(g, wing).size > 0);
+});
+test('Admirals earn XP, promote for hull and points, train skills and wear medals', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
+  g.economy.alliance.credits = 5000;
+  assert(E.assign(g, u.id, 'fischer').ok);
+  const o = E.officer(g, 'fischer');
+  assert.equal(u.cmdRank, o.rank);
+  assert.equal(u.hp, E.maxHP(u));
+  assert.match(E.promoteReason(g, 'fischer'), /more XP/);
+  o.xp = E.RANK_XP[o.rank + 1];
+  const hull = E.maxHP(u),
+    points = o.points;
+  assert(E.promote(g, 'fischer').ok);
+  assert(E.maxHP(u) > hull);
+  assert.equal(o.points, points + 1);
+  assert(E.learnSkill(g, 'fischer', 'gunnery').ok);
+  assert.equal(o.skills.gunnery, 1);
+  assert(E.raiseRating(g, 'fischer', 'escort').ok);
+  assert.equal(o.points, points - 1);
+  assert.match(E.learnReason(g, 'fischer', 'gunnery'), /No skill points/);
+  g.medalInventory = ['valor'];
+  assert(E.equipMedal(g, 'fischer', 'valor').ok);
+  assert.deepEqual(g.medalInventory, []);
+  assert.equal(E.equipReason(g, 'fischer', 'valor'), 'Not in your medal case');
+  const profile = E.exportProfile(g);
+  assert.equal(profile.officers.fischer.rank, o.rank);
+  const next = E.applyProfile(E.createGame('alliance', 'normal', 'conquest', 4), profile);
+  assert.equal(E.officer(next, 'fischer').rank, o.rank);
+  assert.deepEqual(E.officer(next, 'fischer').medals, ['valor']);
+});
+test('Medals are awarded for defeating an enemy admiral and for winning', () => {
+  const g = blank(),
+    a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3, 'yang'),
+    v = E.newUnit(g, 'corvette', 'empire', 3, 2, 1, 'reinhard');
+  v.hp = 1;
+  const xp = E.officer(g, 'yang').xp;
+  assert(E.attack(g, a.id, 3, 2).destroyed);
+  assert(g.medalInventory.includes('valor'));
+  assert.equal(E.officer(g, 'yang').xp, xp + 4);
+  g.stations[1].owner = 'alliance';
+  E.checkVictory(g);
+  assert.equal(g.over.winner, 'alliance');
+  assert(g.medalInventory.includes('campaign'));
 });
