@@ -90,7 +90,7 @@ const SFX = (() => {
       tone(t, v.grit, 75 * v.pitch, 28, 0.45, 0.32);
       burst(t, 'lowpass', 900, 70, 0.55, 0.55);
     },
-    // Arsenal ships: multi-burst rocket WHOOSH, then the impacts.
+    // Artillery cruisers: multi-burst rocket WHOOSH, then the impacts.
     rockets(t, v) {
       for (let i = 0; i < 4; i++) {
         const s = t + i * 0.085;
@@ -98,7 +98,7 @@ const SFX = (() => {
         burst(s + 0.28, 'lowpass', 1600, 180, 0.2, 0.22);
       }
     },
-    // Spinal beam cruisers: humming neutron beam.
+    // Artillery frigates: humming neutron beam.
     beam(t, v) {
       const o = ac.createOscillator(),
         lfo = ac.createOscillator(),
@@ -119,7 +119,7 @@ const SFX = (() => {
       lfo.stop(t + 0.55);
       tone(t, 'sine', 1760 * v.pitch, 2640 * v.pitch, 0.4, 0.06);
     },
-    // Siege monitors: enormous spinal-cannon boom.
+    // Siege cannons: enormous spinal-cannon boom.
     siege(t, v) {
       tone(t, 'sine', 90 * v.pitch, 22, 0.95, 1);
       tone(t, v.grit, 180 * v.pitch, 40, 0.35, 0.3);

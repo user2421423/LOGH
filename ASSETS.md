@@ -145,9 +145,9 @@ Index 3: row 1, column 4 — Light Cruiser
 Index 4: row 1, column 5 — Heavy Cruiser
 Index 5: row 2, column 1 — Battleship
 Index 6: row 2, column 2 — Dreadnought
-Index 7: row 2, column 3 — Spinal Beam Cruiser
-Index 8: row 2, column 4 — Fusion Missile Arsenal Ship
-Index 9: row 2, column 5 — Siege Cannon Monitor
+Index 7: row 2, column 3 — Artillery Frigate (art generated as "Spinal Beam Cruiser")
+Index 8: row 2, column 4 — Artillery Cruiser (art generated as "Fusion Missile Arsenal Ship")
+Index 9: row 2, column 5 — Siege Cannon (art generated as "Siege Cannon Monitor")
 
 Nominal equal cells: 396.6 pixels wide × 396.5 pixels high. Some larger silhouettes extend across nominal vertical cell boundaries; use carefully selected source rectangles if exact silhouette preservation is required.
 

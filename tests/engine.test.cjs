@@ -119,11 +119,11 @@ test('Escort and Battle Line ranges allow normal counter-fire in both directions
       assert(E.attack(long, u.id, 4, 2).counter > 0, 'range-2 heavy hulls exchange fire');
   }
 });
-test('Artillery tiers, ranges, suppression, and monitor station bonus match the roster', () => {
-  for (const [type, tier, max] of [
-    ['beam', 1, 1],
-    ['missile', 2, 2],
-    ['siege', 3, 2],
+test('Artillery tiers, fixed range-2 guns, suppression, and siege station bonus match the roster', () => {
+  for (const [type, tier, min, max] of [
+    ['beam', 1, 1, 1],
+    ['missile', 2, 2, 2],
+    ['siege', 3, 2, 2],
   ]) {
     const g = blank(),
       u = E.newUnit(g, type, 'alliance', 2, 2);
@@ -131,10 +131,13 @@ test('Artillery tiers, ranges, suppression, and monitor station bonus match the 
     E.newUnit(g, 'flagship', 'empire', 4, 2, 3);
     E.newUnit(g, 'flagship', 'empire', 5, 2, 3);
     assert.equal(E.TYPES[type].tier, tier);
-    assert.equal(E.TYPES[type].min, 1);
+    assert.equal(E.TYPES[type].min, min);
     assert.equal(E.TYPES[type].max, max);
-    assert.equal(E.preview(g, u.id, 3, 2).counterAllowed, false);
-    assert.equal(E.attack(g, u.id, 3, 2).counter, 0);
+    // Range-2 artillery cannot fire at an adjacent target.
+    assert.equal(!!E.preview(g, u.id, 3, 2), min === 1);
+    const shot = min === 1 ? [3, 2] : [4, 2];
+    assert.equal(E.preview(g, u.id, ...shot).counterAllowed, false);
+    assert.equal(E.attack(g, u.id, ...shot).counter, 0);
     assert.equal(!!E.preview(g, u.id, 4, 2), max === 2);
     assert.equal(E.preview(g, u.id, 5, 2), null);
   }
