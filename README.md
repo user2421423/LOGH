@@ -2,6 +2,10 @@
 
 This contains the complete published game, including the new Empire and Alliance artwork, ten ship classes, updated combat rules, and saved-campaign migration.
 
+## Play online
+
+https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `.github/workflows/pages.yml` after the tests pass.
+
 ## Run the game
 
 1. Extract this ZIP.
