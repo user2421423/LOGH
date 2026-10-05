@@ -27,18 +27,13 @@ const ICONS = (() => {
         a = ((36 * i - 90) * Math.PI) / 180;
       return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
     }).join(' ');
-  const coin =
-    emblem => `<polygon points="${hex(16, 16, 14.5)}" fill="url(#ig-gold)" stroke="#5c3a08" stroke-width="1"/>
-    <polygon points="${hex(16, 16, 11.5)}" fill="url(#ig-gold-in)" stroke="#fff3c4" stroke-opacity=".7" stroke-width=".8"/>
-    ${emblem}
-    <path d="M6 9.5 16 3.8 26 9.5" fill="none" stroke="#fffbe6" stroke-opacity=".75" stroke-width="1.1" stroke-linecap="round"/>`;
   const symbols = {
-    'credits-empire': coin(
-      `<path d="M16 8.5 18.4 12.6 23 11.2 20.6 15.6 23 20 18.2 18.9 16 23.5 13.8 18.9 9 20 11.4 15.6 9 11.2 13.6 12.6Z" fill="#7a4a0c" stroke="#fff0b8" stroke-width=".7"/><circle cx="16" cy="16" r="2.1" fill="#ffe9a0"/>`,
-    ),
-    'credits-alliance': coin(
-      `<polygon points="${star(16, 16.4, 7.4, 3)}" fill="#7a4a0c" stroke="#fff0b8" stroke-width=".7"/>`,
-    ),
+    // WC4-style gold coin with an embossed dollar sign.
+    credits: `<circle cx="16" cy="16.6" r="14" fill="#6b4208"/>
+      <circle cx="16" cy="15.4" r="14" fill="url(#ig-gold)" stroke="#5c3a08" stroke-width="1"/>
+      <circle cx="16" cy="15.4" r="10.6" fill="url(#ig-gold-in)" stroke="#fff3c4" stroke-opacity=".75" stroke-width=".9"/>
+      <text x="16" y="21.4" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="17" fill="#6b3f05" stroke="#fff0b8" stroke-width=".6">$</text>
+      <path d="M7.5 9.5A10.5 10.5 0 0 1 21 5.6" fill="none" stroke="#fffbe6" stroke-opacity=".8" stroke-width="1.2" stroke-linecap="round"/>`,
     industry: `<path d="${gear}" fill="url(#ig-bronze)" stroke="#2a1a0c" stroke-width=".9"/>
       <circle cx="13" cy="13" r="3.6" fill="#1d150e" stroke="#e9c48a" stroke-width="1"/>
       <path d="M12 23.5 15.5 18h13l-2.6 5.5Z" fill="url(#ig-steel)" stroke="#20262c" stroke-width=".9"/>
@@ -50,16 +45,6 @@ const ICONS = (() => {
         .join('')}</g>
       <rect x="12.5" y="12.5" width="7" height="7" rx="1" fill="#04303d" stroke="#d9fbff" stroke-width=".8"/>
       <path d="M14 16h4M16 14v4" stroke="#7fe9ff" stroke-width="1.1"/>`,
-    energy: `<g filter="url(#if-glow-green)"><rect x="9.5" y="7" width="13" height="21" rx="2.5" fill="url(#ig-plasma)" stroke="#c9ffd9" stroke-width="1"/></g>
-      <rect x="13" y="3.8" width="6" height="3.6" rx="1" fill="#b9c4c0" stroke="#33413b" stroke-width=".8"/>
-      <path d="M17.6 10.5 12.6 18.4h3.6l-1.6 6.3 5.2-8.3h-3.7Z" fill="#fbffe9" stroke="#1d6b3c" stroke-width=".7"/>
-      <path d="M11.5 9.5v16" stroke="#fff" stroke-opacity=".45" stroke-width="1.2"/>`,
-    medals: `<path d="M9 2.5h6l3 10h-6Z" fill="#b3202c" stroke="#4a0b10" stroke-width=".8"/>
-      <path d="M23 2.5h-6l-3 10h6Z" fill="#d22d38" stroke="#4a0b10" stroke-width=".8"/>
-      <path d="M11.6 2.5h1.6l3 10h-1.6ZM20.4 2.5h-1.6l-3 10h1.6Z" fill="#f2c94c"/>
-      <circle cx="16" cy="20.5" r="8.2" fill="url(#ig-gold)" stroke="#5c3a08" stroke-width="1"/>
-      <circle cx="16" cy="20.5" r="6" fill="none" stroke="#fff3c4" stroke-opacity=".7" stroke-width=".8"/>
-      <polygon points="${star(16, 20.8, 4.6, 1.9)}" fill="#a3161f" stroke="#ffe39a" stroke-width=".6"/>`,
     atk: `<g filter="url(#if-glow-red)" fill="none" stroke="#ff5a2e" stroke-width="2.2"><circle cx="16" cy="16" r="9"/></g>
       <g stroke="#ffb35c" stroke-width="2" stroke-linecap="round"><path d="M16 2.5v7M16 22.5v7M2.5 16h7M22.5 16h7"/></g>
       <path d="M4 28 13.5 18.5M28 4 18.5 13.5" stroke="#ff8a3d" stroke-opacity=".75" stroke-width="1.2"/>
@@ -81,7 +66,6 @@ const ICONS = (() => {
     <linearGradient id="ig-bronze" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4d29a"/><stop offset=".5" stop-color="#a8743c"/><stop offset="1" stop-color="#4e3218"/></linearGradient>
     <linearGradient id="ig-steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f6f8"/><stop offset="1" stop-color="#8e9aa4"/></linearGradient>
     <linearGradient id="ig-chip" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7cf3ff"/><stop offset="1" stop-color="#0a7fa6"/></linearGradient>
-    <linearGradient id="ig-plasma" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9dffbf"/><stop offset=".55" stop-color="#19d36a"/><stop offset="1" stop-color="#0a6e36"/></linearGradient>
     <radialGradient id="ig-shield" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#7fd0ff" stop-opacity=".95"/><stop offset="1" stop-color="#1b4fa0" stop-opacity=".85"/></radialGradient>
     <filter id="if-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.2" result="b"/><feFlood flood-color="#4fe6ff"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <filter id="if-glow-green" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.1" result="b"/><feFlood flood-color="#39ff8a"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>

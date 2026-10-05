@@ -10,11 +10,13 @@ https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `
 
 - **One-click attacks:** click (or press Enter on) a red hex to fire immediately. Hover first to see the expected damage and counter-fire.
 - **Undo move:** a fleet that has moved but not fired can be sent back with the **Undo move** button or **Z**. Any attack, purchase or other order locks in earlier moves.
-- **Resources:** Credits (hex coin with the Imperial crest or FPA star), Industry (gear and ingot), Research (microchip), **Plasma Energy** (stations produce it; Battle Line and Artillery hulls cost it) and **Command Medals** (+1 per fleet destroyed, +3 per station captured; spent to appoint admirals).
-- **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and gold laurel pins mark admirals.
-- **Overlays:** green hexes for moves, red hexes with crosshairs for targets, and a pulsing teal outline on the selected hex.
+- **Resources:** Credits (gold $ coin), Industry (gear and ingot) and Research (microchip).
+- **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and admirals appear as framed portraits with rank stars above their fleets.
+- **Combat juice:** synthesized weapon sounds per hull class and faction (🔊 button mutes), floating damage with red **CRIT!** numbers, blue station-defense tags, **MORALE ↓ / CONFUSED / LOW SUPPLY** alerts, and camera shake on heavy hits.
+- **Thor's Hammer:** shielded fortresses (Iserlohn, Geiersburg) fire their main gun each turn at the strongest enemy fleet within 2 hexes. Break the shields to silence them.
+- **Economy:** both sides start with 300 credits and 250/turn. Escorts give the most firepower per credit, flagships the most per hex at about two turns of income; extra stacks cost 85% of a hull, field reinforcement a full hull, repairs a fifth of the fleet's price.
 
-Saves from earlier versions are not loaded (rules version 4).
+Saves from earlier versions are not loaded (rules version 5).
 
 ## Run the game
 

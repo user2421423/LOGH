@@ -43,7 +43,7 @@ function blank() {
   g.phase = 'alliance';
   g.over = null;
   g.nextId = 1;
-  g.economy.alliance = { credits: 5000, industry: 5000, science: 5000, energy: 5000, medals: 50 };
+  g.economy.alliance = { credits: 5000, industry: 5000, science: 5000 };
   return g;
 }
 function station(g, c, r, owner = 'alliance', shield = 150, tier = 3) {
@@ -313,7 +313,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3]) {
+  for (const v of [undefined, 2, 3, 4]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -377,46 +377,50 @@ test('Confused fleets cannot repair or reinforce', () => {
   u.morale = 0;
   assert(E.repair(g, u.id).ok);
 });
-test('Heavy hulls cost plasma energy; escorts do not', () => {
-  const g = blank(),
-    s = station(g, 2, 2);
-  g.economy.alliance.energy = 0;
-  assert.equal(E.price('corvette').energy, 0);
-  assert(E.price('heavy', 2).energy > E.price('heavy').energy);
-  assert(!E.canBuy(g, s, 'heavy'));
-  assert(E.recruit(g, s.id, 'corvette').ok);
-  g.turn++;
-  g.economy.alliance.energy = E.price('heavy').energy;
-  assert(E.recruit(g, s.id, 'heavy').ok);
-  assert.equal(g.economy.alliance.energy, 0);
+test('Both sides start conquest with equal income', () => {
+  const g = E.createGame('alliance', 'normal', 'conquest', 4);
+  assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
+  assert.equal(E.income(g, 'alliance').credits, 250);
 });
-test('Stations produce energy each turn, and upgrades raise it', () => {
-  const g = blank(),
-    s = station(g, 2, 2);
-  s.energy = 4;
-  const before = g.economy.alliance.energy;
-  E.beginTurn(g, 'alliance');
-  assert.equal(g.economy.alliance.energy, before + 4);
-  assert(E.upgrade(g, g.stations[0].id).ok);
-  assert.equal(g.stations[0].energy, 1);
+test('Pricing makes escorts the most cost-efficient and flagships the strongest per hex', () => {
+  const linear = (k, n = 1) => {
+    const t = E.TYPES[k];
+    return Math.sqrt(t.hp * (1 + 0.7 * (n - 1)) * (1 + t.armor / 80) * t.attack * (1 + 0.45 * (n - 1)));
+  };
+  const eff = (k, n = 1) => linear(k, n) / E.price(k, n).credits;
+  assert(eff('corvette') > eff('light') && eff('light') > eff('heavy') && eff('heavy') > eff('battleship'));
+  assert(eff('battleship') > eff('flagship'));
+  assert(linear('flagship') > linear('battleship') && linear('battleship') > linear('heavy'));
+  assert(eff('heavy', 2) < eff('heavy') && eff('heavy', 3) < eff('heavy', 2));
+  const g = E.createGame('alliance', 'normal', 'conquest', 4);
+  assert(E.price('flagship').credits > E.income(g, 'alliance').credits * 1.8);
 });
-test('Command Medals are earned for kills and captures and spent on admirals', () => {
-  const g = blank();
-  g.economy.alliance.medals = 0;
-  const a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3),
-    v = E.newUnit(g, 'corvette', 'empire', 3, 2);
-  v.hp = 1;
-  assert(E.attack(g, a.id, 3, 2).destroyed);
-  assert.equal(g.economy.alliance.medals, E.MEDALS.kill);
-  assert(!E.assign(g, a.id, 'fischer').ok);
-  const s = station(g, 5, 5, 'empire', 0),
-    c = E.newUnit(g, 'corvette', 'alliance', 5, 4);
-  assert(E.move(g, c.id, 5, 5).captured);
-  assert.equal(g.economy.alliance.medals, E.MEDALS.kill + E.MEDALS.capture);
-  assert.equal(E.ADMIRALS.yang.medals, 4);
-  assert.equal(E.ADMIRALS.fischer.medals, 3);
-  assert(E.assign(g, c.id, 'fischer').ok);
-  assert.equal(g.economy.alliance.medals, E.MEDALS.kill + E.MEDALS.capture - 3);
-  assert(!E.assign(g, a.id, 'yang').ok);
-  assert(!s.shield);
+test('Repairs cost a fifth of the fleet build price; reinforcing costs a full hull', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'flagship', 'alliance', 0, 1, 2);
+  u.hp -= 200;
+  const before = g.economy.alliance.credits;
+  assert(E.repair(g, u.id).ok);
+  assert.equal(before - g.economy.alliance.credits, Math.round(E.price('flagship', 2).credits * 0.2));
+  assert.deepEqual(E.reinforceCost('heavy'), { credits: E.TYPES.heavy.cost, industry: E.TYPES.heavy.industry });
+});
+test("Thor's Hammer fires from a shielded fortress at the strongest fleet in range", () => {
+  const g = blank(),
+    fort = station(g, 4, 4, 'empire', 150);
+  fort.fort = true;
+  fort.name = 'Iserlohn';
+  const weak = E.newUnit(g, 'corvette', 'alliance', 4, 3),
+    strong = E.newUnit(g, 'flagship', 'alliance', 5, 4),
+    far = E.newUnit(g, 'battleship', 'alliance', 8, 8);
+  E.beginTurn(g, 'empire', false);
+  assert.equal(g.strikes.length, 1);
+  assert.equal(g.strikes[0].name, "Thor's Hammer");
+  assert.equal(g.strikes[0].id, strong.id);
+  assert.equal(strong.hp, E.maxHP(strong) - g.strikes[0].damage);
+  assert.equal(weak.hp, E.maxHP(weak));
+  assert.equal(far.hp, E.maxHP(far));
+  assert.equal(strong.morale, -1);
+  fort.shield = 0;
+  E.beginTurn(g, 'empire', false);
+  assert.equal(g.strikes.length, 0);
 });

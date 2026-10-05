@@ -19,8 +19,8 @@
       move: 4,
       min: 1,
       max: 1,
-      cost: 65,
-      industry: 12,
+      cost: 60,
+      industry: 10,
       tier: 1,
       crit: 0.08,
       pen: 0.08,
@@ -38,8 +38,8 @@
       move: 3,
       min: 1,
       max: 1,
-      cost: 135,
-      industry: 30,
+      cost: 110,
+      industry: 25,
       tier: 1,
       crit: 0.12,
       pen: 0.45,
@@ -58,8 +58,8 @@
       move: 5,
       min: 1,
       max: 1,
-      cost: 125,
-      industry: 30,
+      cost: 115,
+      industry: 25,
       tier: 2,
       crit: 0.1,
       pen: 0.15,
@@ -77,8 +77,8 @@
       move: 4,
       min: 1,
       max: 1,
-      cost: 130,
-      industry: 35,
+      cost: 135,
+      industry: 30,
       tier: 1,
       crit: 0.12,
       pen: 0.2,
@@ -97,8 +97,8 @@
       move: 3,
       min: 1,
       max: 1,
-      cost: 190,
-      industry: 50,
+      cost: 215,
+      industry: 55,
       tier: 2,
       crit: 0.14,
       pen: 0.3,
@@ -117,8 +117,8 @@
       move: 3,
       min: 1,
       max: 2,
-      cost: 270,
-      industry: 75,
+      cost: 330,
+      industry: 90,
       tier: 3,
       crit: 0.18,
       pen: 0.42,
@@ -137,8 +137,8 @@
       move: 2,
       min: 1,
       max: 2,
-      cost: 390,
-      industry: 115,
+      cost: 500,
+      industry: 140,
       tier: 3,
       crit: 0.22,
       pen: 0.48,
@@ -158,8 +158,8 @@
       move: 2,
       min: 1,
       max: 1,
-      cost: 125,
-      industry: 32,
+      cost: 130,
+      industry: 30,
       tier: 1,
       crit: 0.12,
       pen: 0.45,
@@ -179,8 +179,8 @@
       move: 3,
       min: 1,
       max: 2,
-      cost: 250,
-      industry: 75,
+      cost: 235,
+      industry: 70,
       tier: 2,
       crit: 0.12,
       pen: 0.55,
@@ -201,8 +201,8 @@
       move: 1,
       min: 1,
       max: 2,
-      cost: 320,
-      industry: 100,
+      cost: 380,
+      industry: 110,
       tier: 3,
       crit: 0.25,
       critMult: 1.9,
@@ -218,6 +218,7 @@
       short: 'Reinhard',
       side: 'empire',
       stars: 5,
+      cost: 210,
       role: 'Battle Line',
       hull: 'Brünhild',
       skill: 'Fleet Leader',
@@ -229,6 +230,7 @@
       short: 'Yang',
       side: 'alliance',
       stars: 5,
+      cost: 210,
       role: 'Battle Line',
       hull: 'Hyperion',
       skill: 'The Magician',
@@ -240,6 +242,7 @@
       short: 'Mittermeyer',
       side: 'empire',
       stars: 5,
+      cost: 160,
       role: 'Battle Line',
       hull: 'Beowulf',
       skill: 'Gale Wolf',
@@ -251,6 +254,7 @@
       short: 'Reuenthal',
       side: 'empire',
       stars: 5,
+      cost: 160,
       role: 'Battle Line',
       hull: 'Tristan',
       skill: 'Twin Pillar',
@@ -262,6 +266,7 @@
       short: 'Kircheis',
       side: 'empire',
       stars: 4,
+      cost: 145,
       role: 'Escort',
       hull: 'Barbarossa',
       skill: 'Unwavering Loyalty',
@@ -273,6 +278,7 @@
       short: 'Attenborough',
       side: 'alliance',
       stars: 4,
+      cost: 145,
       role: 'Battle Line',
       hull: 'Triglaph',
       skill: 'Flexible Command',
@@ -284,6 +290,7 @@
       short: 'Fischer',
       side: 'alliance',
       stars: 4,
+      cost: 125,
       role: 'Battle Line',
       hull: 'Patroklos',
       skill: 'Fleet Maneuver',
@@ -295,6 +302,7 @@
       short: 'Schönkopf',
       side: 'alliance',
       stars: 4,
+      cost: 145,
       role: 'Escort',
       hull: 'Rosen Ritter',
       skill: 'Boarding Specialist',
@@ -302,22 +310,6 @@
       trait: 'boarding',
     },
   };
-  // Plasma energy fuels heavy hulls; escorts need none. Admirals cost Command Medals by rank.
-  const ENERGY = {
-    corvette: 0,
-    frigate: 0,
-    destroyer: 0,
-    light: 6,
-    heavy: 10,
-    battleship: 16,
-    flagship: 24,
-    beam: 6,
-    missile: 12,
-    siege: 18,
-  };
-  for (const [k, t] of Object.entries(TYPES)) t.energy = ENERGY[k] ?? 0;
-  for (const a of Object.values(ADMIRALS)) a.medals = a.stars - 1;
-  const MEDALS = { kill: 1, capture: 3 };
   const TECHS = {
     warp: {
       name: 'Warp Drive Efficiency',
@@ -394,7 +386,7 @@
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 4 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 5 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -494,7 +486,6 @@
       captured = s.name;
       u.morale = 1;
       funds(g, u.side).credits += 40;
-      funds(g, u.side).medals += MEDALS.capture;
       if (u.admiral === 'schonkopf') u.hp = Math.min(maxHP(u), u.hp + maxHP(u) * 0.3);
       log(g, `${ADMIRALS[u.admiral]?.short || TYPES[u.type].short} captures ${s.name}.`, u.side);
     }
@@ -569,7 +560,6 @@
     if (v.hp > 0) return;
     v.hp = 0;
     if (attacker) {
-      funds(g, attacker.side).medals += MEDALS.kill;
       attacker.kills++;
       attacker.xp = Math.min(5, attacker.xp + 1);
       attacker.morale = clamp(attacker.morale + 1, -3, 1);
@@ -656,9 +646,8 @@
           credits: a.credits + s.income,
           industry: a.industry + s.industry,
           science: a.science + s.science,
-          energy: a.energy + (s.energy || 0),
         }),
-        { credits: 0, industry: 0, science: 0, energy: 0 },
+        { credits: 0, industry: 0, science: 0 },
       );
   }
   function recruitOptions(g, s, side) {
@@ -670,9 +659,8 @@
   function price(type, stack = 1) {
     const t = TYPES[type];
     return {
-      credits: Math.round(t.cost * (1 + 0.8 * (stack - 1))),
-      industry: Math.round(t.industry * (1 + 0.8 * (stack - 1))),
-      energy: Math.round(t.energy * (1 + 0.8 * (stack - 1))),
+      credits: Math.round(t.cost * (1 + 0.85 * (stack - 1))),
+      industry: Math.round(t.industry * (1 + 0.85 * (stack - 1))),
     };
   }
   function canBuy(g, s, type, stack = 1) {
@@ -689,7 +677,6 @@
       stack <= 3 &&
       e.credits >= cost.credits &&
       e.industry >= cost.industry &&
-      e.energy >= cost.energy &&
       s.producedTurn !== g.turn &&
       recruitOptions(g, s, s.owner).length > 0
     );
@@ -704,19 +691,17 @@
     const cost = price(type, stack);
     funds(g, s.owner).credits -= cost.credits;
     funds(g, s.owner).industry -= cost.industry;
-    funds(g, s.owner).energy -= cost.energy;
     s.producedTurn = g.turn;
     const u = newUnit(g, type, s.owner, p.c, p.r, stack, null, false);
     log(g, `${TYPES[type].short} ×${stack} commissioned at ${s.name}. Ready next turn.`, s.owner);
     return { ok: true, unit: u };
   }
   function reinforceCost(type) {
-    const t = TYPES[type];
-    return {
-      credits: Math.round(t.cost * 0.8),
-      industry: Math.round(t.industry * 0.8),
-      energy: Math.round(t.energy * 0.8),
-    };
+    return { credits: TYPES[type].cost, industry: TYPES[type].industry };
+  }
+  // Repairs restore 35% hull for a fifth of the fleet's build price.
+  function repairCost(u) {
+    return Math.max(20, Math.round(price(u.type, u.stack).credits * 0.2));
   }
   function reinforce(g, id) {
     const u = g.units.find(u => u.id === id);
@@ -726,11 +711,9 @@
     if (!st) return { ok: false, reason: 'Reinforce on or next to a friendly station.' };
     const cost = reinforceCost(u.type),
       e = funds(g, u.side);
-    if (e.credits < cost.credits || e.industry < cost.industry || e.energy < cost.energy)
-      return { ok: false, reason: 'Not enough resources.' };
+    if (e.credits < cost.credits || e.industry < cost.industry) return { ok: false, reason: 'Not enough resources.' };
     e.credits -= cost.credits;
     e.industry -= cost.industry;
-    e.energy -= cost.energy;
     const old = maxHP(u);
     u.stack++;
     u.hp += maxHP(u) - old;
@@ -744,7 +727,7 @@
       return { ok: false, reason: 'A damaged fleet with unused actions is required.' };
     if (!g.stations.some(s => s.owner === u.side && distance(s, u) <= 1))
       return { ok: false, reason: 'Repair on or next to a friendly station.' };
-    const cost = 45 + u.stack * 15;
+    const cost = repairCost(u);
     if (funds(g, u.side).credits < cost) return { ok: false, reason: 'Not enough credits.' };
     funds(g, u.side).credits -= cost;
     const amount = Math.min(maxHP(u) - u.hp, Math.round(maxHP(u) * 0.35));
@@ -753,19 +736,22 @@
     log(g, `${TYPES[u.type].short} repairs ${amount} HP.`, u.side);
     return { ok: true, amount };
   }
+  function upgradeCost(s) {
+    return { credits: 160 * s.tier, industry: 40 * s.tier };
+  }
   function upgrade(g, id) {
     const s = g.stations.find(s => s.id === id);
     if (!s || s.owner !== g.phase || g.over || s.tier >= 3)
       return { ok: false, reason: 'Shipyard is already maximum tier or not yours.' };
-    const cost = 130 * s.tier,
+    const cost = upgradeCost(s).credits,
       e = funds(g, s.owner);
-    if (e.credits < cost || e.industry < 35 * s.tier) return { ok: false, reason: 'Insufficient credits or industry.' };
+    if (e.credits < cost || e.industry < upgradeCost(s).industry)
+      return { ok: false, reason: 'Insufficient credits or industry.' };
     e.credits -= cost;
-    e.industry -= 35 * s.tier;
+    e.industry -= upgradeCost(s).industry;
     s.tier++;
-    s.income += 10;
-    s.industry += 5;
-    s.energy = (s.energy || 0) + 1;
+    s.income += 15;
+    s.industry += 10;
     s.maxShield += 60;
     s.shield = Math.min(s.maxShield, s.shield + 60);
     log(g, `${s.name} upgraded to tier ${s.tier}.`, s.owner);
@@ -773,7 +759,7 @@
   }
   function researchCost(g, side, k) {
     const l = g.tech[side][k];
-    return { credits: TECHS[k].base * (l + 1), science: 35 + 30 * l };
+    return { credits: TECHS[k].base * (l + 1), science: 40 + 35 * l };
   }
   function research(g, k) {
     if (!TECHS[k] || g.over || g.tech[g.phase][k] >= 3) return { ok: false, reason: 'Research unavailable.' };
@@ -800,8 +786,8 @@
       g.units.some(v => v.hp > 0 && v.admiral === admiral)
     )
       return { ok: false, reason: 'That admiral cannot be assigned to this fleet.' };
-    if (funds(g, u.side).medals < a.medals) return { ok: false, reason: 'Not enough Command Medals.' };
-    funds(g, u.side).medals -= a.medals;
+    if (funds(g, u.side).credits < a.cost) return { ok: false, reason: 'Insufficient credits.' };
+    funds(g, u.side).credits -= a.cost;
     u.admiral = admiral;
     log(g, `${a.short} assumes command of ${TYPES[u.type].short}.`, u.side);
     return { ok: true };
@@ -826,7 +812,6 @@
       e.credits += Math.round(inc.credits * modifier);
       e.industry += Math.round(inc.industry * modifier);
       e.science += Math.round(inc.science * modifier);
-      e.energy += Math.round(inc.energy * modifier);
     }
     for (const u of g.units) {
       if (u.hp <= 0 || u.side !== side) continue;
@@ -850,10 +835,37 @@
       const s = stationAt(g, u);
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
     }
+    fortressFire(g, side);
     for (const s of g.stations) {
       if (s.owner === side) s.shield = Math.min(s.maxShield, s.shield + Math.round(s.maxShield * 0.12));
     }
     checkVictory(g);
+  }
+  // A fortress with its shields up fires its main gun at the strongest enemy fleet within 2 hexes.
+  function fortressFire(g, side) {
+    g.strikes = [];
+    for (const s of g.stations) {
+      if (!s.fort || s.owner !== side || s.shield <= 0) continue;
+      const foe = g.units
+        .filter(u => u.hp > 0 && u.side !== side && distance(s, u) <= 2)
+        .sort((a, b) => b.hp - a.hp || a.id - b.id)[0];
+      if (!foe) continue;
+      const damage = Math.max(1, Math.round(maxHP(foe) * 0.3 * (1 - g.tech[foe.side].armor * 0.08)));
+      foe.hp = Math.max(0, foe.hp - damage);
+      foe.morale = Math.max(foe.admiral === 'reinhard' ? 0 : -3, foe.morale - 1);
+      const name = s.name === 'Iserlohn' ? "Thor's Hammer" : `${s.name} main cannon`;
+      g.strikes.push({
+        name,
+        from: { c: s.c, r: s.r },
+        to: { c: foe.c, r: foe.r },
+        id: foe.id,
+        damage,
+        destroyed: foe.hp <= 0,
+      });
+      log(g, `${name} strikes ${TYPES[foe.type].short} for ${damage}.`, side);
+      kill(g, foe, null);
+    }
+    return g.strikes;
   }
   function checkVictory(g) {
     if (g.over) return g.over;
@@ -887,7 +899,7 @@
   function createGame(player = 'alliance', difficulty = 'normal', mode = 'conquest', seed = 246801) {
     const g = {
       version: 2,
-      rulesVersion: 4,
+      rulesVersion: 5,
       player,
       difficulty,
       mode,
@@ -902,8 +914,8 @@
       stations: [],
       log: [],
       economy: {
-        empire: { credits: 430, industry: 170, science: 55, energy: 40, medals: 3 },
-        alliance: { credits: 430, industry: 170, science: 55, energy: 40, medals: 3 },
+        empire: { credits: 300, industry: 120, science: 40 },
+        alliance: { credits: 300, industry: 120, science: 40 },
       },
       tech: { empire: { warp: 0, armor: 0, laser: 0, comms: 0 }, alliance: { warp: 0, armor: 0, laser: 0, comms: 0 } },
       over: null,
@@ -933,10 +945,9 @@
         fort,
         shield: fort ? 450 : capital ? 260 : 150,
         maxShield: fort ? 450 : capital ? 260 : 150,
-        income: capital ? 75 : fort ? 45 : 50,
-        industry: tier * 10 + 5,
-        science: capital ? 12 : 8,
-        energy: (capital ? 6 : fort ? 5 : 3) + tier - 1,
+        income: capital ? 60 : fort ? 40 : 25 + 15 * tier,
+        industry: capital ? 30 : 10 * tier,
+        science: capital ? 10 : 6,
         producedTurn: 0,
       };
       g.stations.push(s);
@@ -969,9 +980,15 @@
         newUnit(g, 'corvette', side, mirror(6), 8, 2);
         newUnit(g, 'destroyer', side, mirror(3), 9, 1);
       }
-      // Alliance has one extra small hub; balance Imperial industrial income.
-      g.stations.find(s => s.name === 'Valhalla').income += 25;
-      g.stations.find(s => s.name === 'Kempff').income += 25;
+      // The Alliance holds one extra hub; Imperial worlds yield more so both sides start with equal income.
+      const ally = income(g, 'alliance'),
+        imp = income(g, 'empire'),
+        valhalla = g.stations.find(s => s.name === 'Valhalla'),
+        kempff = g.stations.find(s => s.name === 'Kempff');
+      valhalla.income += Math.ceil((ally.credits - imp.credits) / 2);
+      kempff.income += Math.floor((ally.credits - imp.credits) / 2);
+      kempff.industry += ally.industry - imp.industry;
+      valhalla.science += ally.science - imp.science;
     } else {
       const enemy = opponent(player);
       g.tiles.forEach(t => (t.owner = t.c < 4 ? player : enemy));
@@ -990,14 +1007,12 @@
       newUnit(g, 'light', enemy, 6, 6, 2);
       newUnit(g, 'beam', enemy, 8, 3, 2);
       newUnit(g, 'missile', enemy, 8, 5, 1);
-      g.economy[enemy] = { credits: 140, industry: 70, science: 0, energy: 30, medals: 0 };
+      g.economy[enemy] = { credits: 140, industry: 70, science: 0 };
     }
     for (const u of g.units) tile(g, u.c, u.r).terrain = 'space';
     if (difficulty === 'easy') {
-      g.economy[player].credits += 180;
-      g.economy[player].industry += 60;
-      g.economy[player].energy += 20;
-      g.economy[player].medals += 2;
+      g.economy[player].credits += 150;
+      g.economy[player].industry += 50;
     }
     log(
       g,
@@ -1117,8 +1132,10 @@
   }
   root.Galactic = {
     FACTIONS,
-    MEDALS,
     reinforceCost,
+    repairCost,
+    upgradeCost,
+    fortressFire,
     TYPES,
     ADMIRALS,
     TECHS,

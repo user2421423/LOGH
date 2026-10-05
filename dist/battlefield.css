@@ -1266,9 +1266,6 @@ h3 {
 .side .hp-row .mono {
   margin-left: auto;
 }
-.side .station-yield {
-  grid-template-columns: repeat(2, 1fr);
-}
 .dock-stats {
   display: flex;
   align-items: center;
