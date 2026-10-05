@@ -14,3 +14,5 @@ Any static server works, e.g. `python3 -m http.server` and open http://localhost
 - `assets/` — sprite atlases (see `ASSETS.md`).
 
 See `REVIEW.md` for the code review.
+
+![Battlefield](screenshot.png)

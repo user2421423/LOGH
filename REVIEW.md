@@ -50,5 +50,4 @@ attack or spend resources.
 
 ## Assets
 
-`assets/fleet-atlas.png` and `assets/terrain-atlas.png` were not supplied, so locally ships render as two-letter codes and terrain props are not drawn.
-See `ASSETS.md`.
+All three atlases are present (`fleet-atlas.png` and `terrain-atlas.png` are RGBA with real transparency). Verified in Chromium: all images load and no console errors appear.
