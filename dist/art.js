@@ -773,6 +773,8 @@ const ART = {
   serial: 0,
   load() {
     if (typeof Image === 'undefined') return;
+    for (const side of ['empire', 'alliance'])
+      for (const type of Object.keys(this.airWings)) this.urls[`air-${side}-${type}`] = this.airUrl(type, side);
     for (const [name, url] of Object.entries(this.urls)) {
       const img = new Image();
       img.onload = () => {
@@ -799,7 +801,10 @@ const ART = {
     if (this.airWings[type]) return this.drawAir(context, type, side, x, y, width);
     return this.draw(context, side, this.frames[type], x, y, width, height, side === 'alliance');
   },
-  // Air wings have no sprite sheet: they are drawn as small vector formations in faction livery.
+  // Air wings are rendered formations (tools/air-art.cjs → assets/air/); the vector fallback covers loading.
+  airUrl(type, side) {
+    return `assets/air/${side === 'alliance' ? 'alliance' : 'empire'}-${type}.svg`;
+  },
   airWings: {
     fighter: { count: 3, size: 0.2, span: 0.55 },
     bomber: { count: 2, size: 0.28, span: 0.75 },
@@ -810,6 +815,15 @@ const ART = {
     alliance: { body: '#8a9659', trim: '#2f7377', dark: '#2a3320' },
   },
   drawAir(context, type, side, x, y, width) {
+    const key = `air-${side}-${type}`,
+      img = this.images[key];
+    if (this.ready[key] && img) {
+      const ratio = Math.min((width * 1.15) / img.naturalWidth, (width * 0.95) / img.naturalHeight),
+        dw = img.naturalWidth * ratio,
+        dh = img.naturalHeight * ratio;
+      context.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+      return true;
+    }
     const w = this.airWings[type],
       c = this.airLivery[side] || this.airLivery.empire,
       L = width * w.size,
@@ -893,7 +907,7 @@ const ART = {
   },
   ship(type, extra = '', side = 'alliance') {
     if (this.airWings[type])
-      return `<span class="ship-art air-art ${side} ${extra}" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="#ico-air-${type}"/></svg></span>`;
+      return `<span class="ship-art air-art ${side} ${extra}" aria-hidden="true"><img src="${this.airUrl(type, side)}" alt="" draggable="false"></span>`;
     if (side === 'neutral') side = 'empire';
     const name = ['station', 'fortress', 'capital'].includes(type) ? 'fleet' : side;
     return this.svg(name, this.frames[type] ?? 13, extra);

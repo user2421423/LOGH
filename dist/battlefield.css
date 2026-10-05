@@ -1399,10 +1399,12 @@ h3 {
 .air-art.alliance {
   color: #8a9659;
 }
-.air-art svg {
+.air-art svg,
+.air-art img {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
   filter: drop-shadow(0 6px 4px #0008);
 }
 

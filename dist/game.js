@@ -1574,11 +1574,18 @@ function draw(time, dt) {
     ctx.globalAlpha = spent ? 0.62 : 1;
     // Extra hull silhouettes visualize stacks without hiding the readable front hull.
     const size =
-      u.type === 'siege' ? R * 2.3 : u.type === 'flagship' ? R * 2.2 : t.branch === 'Battle Line' ? R * 2.0 : R * 1.85;
+      u.type === 'siege'
+        ? R * 2.3
+        : u.type === 'flagship'
+          ? R * 2.2
+          : t.branch === 'Battle Line' || t.air
+            ? R * 2.0
+            : R * 1.85;
     ctx.shadowColor = '#000a';
     ctx.shadowBlur = 5;
     ctx.shadowOffsetY = 4;
-    for (let i = Math.min(u.stack - 1, 2); i >= 0; i--)
+    // Air wings are already drawn as a formation, so their stack shows only in the stack bars.
+    for (let i = t.air ? 0 : Math.min(u.stack - 1, 2); i >= 0; i--)
       ART.drawShip(
         ctx,
         u.type,
