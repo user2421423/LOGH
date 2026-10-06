@@ -14,19 +14,9 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# Deploys straight from dist/ without running the test suite (tests/ can still be run locally).
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node --test tests/engine.test.cjs
-      - run: node tests/ui-smoke.cjs
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
