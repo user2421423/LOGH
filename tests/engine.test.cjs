@@ -674,3 +674,24 @@ test('Hard and Challenge strengthen only the enemy, and tokens are paid only for
   assert.equal(again.total, 0);
   assert(again.repeat);
 });
+test('Command tokens buy branch stars up to six, and the stars carry into every mode', () => {
+  const g = blank(),
+    p = { tokens: 100 };
+  assert.equal(E.officer(g, 'fischer').ratings.escort, 4);
+  assert.equal(E.starCost(g, 'fischer', 'escort'), 220);
+  assert.equal(E.starReason(g, p, 'fischer', 'escort'), 'Need 120 more command tokens');
+  p.tokens = 1000;
+  assert(E.buyStar(g, p, 'fischer', 'escort').ok);
+  assert(E.buyStar(g, p, 'fischer', 'escort').ok);
+  assert.equal(E.officer(g, 'fischer').ratings.escort, 6);
+  assert.equal(p.tokens, 1000 - 220 - 360);
+  assert.equal(E.starReason(g, p, 'fischer', 'escort'), 'Already 6 stars');
+  assert.match(E.starReason(g, p, 'reinhard', 'line'), /Not your officer/);
+  const profile = E.exportProfile(g, p);
+  assert.equal(profile.tokens, 1000 - 220 - 360);
+  for (const mode of ['conquest:astarte', 'iserlohn', 'amritsar'])
+    assert.equal(
+      E.officer(E.applyProfile(E.createGame('alliance', 'hard', mode, 3), profile), 'fischer').ratings.escort,
+      6,
+    );
+});

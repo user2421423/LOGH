@@ -1930,3 +1930,20 @@ button.mini small {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+.gi-rating .star-buy {
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-color: #e7b937;
+  background: linear-gradient(180deg, #4a3a14, #2a2008);
+  color: #ffe08a;
+}
+.gi-rating .star-buy .cost-line {
+  display: inline-flex;
+}
+.gi-rating .star-buy .cost-ico {
+  width: 14px;
+  height: 14px;
+}
+.gi-stars {
+  font-size: 19px;
+}

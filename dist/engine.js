@@ -970,9 +970,37 @@
     if (!BRANCH_NAMES[branch]) return 'Unknown branch';
     return (
       officerReason(g, k) ||
-      ((o.ratings[branch] || 0) >= 5 ? 'Already five stars' : null) ||
+      ((o.ratings[branch] || 0) >= MAX_RATING ? `Already ${MAX_RATING} stars` : null) ||
       (o.points < 1 ? 'No skill points: promote to earn more' : null)
     );
+  }
+  // As in WC4, command tokens (the medals of this game) buy extra branch stars, up to six. Stars are part of the
+  // officer record, so they carry into every operation and mode the officer serves in.
+  const MAX_RATING = 6;
+  const STAR_COST = [0, 0, 0, 60, 120, 220, 360];
+  function starCost(g, k, branch) {
+    return STAR_COST[(officer(g, k)?.ratings[branch] || 0) + 1] ?? Infinity;
+  }
+  function starReason(g, profile, k, branch) {
+    const o = officer(g, k);
+    if (!o) return 'Unknown admiral';
+    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
+    const cost = starCost(g, k, branch),
+      have = profile?.tokens || 0;
+    return (
+      officerReason(g, k) ||
+      ((o.ratings[branch] || 0) >= MAX_RATING ? `Already ${MAX_RATING} stars` : null) ||
+      (cost > have ? `Need ${cost - have} more command tokens` : null)
+    );
+  }
+  function buyStar(g, profile, k, branch) {
+    const why = starReason(g, profile, k, branch);
+    if (why) return { ok: false, reason: why };
+    profile.tokens -= starCost(g, k, branch);
+    const o = officer(g, k);
+    o.ratings[branch]++;
+    log(g, `${ADMIRALS[k].short} rises to ${o.ratings[branch]}★ in ${BRANCH_NAMES[branch]}.`, ADMIRALS[k].side);
+    return { ok: true, stars: o.ratings[branch] };
   }
   function equipReason(g, k, medal) {
     const o = officer(g, k);
@@ -1042,7 +1070,9 @@
         rank: clamp(Number.isInteger(rec.rank) ? rec.rank : base.rank, 0, RANKS.length - 1),
         xp: Number.isFinite(rec.xp) ? Math.max(0, rec.xp) : base.xp,
         points: Number.isInteger(rec.points) ? Math.max(0, rec.points) : base.points,
-        ratings: { ...base.ratings, ...(rec.ratings || {}) },
+        ratings: Object.fromEntries(
+          Object.entries({ ...base.ratings, ...(rec.ratings || {}) }).map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
+        ),
         skills: { ...(rec.skills || {}) },
         medals: (rec.medals || []).filter(m => MEDALS[m]),
       };
@@ -2605,6 +2635,10 @@
     MEDALS,
     officer,
     medalSlots,
+    MAX_RATING,
+    starCost,
+    starReason,
+    buyStar,
     promoteCost,
     promote,
     learnSkill,
