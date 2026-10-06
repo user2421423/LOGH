@@ -731,23 +731,24 @@
     return techLevel(g, side, 'air.carrier') >= 1 ? 5 : 3;
   }
 
-  // Admiral development: ranks, branch ratings, upgradeable skills and medals. Progress persists between operations.
-  const RANKS = ['Commodore', 'Rear Admiral', 'Vice Admiral', 'Admiral', 'Fleet Admiral'];
-  const RANK_XP = [0, 10, 25, 45, 70];
-  const SKILLS = {
-    gunnery: { name: 'Precision Gunnery', desc: '+5% damage per level.' },
-    bulwark: { name: 'Damage Control', desc: '5% less damage taken per level.' },
-    maneuver: { name: 'Fleet Maneuver', desc: 'Level 1 ignores terrain costs; levels 2 and 3 each add +1 movement.' },
-    command: {
-      name: 'Command Network',
-      desc: 'The command aura reaches 1 hex further and grants +2% more damage per level.',
-    },
-    logistics: { name: 'Logistics', desc: 'The fleet repairs 4% hull per level at the start of each turn.' },
-    tactics: {
-      name: 'Tactical Insight',
-      desc: '+5% critical chance per level; level 3 adds one breakthrough refresh.',
-    },
-  };
+  // Admiral development, as in WC4: naval ranks bought with command tokens raise the commanded fleet's hull,
+  // and branch stars raise its damage. Each admiral keeps one signature ability. Records persist between operations.
+  const RANKS = [
+    'Ensign',
+    'Lieutenant JG',
+    'Lieutenant',
+    'Lt Commander',
+    'Commander',
+    'Captain',
+    'Commodore',
+    'Rear Admiral',
+    'Vice Admiral',
+    'Admiral',
+    'Fleet Admiral',
+  ];
+  const RANK_HP = [1.12, 1.16, 1.2, 1.24, 1.28, 1.33, 1.38, 1.43, 1.48, 1.54, 1.6];
+  // Tokens to reach each rank.
+  const PROMOTE_COST = [0, 50, 80, 120, 160, 220, 280, 350, 430, 520, 650];
   const MEDALS = {
     valor: { name: 'Order of Valor', desc: '+8% damage.', earn: 'Destroy a fleet commanded by an enemy admiral.' },
     laurel: { name: 'Golden Laurel', desc: '8% less damage taken.', earn: 'Win a scenario with three stars.' },
@@ -759,7 +760,7 @@
     },
     campaign: { name: 'Campaign Ribbon', desc: '+4% damage and 4% less damage taken.', earn: 'Win any operation.' },
   };
-  // Branch ratings (1–5 stars): Escort, Battle Line, Artillery, Aerospace.
+  // Starting branch ratings (stars, up to 6 with command tokens): Escort, Battle Line, Artillery, Aerospace.
   const RATINGS = {
     reinhard: { escort: 3, line: 5, artillery: 4, air: 3 },
     yang: { escort: 4, line: 5, artillery: 4, air: 4 },
@@ -771,29 +772,25 @@
     schonkopf: { escort: 5, line: 2, artillery: 2, air: 3 },
   };
   function defaultOfficer(k) {
-    const rank = ADMIRALS[k].stars >= 5 ? 2 : 1;
-    return { rank, xp: RANK_XP[rank], points: 1, ratings: { ...RATINGS[k] }, skills: {}, medals: [] };
+    return { rank: ADMIRALS[k].stars >= 5 ? 1 : 0, ratings: { ...RATINGS[k] }, medals: [] };
   }
   function officer(g, k) {
     if (!k || !ADMIRALS[k]) return null;
     g.officers ||= {};
     return (g.officers[k] ||= defaultOfficer(k));
   }
-  function skill(g, k, name) {
-    return k ? officer(g, k)?.skills[name] || 0 : 0;
-  }
   function wears(g, k, medal) {
     return !!k && !!officer(g, k)?.medals.includes(medal);
   }
   function medalSlots(o) {
-    return 1 + Math.floor(o.rank / 2);
+    return 1 + Math.floor(o.rank / 4);
   }
-  // Damage dealt and taken by an admiral's fleet: branch rating, skills and medals.
+  // Damage dealt and taken by an admiral's fleet: branch rating and medals.
   function officerAttack(g, u) {
     if (!u.admiral) return 1;
     const o = officer(g, u.admiral);
     return (
-      (1 + 0.04 * ((o.ratings[branchOf(u.type)] || 3) - 3) + 0.05 * skill(g, u.admiral, 'gunnery')) *
+      (1 + 0.04 * ((o.ratings[branchOf(u.type)] || 3) - 3)) *
       (wears(g, u.admiral, 'valor') ? 1.08 : 1) *
       (wears(g, u.admiral, 'campaign') ? 1.04 : 1)
     );
@@ -803,16 +800,13 @@
     const o = officer(g, u.admiral);
     return Math.max(
       0.5,
-      (1 - 0.03 * ((o.ratings[branchOf(u.type)] || 3) - 3) - 0.05 * skill(g, u.admiral, 'bulwark')) *
+      (1 - 0.03 * ((o.ratings[branchOf(u.type)] || 3) - 3)) *
         (wears(g, u.admiral, 'laurel') ? 0.92 : 1) *
         (wears(g, u.admiral, 'campaign') ? 0.96 : 1),
     );
   }
-  function auraRange(g, a) {
-    return 1 + skill(g, a.admiral, 'command');
-  }
-  function gainXP(g, u, amount) {
-    if (u?.admiral) officer(g, u.admiral).xp += amount;
+  function auraRange() {
+    return 1;
   }
   function award(g, side, id, reason) {
     if (side !== g.player || !MEDALS[id]) return;
@@ -939,7 +933,7 @@
     );
   }
   function promoteCost(o) {
-    return { credits: 100 * (o.rank + 1) };
+    return PROMOTE_COST[o.rank + 1] ?? Infinity;
   }
   function officerReason(g, k) {
     const a = ADMIRALS[k];
@@ -947,31 +941,15 @@
     if (a.side !== g.player) return 'Not your officer';
     return turnReason(g, a.side);
   }
-  function promoteReason(g, k) {
+  function promoteReason(g, profile, k) {
     const o = officer(g, k);
+    if (!o) return 'Unknown admiral';
+    const cost = promoteCost(o),
+      have = profile?.tokens || 0;
     return (
       officerReason(g, k) ||
       (o.rank >= RANKS.length - 1 ? 'Highest rank reached' : null) ||
-      (o.xp < RANK_XP[o.rank + 1] ? `Need ${RANK_XP[o.rank + 1] - o.xp} more XP` : null) ||
-      shortfall(funds(g, ADMIRALS[k].side), promoteCost(o))
-    );
-  }
-  function learnReason(g, k, name) {
-    const o = officer(g, k);
-    if (!SKILLS[name]) return 'Unknown skill';
-    return (
-      officerReason(g, k) ||
-      ((o.skills[name] || 0) >= 3 ? 'Mastered' : null) ||
-      (o.points < 1 ? 'No skill points: promote to earn more' : null)
-    );
-  }
-  function rateReason(g, k, branch) {
-    const o = officer(g, k);
-    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
-    return (
-      officerReason(g, k) ||
-      ((o.ratings[branch] || 0) >= MAX_RATING ? `Already ${MAX_RATING} stars` : null) ||
-      (o.points < 1 ? 'No skill points: promote to earn more' : null)
+      (cost > have ? `Need ${cost - have} more command tokens` : null)
     );
   }
   // As in WC4, command tokens (the medals of this game) buy extra branch stars, up to six. Stars are part of the
@@ -1011,13 +989,12 @@
       (o.medals.length >= medalSlots(o) ? `All ${medalSlots(o)} medal slots in use` : null)
     );
   }
-  function promote(g, k) {
-    const why = promoteReason(g, k);
+  function promote(g, profile, k) {
+    const why = promoteReason(g, profile, k);
     if (why) return { ok: false, reason: why };
     const o = officer(g, k);
-    funds(g, ADMIRALS[k].side).credits -= promoteCost(o).credits;
+    profile.tokens -= promoteCost(o);
     o.rank++;
-    o.points++;
     const u = g.units.find(u => u.hp > 0 && u.admiral === k);
     if (u) {
       const old = maxHP(u);
@@ -1025,23 +1002,6 @@
       u.hp += maxHP(u) - old;
     }
     log(g, `${ADMIRALS[k].short} is promoted to ${RANKS[o.rank]}.`, ADMIRALS[k].side);
-    return { ok: true };
-  }
-  function learnSkill(g, k, name) {
-    const why = learnReason(g, k, name);
-    if (why) return { ok: false, reason: why };
-    const o = officer(g, k);
-    o.skills[name] = (o.skills[name] || 0) + 1;
-    o.points--;
-    log(g, `${ADMIRALS[k].short} trains ${SKILLS[name].name} to level ${o.skills[name]}.`, ADMIRALS[k].side);
-    return { ok: true };
-  }
-  function raiseRating(g, k, branch) {
-    const why = rateReason(g, k, branch);
-    if (why) return { ok: false, reason: why };
-    const o = officer(g, k);
-    o.ratings[branch]++;
-    o.points--;
     return { ok: true };
   }
   function equipMedal(g, k, medal) {
@@ -1068,12 +1028,9 @@
       const base = defaultOfficer(k);
       g.officers[k] = {
         rank: clamp(Number.isInteger(rec.rank) ? rec.rank : base.rank, 0, RANKS.length - 1),
-        xp: Number.isFinite(rec.xp) ? Math.max(0, rec.xp) : base.xp,
-        points: Number.isInteger(rec.points) ? Math.max(0, rec.points) : base.points,
         ratings: Object.fromEntries(
           Object.entries({ ...base.ratings, ...(rec.ratings || {}) }).map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
         ),
-        skills: { ...(rec.skills || {}) },
         medals: (rec.medals || []).filter(m => MEDALS[m]),
       };
     }
@@ -1198,15 +1155,18 @@
   function funds(g, side) {
     return g.economy[side];
   }
-  // Each admiral rank adds 6% hull to the fleet they command.
+  // An admiral's naval rank sets the hull bonus of the fleet they command (112% for an Ensign to 160%).
   function maxHP(u) {
     return Math.round(
-      TYPES[u.type].hp * (1 + 0.7 * (u.stack - 1)) * (1 + 0.06 * (u.cmdRank || 0)) * (1 + (u.hpTech || 0)),
+      TYPES[u.type].hp *
+        (1 + 0.7 * (u.stack - 1)) *
+        (u.cmdRank == null ? 1 : RANK_HP[u.cmdRank] || 1) *
+        (1 + (u.hpTech || 0)),
     );
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 8 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 9 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -1236,14 +1196,14 @@
     const t = TYPES[u.type];
     if (t.elite) return 1;
     let n = t.move + unitTech(g, u, 'drives');
-    n += Math.max(0, skill(g, u.admiral, 'maneuver') - 1) + (wears(g, u.admiral, 'star') ? 1 : 0);
+    n += wears(g, u.admiral, 'star') ? 1 : 0;
     if (u.admiral === 'reinhard' && t.branch === 'Battle Line') n++;
     if (u.admiral === 'mittermeyer') n += 2;
     if (['attenborough', 'fischer'].includes(u.admiral)) n++;
     return n;
   }
   function terrainCost(g, u, t) {
-    if (u.admiral === 'yang' || TYPES[u.type].air || skill(g, u.admiral, 'maneuver') >= 1) return 1;
+    if (u.admiral === 'yang' || TYPES[u.type].air) return 1;
     const nav = TYPES[u.type].branch === 'Escort' ? techLevel(g, u.side, 'escort.nav') : 0;
     if (nav >= 2 || (nav >= 1 && t.terrain === 'asteroid')) return 1;
     return t.terrain === 'nebula' || t.terrain === 'asteroid' ? 2 : 1;
@@ -1321,7 +1281,6 @@
       captured = s.name;
       u.morale = 1;
       funds(g, u.side).credits += 40;
-      gainXP(g, u, 4);
       fortify(g, s);
       if (s.capital) award(g, u.side, 'star', `${s.name} captured`);
       if (u.admiral === 'schonkopf') u.hp = Math.min(maxHP(u), u.hp + maxHP(u) * 0.3);
@@ -1334,8 +1293,7 @@
     let bonus = 0;
     for (const a of g.units) {
       if (a.hp <= 0 || a.side !== u.side || !a.admiral || a.id === u.id) continue;
-      if (distance(a, u) <= auraRange(g, a))
-        bonus = Math.max(bonus, (a.admiral === 'fischer' ? 0.1 : 0.08) + 0.02 * skill(g, a.admiral, 'command'));
+      if (distance(a, u) <= auraRange(g, a)) bonus = Math.max(bonus, a.admiral === 'fischer' ? 0.1 : 0.08);
     }
     return bonus;
   }
@@ -1441,7 +1399,6 @@
     const crit = clamp(
       t.crit +
         (a.admiral === 'reinhard' && t.branch === 'Battle Line' ? 0.3 : 0) +
-        0.05 * skill(g, a.admiral, 'tactics') +
         (wears(g, a.admiral, 'marksman') ? 0.08 : 0),
       0,
       0.85,
@@ -1461,7 +1418,6 @@
     if (v.hp > 0) return;
     v.hp = 0;
     if (attacker) {
-      gainXP(g, attacker, 3);
       if (attacker.admiral) {
         const k = attacker.admiral,
           tally = (g.missionKills ||= {});
@@ -1495,7 +1451,6 @@
     a.attacked = true;
     a.moved = !sortie;
     a.sortie = sortie;
-    gainXP(g, a, 1);
     let dmg = 0,
       sd = 0;
     if (d) {
@@ -1528,8 +1483,7 @@
     }
     const destroyed = !!d && d.hp <= 0;
     if (destroyed) kill(g, d, a);
-    let cap =
-      (['mittermeyer', 'attenborough'].includes(a.admiral) ? 2 : 1) + (skill(g, a.admiral, 'tactics') >= 3 ? 1 : 0);
+    let cap = ['mittermeyer', 'attenborough'].includes(a.admiral) ? 2 : 1;
     // Assault Doctrine: a kill at the cap may still earn one more breakthrough.
     if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain === cap) {
       const chance = techValue(g, a.side, 'line.assault');
@@ -1745,8 +1699,6 @@
       }
       const s = stationAt(g, u);
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
-      if (u.admiral && skill(g, u.admiral, 'logistics'))
-        u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.04 * skill(g, u.admiral, 'logistics')));
       if (
         TYPES[u.type].air &&
         !g.stations.some(s => s.owner === side && (s.air || 0) > 0 && distance(s, u) <= airSupply(g, side))
@@ -2169,7 +2121,7 @@
     if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 8,
+      rulesVersion: 9,
       player,
       difficulty,
       mode: era ? 'conquest' : scen,
@@ -2630,8 +2582,8 @@
     rangeOf,
     airSupply,
     RANKS,
-    RANK_XP,
-    SKILLS,
+    RANK_HP,
+    PROMOTE_COST,
     MEDALS,
     officer,
     medalSlots,
@@ -2641,8 +2593,6 @@
     buyStar,
     promoteCost,
     promote,
-    learnSkill,
-    raiseRating,
     equipMedal,
     unequipMedal,
     applyProfile,
@@ -2656,8 +2606,6 @@
     assignReason,
     confuseReason,
     promoteReason,
-    learnReason,
-    rateReason,
     equipReason,
     clamp,
     key,

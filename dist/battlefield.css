@@ -1947,3 +1947,47 @@ button.mini small {
 .gi-stars {
   font-size: 19px;
 }
+/* Token-priced buttons and the promotion row on the General Info card. */
+.token-buy {
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-color: #e7b937;
+  background: linear-gradient(180deg, #4a3a14, #2a2008);
+  color: #ffe08a;
+}
+.token-buy.blocked {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+.token-buy .cost-line {
+  display: inline-flex;
+}
+.token-buy .cost-ico {
+  width: 15px;
+  height: 15px;
+}
+.gi-promote-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-top: auto;
+  border-top: 1px solid #16293b;
+  background: #1c3046;
+}
+.gi-promote-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gi-promote-row b {
+  color: #fff;
+  font-size: 16px;
+}
+.gi-promote-row small {
+  color: #9fb4c8;
+}
+.gi-portrait {
+  height: 330px;
+}

@@ -348,7 +348,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3, 4, 5, 6, 7]) {
+  for (const v of [undefined, 2, 3, 4, 5, 6, 7, 8]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -593,34 +593,36 @@ test('HQ class abilities: Fire Control range and Carrier Operations hit-and-run'
   assert(!wing.moved && wing.attacked);
   assert(E.reachable(g, wing).size > 0);
 });
-test('Admirals earn XP, promote for hull and points, train skills and wear medals', () => {
+test('Admirals promote through naval ranks with command tokens for the listed hull bonus, and wear medals', () => {
   const g = blank(),
     u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
   g.economy.alliance.credits = 5000;
+  assert.equal(E.RANKS.length, 11);
+  assert.deepEqual(E.RANK_HP, [1.12, 1.16, 1.2, 1.24, 1.28, 1.33, 1.38, 1.43, 1.48, 1.54, 1.6]);
   assert(E.assign(g, u.id, 'fischer').ok);
   const o = E.officer(g, 'fischer');
-  assert.equal(u.cmdRank, o.rank);
+  assert.equal(o.rank, 0);
+  assert.equal(u.cmdRank, 0);
+  assert.equal(E.maxHP(u), Math.round(E.TYPES.heavy.hp * 1.12));
   assert.equal(u.hp, E.maxHP(u));
-  assert.match(E.promoteReason(g, 'fischer'), /more XP/);
-  o.xp = E.RANK_XP[o.rank + 1];
-  const hull = E.maxHP(u),
-    points = o.points;
-  assert(E.promote(g, 'fischer').ok);
-  assert(E.maxHP(u) > hull);
-  assert.equal(o.points, points + 1);
-  assert(E.learnSkill(g, 'fischer', 'gunnery').ok);
-  assert.equal(o.skills.gunnery, 1);
-  assert(E.raiseRating(g, 'fischer', 'escort').ok);
-  assert.equal(o.points, points - 1);
-  assert.match(E.learnReason(g, 'fischer', 'gunnery'), /No skill points/);
+  const p = { tokens: 10 };
+  assert.equal(E.promoteReason(g, p, 'fischer'), 'Need 40 more command tokens');
+  p.tokens = 200;
+  assert(E.promote(g, p, 'fischer').ok);
+  assert.equal(p.tokens, 150);
+  assert.equal(o.rank, 1);
+  assert.equal(E.RANKS[o.rank], 'Lieutenant JG');
+  assert.equal(E.maxHP(u), Math.round(E.TYPES.heavy.hp * 1.16));
+  assert.equal(u.hp, E.maxHP(u));
+  assert.match(E.promoteReason(g, p, 'reinhard'), /Not your officer/);
   g.medalInventory = ['valor'];
   assert(E.equipMedal(g, 'fischer', 'valor').ok);
   assert.deepEqual(g.medalInventory, []);
   assert.equal(E.equipReason(g, 'fischer', 'valor'), 'Not in your medal case');
-  const profile = E.exportProfile(g);
-  assert.equal(profile.officers.fischer.rank, o.rank);
+  const profile = E.exportProfile(g, p);
+  assert.equal(profile.officers.fischer.rank, 1);
   const next = E.applyProfile(E.createGame('alliance', 'normal', 'conquest', 4), profile);
-  assert.equal(E.officer(next, 'fischer').rank, o.rank);
+  assert.equal(E.officer(next, 'fischer').rank, 1);
   assert.deepEqual(E.officer(next, 'fischer').medals, ['valor']);
 });
 test('Medals are awarded for defeating an enemy admiral and for winning', () => {
@@ -628,10 +630,8 @@ test('Medals are awarded for defeating an enemy admiral and for winning', () => 
     a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3, 'yang'),
     v = E.newUnit(g, 'corvette', 'empire', 3, 2, 1, 'reinhard');
   v.hp = 1;
-  const xp = E.officer(g, 'yang').xp;
   assert(E.attack(g, a.id, 3, 2).destroyed);
   assert(g.medalInventory.includes('valor'));
-  assert.equal(E.officer(g, 'yang').xp, xp + 4);
   g.stations[1].owner = 'alliance';
   E.checkVictory(g);
   assert.equal(g.over.winner, 'alliance');
