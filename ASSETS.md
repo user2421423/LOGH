@@ -185,3 +185,10 @@ Faction: FREE PLANETS ALLIANCE (FPA). Strong OLIVE-GREEN and dark TEAL hull pain
 view: Imperial porcelain-white armor with gold trim, Alliance olive-green and teal plating with exposed thrusters.
 They come from the aerospace redesign package (built-in image generation with both fleet atlases as references),
 trimmed to their content and scaled to 900 px wide for the web.
+
+## Recruitable admiral portraits
+
+The 22 recruitable admirals have no atlas art yet. `ART.portraitSVG` draws a placeholder bust for each
+(faction uniform and cap, hair colour and initials). Official Die Neue These artwork is copyrighted and is
+not bundled; drop licensed or original portraits into a new atlas and map them in `ART.officers` to replace
+the placeholders.

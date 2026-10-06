@@ -375,6 +375,293 @@
       desc: 'Escort hulls deal +35% damage. Capturing a station restores 30% of the fleet’s maximum HP.',
       trait: 'boarding',
     },
+    // Recruitable admirals: bought once with command tokens (recruit), then assignable in every operation.
+    bittenfeld: {
+      name: 'Fritz Joseph Bittenfeld',
+      short: 'Bittenfeld',
+      side: 'empire',
+      stars: 4,
+      cost: 150,
+      role: 'Battle Line',
+      hull: 'Königs Tiger',
+      skill: 'Black Lancers',
+      desc: 'Battle Line attacks deal +25% damage, but the fleet takes 10% more counter-fire.',
+      trait: 'lancer',
+      recruit: 300,
+    },
+    muller: {
+      name: 'Neidhart Müller',
+      short: 'Müller',
+      side: 'empire',
+      stars: 4,
+      cost: 145,
+      role: 'Battle Line',
+      hull: 'Percival',
+      skill: 'Iron Wall',
+      desc: 'Takes 30% less damage while below half hull.',
+      trait: 'ironwall',
+      recruit: 300,
+    },
+    fahrenheit: {
+      name: 'Adalbert von Fahrenheit',
+      short: 'Fahrenheit',
+      side: 'empire',
+      stars: 4,
+      cost: 140,
+      role: 'Battle Line',
+      hull: 'Ásgrímm',
+      skill: 'Opening Strike',
+      desc: '+30% damage when firing before moving this turn.',
+      trait: 'opening',
+      recruit: 300,
+    },
+    kempff: {
+      name: 'Karl Gustav Kempff',
+      short: 'Kempff',
+      side: 'empire',
+      stars: 3,
+      cost: 120,
+      role: 'Air',
+      hull: 'Jotunheim',
+      skill: 'Fighter Ace',
+      desc: 'Air wings and Siege Cannons deal +25% damage; +30% damage to station defenses.',
+      trait: 'ace',
+      recruit: 200,
+    },
+    eisenach: {
+      name: 'Ernst von Eisenach',
+      short: 'Eisenach',
+      side: 'empire',
+      stars: 4,
+      cost: 140,
+      role: 'Battle Line',
+      hull: 'Wiesengrund',
+      skill: 'The Silent Admiral',
+      desc: 'Command aura reaches 2 hexes and grants nearby fleets +12% damage.',
+      trait: 'silent',
+      recruit: 300,
+    },
+    oberstein: {
+      name: 'Paul von Oberstein',
+      short: 'Oberstein',
+      side: 'empire',
+      stars: 4,
+      cost: 135,
+      role: 'Escort',
+      hull: 'Staff command ship',
+      skill: 'Calculated Terror',
+      desc: 'Each attack also lowers the surviving target’s morale by 1.',
+      trait: 'terror',
+      recruit: 300,
+    },
+    wahlen: {
+      name: 'August Samuel Wahlen',
+      short: 'Wahlen',
+      side: 'empire',
+      stars: 4,
+      cost: 140,
+      role: 'Battle Line',
+      hull: 'Salamander',
+      skill: 'Steadfast',
+      desc: 'Morale never falls below steady; takes 10% less damage.',
+      trait: 'steadfast',
+      recruit: 300,
+    },
+    lutz: {
+      name: 'Cornelius Lutz',
+      short: 'Lutz',
+      side: 'empire',
+      stars: 4,
+      cost: 140,
+      role: 'Battle Line',
+      hull: 'Skírnir',
+      skill: 'Marksman',
+      desc: '+20% critical chance and critical hits deal +25% more.',
+      trait: 'marksman',
+      recruit: 300,
+    },
+    mecklinger: {
+      name: 'Ernest Mecklinger',
+      short: 'Mecklinger',
+      side: 'empire',
+      stars: 4,
+      cost: 135,
+      role: 'Artillery',
+      hull: 'Kvasir',
+      skill: 'Artist Admiral',
+      desc: '+10% damage for each other friendly fleet next to the target (up to +30%).',
+      trait: 'artist',
+      recruit: 300,
+    },
+    kessler: {
+      name: 'Ulrich Kessler',
+      short: 'Kessler',
+      side: 'empire',
+      stars: 3,
+      cost: 110,
+      role: 'Escort',
+      hull: 'Capital Guard flagship',
+      skill: 'Capital Defense',
+      desc: 'Takes 25% less damage on or next to a friendly station.',
+      trait: 'guardian',
+      recruit: 200,
+    },
+    steinmetz: {
+      name: 'Karl Robert Steinmetz',
+      short: 'Steinmetz',
+      side: 'empire',
+      stars: 3,
+      cost: 110,
+      role: 'Battle Line',
+      hull: 'Fornheim',
+      skill: 'Brünhild’s Captain',
+      desc: 'Counter-fire +40%; commanding a Dreadnought, takes 10% less damage.',
+      trait: 'captain',
+      recruit: 200,
+    },
+    lennenkampf: {
+      name: 'Helmut Lennenkampf',
+      short: 'Lennenkampf',
+      side: 'empire',
+      stars: 3,
+      cost: 90,
+      role: 'Battle Line',
+      hull: 'Gálahad',
+      skill: 'Old School',
+      desc: 'A low-cost commander: Battle Line +10% damage.',
+      trait: 'oldschool',
+      recruit: 200,
+    },
+    bucock: {
+      name: 'Alexandre Bucock',
+      short: 'Bucock',
+      side: 'alliance',
+      stars: 4,
+      cost: 145,
+      role: 'Battle Line',
+      hull: 'Rio Grande',
+      skill: 'Old Guard',
+      desc: 'Counter-fire +35%; morale never falls below steady.',
+      trait: 'oldguard',
+      recruit: 300,
+    },
+    merkatz: {
+      name: 'Willibald Joachim von Merkatz',
+      short: 'Merkatz',
+      side: 'alliance',
+      stars: 4,
+      cost: 140,
+      role: 'Escort',
+      hull: 'Shiva',
+      skill: 'Combined Arms',
+      desc: 'Escorts and air wings within 2 hexes deal +15% damage; other fleets nearby +8%.',
+      trait: 'combined',
+      recruit: 300,
+    },
+    ulanhu: {
+      name: 'Ulanhu',
+      short: 'Ulanhu',
+      side: 'alliance',
+      stars: 3,
+      cost: 110,
+      role: 'Battle Line',
+      hull: '10th Fleet flagship',
+      skill: 'Rearguard',
+      desc: 'His fleet and adjacent friendly fleets take 10% less damage.',
+      trait: 'rearguard',
+      recruit: 200,
+    },
+    borodin: {
+      name: 'Borodin',
+      short: 'Borodin',
+      side: 'alliance',
+      stars: 3,
+      cost: 90,
+      role: 'Battle Line',
+      hull: '12th Fleet flagship',
+      skill: 'Steady Hand',
+      desc: '+8% damage and 8% less damage taken.',
+      trait: 'steady',
+      recruit: 200,
+    },
+    cazerne: {
+      name: 'Alex Cazerne',
+      short: 'Cazerne',
+      side: 'alliance',
+      stars: 3,
+      cost: 100,
+      role: 'Escort',
+      hull: 'Supply flagship',
+      skill: 'Quartermaster',
+      desc: 'While he commands, all your repairs cost half; his fleet repairs 8% hull each turn.',
+      trait: 'quartermaster',
+      recruit: 200,
+    },
+    poplin: {
+      name: 'Olivier Poplin',
+      short: 'Poplin',
+      side: 'alliance',
+      stars: 3,
+      cost: 110,
+      role: 'Air',
+      hull: 'Spartanian',
+      skill: 'Spartanian Ace',
+      desc: '+25% critical chance; +40% damage against air wings.',
+      trait: 'spartanian',
+      recruit: 200,
+    },
+    konev: {
+      name: 'Ivan Konev',
+      short: 'Konev',
+      side: 'alliance',
+      stars: 3,
+      cost: 100,
+      role: 'Air',
+      hull: 'Spartanian',
+      skill: 'Wingman',
+      desc: 'Takes 30% less damage and never loses hull for being out of air supply.',
+      trait: 'wingman',
+      recruit: 200,
+    },
+    murai: {
+      name: 'Murai',
+      short: 'Murai',
+      side: 'alliance',
+      stars: 3,
+      cost: 100,
+      role: 'Escort',
+      hull: 'Hyperion staff',
+      skill: 'Calm Analysis',
+      desc: 'His fleet and fleets within 1 hex never drop below low morale (no diminished or confused).',
+      trait: 'calm',
+      recruit: 200,
+    },
+    patrichev: {
+      name: 'Fyodor Patrichev',
+      short: 'Patrichev',
+      side: 'alliance',
+      stars: 3,
+      cost: 100,
+      role: 'Battle Line',
+      hull: 'Hyperion staff',
+      skill: 'Reassuring Presence',
+      desc: 'Friendly fleets within 2 hexes recover 1 extra morale and 5% hull each turn.',
+      trait: 'reassure',
+      recruit: 200,
+    },
+    nguyen: {
+      name: 'Nguyen Van Huu',
+      short: 'Nguyen',
+      side: 'alliance',
+      stars: 3,
+      cost: 110,
+      role: 'Battle Line',
+      hull: 'Iserlohn detachment flagship',
+      skill: 'Aggressive Raider',
+      desc: '+20% damage when attacking; Battle Line can refresh actions twice per turn.',
+      trait: 'raider',
+      recruit: 200,
+    },
   };
   // HQ technology, as in World Conqueror 4: bought with command tokens earned by winning operations, kept in the
   // player's profile across every operation and side. Each level unlocks at a tier gated by total victories.
@@ -770,6 +1057,28 @@
     attenborough: { escort: 4, line: 4, artillery: 3, air: 3 },
     fischer: { escort: 4, line: 4, artillery: 3, air: 3 },
     schonkopf: { escort: 5, line: 2, artillery: 2, air: 3 },
+    bittenfeld: { escort: 3, line: 5, artillery: 3, air: 3 },
+    muller: { escort: 4, line: 5, artillery: 3, air: 3 },
+    fahrenheit: { escort: 4, line: 4, artillery: 3, air: 3 },
+    kempff: { escort: 3, line: 3, artillery: 4, air: 5 },
+    eisenach: { escort: 4, line: 4, artillery: 4, air: 3 },
+    oberstein: { escort: 4, line: 3, artillery: 4, air: 3 },
+    wahlen: { escort: 3, line: 5, artillery: 3, air: 3 },
+    lutz: { escort: 3, line: 4, artillery: 5, air: 3 },
+    mecklinger: { escort: 3, line: 4, artillery: 5, air: 3 },
+    kessler: { escort: 4, line: 3, artillery: 3, air: 3 },
+    steinmetz: { escort: 3, line: 4, artillery: 3, air: 3 },
+    lennenkampf: { escort: 3, line: 4, artillery: 3, air: 2 },
+    bucock: { escort: 3, line: 5, artillery: 4, air: 3 },
+    merkatz: { escort: 5, line: 4, artillery: 3, air: 4 },
+    ulanhu: { escort: 3, line: 4, artillery: 3, air: 3 },
+    borodin: { escort: 3, line: 4, artillery: 3, air: 3 },
+    cazerne: { escort: 4, line: 3, artillery: 3, air: 3 },
+    poplin: { escort: 3, line: 2, artillery: 2, air: 5 },
+    konev: { escort: 3, line: 2, artillery: 2, air: 5 },
+    murai: { escort: 4, line: 3, artillery: 3, air: 3 },
+    patrichev: { escort: 3, line: 4, artillery: 3, air: 3 },
+    nguyen: { escort: 4, line: 4, artillery: 3, air: 3 },
   };
   function defaultOfficer(k) {
     return { rank: ADMIRALS[k].stars >= 5 ? 1 : 0, ratings: { ...RATINGS[k] }, medals: [] };
@@ -805,8 +1114,34 @@
         (wears(g, u.admiral, 'campaign') ? 0.96 : 1),
     );
   }
-  function auraRange() {
-    return 1;
+  function auraRange(g, a) {
+    return a && ['eisenach', 'merkatz'].includes(a.admiral) ? 2 : 1;
+  }
+  // Lowest morale a fleet can be pushed to: Reinhard, Wahlen and Bucock hold steady; Murai's staff stops confusion.
+  function moraleFloor(g, v) {
+    if (['reinhard', 'wahlen', 'bucock'].includes(v.admiral)) return 0;
+    return g.units.some(m => m.hp > 0 && m.side === v.side && m.admiral === 'murai' && distance(m, v) <= 1) ? -1 : -3;
+  }
+  function recruited(g, k) {
+    return !ADMIRALS[k]?.recruit || (g.recruited || []).includes(k);
+  }
+  function recruitReason(g, profile, k) {
+    const a = ADMIRALS[k];
+    if (!a?.recruit) return 'Not recruitable';
+    if (a.side !== g.player) return 'Serves the other side';
+    if ((profile?.recruited || []).includes(k) || recruited(g, k)) return 'Already recruited';
+    const have = profile?.tokens || 0;
+    return a.recruit > have ? `Need ${a.recruit - have} more command tokens` : null;
+  }
+  // Recruiting is permanent: the admiral joins the profile and is assignable in every operation on their side.
+  function recruitAdmiral(g, profile, k) {
+    const why = recruitReason(g, profile, k);
+    if (why) return { ok: false, reason: why };
+    profile.tokens -= ADMIRALS[k].recruit;
+    (profile.recruited ||= []).push(k);
+    (g.recruited ||= []).push(k);
+    log(g, `${ADMIRALS[k].name} joins the high command.`, ADMIRALS[k].side);
+    return { ok: true };
   }
   function award(g, side, id, reason) {
     if (side !== g.player || !MEDALS[id]) return;
@@ -848,7 +1183,7 @@
       actedReason(u) ||
       (u.hp >= maxHP(u) ? 'Hull already intact' : null) ||
       (!nearFriendlyStation(g, u) ? 'No friendly station nearby' : null) ||
-      shortfall(funds(g, u.side), { credits: repairCost(u) })
+      shortfall(funds(g, u.side), { credits: repairCost(u, g) })
     );
   }
   function reinforceReason(g, u) {
@@ -913,6 +1248,7 @@
     const a = ADMIRALS[k];
     if (!a) return 'Unknown admiral';
     if ((g.retired || []).includes(k)) return 'Fallen in this era';
+    if (!recruited(g, k)) return `Recruit for ${a.recruit} command tokens first`;
     const busy = g.units.find(v => v.hp > 0 && v.admiral === k);
     if (busy) return `Commanding ${TYPES[busy.type].short}`;
     if (!u) return 'Select one of your fleets first';
@@ -939,6 +1275,7 @@
     const a = ADMIRALS[k];
     if (!a) return 'Unknown admiral';
     if (a.side !== g.player) return 'Not your officer';
+    if (!recruited(g, k)) return `Recruit for ${a.recruit} command tokens first`;
     return turnReason(g, a.side);
   }
   function promoteReason(g, profile, k) {
@@ -1035,6 +1372,7 @@
       };
     }
     g.medalInventory = (profile?.medals || []).filter(m => MEDALS[m]);
+    g.recruited = (profile?.recruited || []).filter(k => ADMIRALS[k]?.recruit);
     for (const u of g.units)
       if (u.admiral) {
         u.cmdRank = officer(g, u.admiral).rank;
@@ -1166,7 +1504,7 @@
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 9 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 10 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -1293,7 +1631,17 @@
     let bonus = 0;
     for (const a of g.units) {
       if (a.hp <= 0 || a.side !== u.side || !a.admiral || a.id === u.id) continue;
-      if (distance(a, u) <= auraRange(g, a)) bonus = Math.max(bonus, a.admiral === 'fischer' ? 0.1 : 0.08);
+      if (distance(a, u) > auraRange(g, a)) continue;
+      const t = TYPES[u.type],
+        b =
+          a.admiral === 'fischer'
+            ? 0.1
+            : a.admiral === 'eisenach'
+              ? 0.12
+              : a.admiral === 'merkatz' && (t.branch === 'Escort' || t.air)
+                ? 0.15
+                : 0.08;
+      bonus = Math.max(bonus, b);
     }
     return bonus;
   }
@@ -1308,6 +1656,25 @@
     if (u.admiral === 'schonkopf' && t.branch === 'Escort') attack *= 1.35;
     if (u.admiral === 'attenborough') attack *= 1.15;
     if (counter && u.admiral === 'yang') attack *= 1.65;
+    // Recruitable admirals' signature abilities (attacker side).
+    const k = u.admiral;
+    if (k === 'bittenfeld' && !counter && t.branch === 'Battle Line') attack *= 1.25;
+    if (k === 'fahrenheit' && !counter && !u.moved) attack *= 1.3;
+    if (k === 'kempff' && (t.air || u.type === 'siege')) attack *= 1.25;
+    if (k === 'lennenkampf' && t.branch === 'Battle Line') attack *= 1.1;
+    if (k === 'borodin') attack *= 1.08;
+    if (k === 'nguyen' && !counter) attack *= 1.2;
+    if (k === 'poplin' && victim?.air) attack *= 1.4;
+    if (counter && k === 'steinmetz') attack *= 1.4;
+    if (counter && k === 'bucock') attack *= 1.35;
+    if (k === 'mecklinger' && target)
+      attack *=
+        1 +
+        0.1 *
+          Math.min(
+            3,
+            g.units.filter(v => v.hp > 0 && v.side === u.side && v.id !== u.id && distance(v, target) === 1).length,
+          );
     if (t.boarding && (target ? victim.branch === 'Battle Line' : !!st)) attack *= 1.55;
     if (victim?.air && t.antiAir) attack *= t.antiAir;
     if (victim?.air && t.branch === 'Escort') attack *= 1.5;
@@ -1356,6 +1723,17 @@
       )
         attack *= 0.85;
       if (target.admiral === 'yang') attack *= 0.8;
+      // Recruitable admirals' signature abilities (defender side).
+      const dk = target.admiral;
+      if (dk === 'muller' && target.hp / maxHP(target) < 0.5) attack *= 0.7;
+      if (dk === 'wahlen') attack *= 0.9;
+      if (dk === 'borodin') attack *= 0.92;
+      if (dk === 'konev') attack *= 0.7;
+      if (dk === 'bittenfeld' && counter) attack *= 1.1;
+      if (dk === 'steinmetz' && target.type === 'flagship') attack *= 0.9;
+      if (dk === 'kessler' && g.stations.some(s => s.owner === target.side && distance(s, target) <= 1)) attack *= 0.75;
+      if (g.units.some(v => v.hp > 0 && v.side === target.side && v.admiral === 'ulanhu' && distance(v, target) <= 1))
+        attack *= 0.9;
       const terrain = tile(g, target.c, target.r).terrain;
       if (terrain === 'asteroid') attack *= 0.85;
       if (victim.evasion) attack *= 1 - victim.evasion * 0.5;
@@ -1378,7 +1756,8 @@
       raid =
         (1 + (t.branch === 'Escort' ? techValue(g, a.side, 'escort.boarding') : 0)) *
         (1 + (t.air ? techValue(g, a.side, 'air.bombing') : 0)) *
-        (intercept >= 2 ? 0.5 : intercept >= 1 && a.type === 'strategic' ? 0.7 : 1);
+        (intercept >= 2 ? 0.5 : intercept >= 1 && a.type === 'strategic' ? 0.7 : 1) *
+        (a.admiral === 'kempff' ? 1.3 : 1);
     const shieldDmg = shield
       ? Math.round(
           base *
@@ -1399,6 +1778,8 @@
     const crit = clamp(
       t.crit +
         (a.admiral === 'reinhard' && t.branch === 'Battle Line' ? 0.3 : 0) +
+        (a.admiral === 'lutz' ? 0.2 : 0) +
+        (a.admiral === 'poplin' ? 0.25 : 0) +
         (wears(g, a.admiral, 'marksman') ? 0.08 : 0),
       0,
       0.85,
@@ -1409,7 +1790,7 @@
       counter: counter ? power(g, d, a, stationAt(g, a), true) : 0,
       counterAllowed: counter,
       crit,
-      critMult: t.critMult || 1.55,
+      critMult: (t.critMult || 1.55) + (a.admiral === 'lutz' ? 0.25 : 0),
       splash: t.splash ? t.splash + techValue(g, a.side, 'artillery.salvo') : 0,
       armorPen: clamp(t.pen + (a.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95),
     };
@@ -1462,6 +1843,7 @@
       sd = Math.min(s.shield, Math.round(pr.shield * mult));
       s.shield -= sd;
     }
+    if (a.admiral === 'oberstein' && d && d.hp > 0) d.morale = Math.max(moraleFloor(g, d), d.morale - 1);
     let retaliation = 0;
     if (d && d.hp > 0 && pr.counterAllowed) {
       retaliation = Math.round(pr.counter * (0.94 + random(g) * 0.12));
@@ -1476,14 +1858,14 @@
         if (v.hp <= 0 || v.side === a.side || v.id === d?.id || distance(v, p) !== 1) continue;
         const amount = Math.round(power(g, a, v, stationAt(g, v)) * pr.splash);
         v.hp = Math.max(0, v.hp - amount);
-        v.morale = Math.max(v.admiral === 'reinhard' ? 0 : -3, v.morale - 1);
+        v.morale = Math.max(moraleFloor(g, v), v.morale - 1);
         hit.push({ id: v.id, c: v.c, r: v.r, damage: amount });
         kill(g, v, a);
       }
     }
     const destroyed = !!d && d.hp <= 0;
     if (destroyed) kill(g, d, a);
-    let cap = ['mittermeyer', 'attenborough'].includes(a.admiral) ? 2 : 1;
+    let cap = ['mittermeyer', 'attenborough', 'nguyen'].includes(a.admiral) ? 2 : 1;
     // Assault Doctrine: a kill at the cap may still earn one more breakthrough.
     if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain === cap) {
       const chance = techValue(g, a.side, 'line.assault');
@@ -1565,7 +1947,11 @@
     return { credits: TYPES[type].cost, industry: TYPES[type].industry };
   }
   // Repairs restore 35% hull for a fifth of the fleet's build price.
-  function repairCost(u) {
+  function repairCost(u, g = null) {
+    const half = g && g.units.some(v => v.hp > 0 && v.side === u.side && v.admiral === 'cazerne') ? 0.5 : 1;
+    return Math.max(10, Math.round(baseRepairCost(u) * half));
+  }
+  function baseRepairCost(u) {
     return Math.max(20, Math.round(price(u.type, u.stack).credits * 0.2));
   }
   function reinforce(g, id) {
@@ -1587,7 +1973,7 @@
     const u = g.units.find(u => u.id === id);
     const why = repairReason(g, u);
     if (why) return { ok: false, reason: why };
-    const cost = repairCost(u);
+    const cost = repairCost(u, g);
     funds(g, u.side).credits -= cost;
     const amount = Math.min(maxHP(u) - u.hp, Math.round(maxHP(u) * 0.35));
     u.hp += amount;
@@ -1659,7 +2045,7 @@
     const why = confuseReason(g, u);
     if (why) return { ok: false, reason: why };
     const victims = g.units.filter(v => v.hp > 0 && v.side !== u.side && distance(u, v) <= 2);
-    victims.forEach(v => (v.morale = Math.max(v.admiral === 'reinhard' ? 0 : -3, v.morale - 2)));
+    victims.forEach(v => (v.morale = Math.max(moraleFloor(g, v), v.morale - 2)));
     u.confusionCD = 3;
     log(g, `Yang's feint disrupts ${victims.length} enemy fleets.`, u.side);
     return { ok: true, affected: victims.length };
@@ -1683,10 +2069,16 @@
       u.confusionCD = Math.max(0, u.confusionCD - 1);
       const nearby = g.units.filter(v => v.hp > 0 && v.side !== side && distance(u, v) === 1).length;
       let desired = nearby >= 3 ? -2 : nearby >= 2 ? -1 : 0;
-      if (u.admiral === 'reinhard') desired = Math.max(0, desired);
+      desired = Math.max(moraleFloor(g, u), desired);
       if (u.morale < desired) u.morale++;
       else if (u.morale > desired) u.morale--;
       if (nearby >= 2) u.morale = Math.min(u.morale, desired);
+      // Patrichev reassures fleets within 2 hexes: one extra morale step and 5% hull.
+      if (g.units.some(m => m.hp > 0 && m.side === side && m.admiral === 'patrichev' && distance(m, u) <= 2)) {
+        u.morale = Math.min(1, u.morale + 1);
+        u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.05));
+      }
+      if (u.admiral === 'cazerne') u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
       const auras = g.units.filter(
           v => v.hp > 0 && v.side === side && v.admiral && v.id !== u.id && distance(u, v) <= auraRange(g, v),
         ),
@@ -1701,6 +2093,7 @@
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
       if (
         TYPES[u.type].air &&
+        u.admiral !== 'konev' &&
         !g.stations.some(s => s.owner === side && (s.air || 0) > 0 && distance(s, u) <= airSupply(g, side))
       )
         u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.1));
@@ -1750,7 +2143,7 @@
       name = fortressName(s),
       hit = [];
     foe.hp = Math.max(0, foe.hp - damage);
-    foe.morale = Math.max(foe.admiral === 'reinhard' ? 0 : -3, foe.morale - 1);
+    foe.morale = Math.max(moraleFloor(g, foe), foe.morale - 1);
     s.gunReady = g.turn + fortressRecharge(g, s);
     log(g, `${name} strikes ${TYPES[foe.type].short} for ${damage}.`, s.owner);
     const destroyed = foe.hp <= 0;
@@ -2121,7 +2514,7 @@
     if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 9,
+      rulesVersion: 10,
       player,
       difficulty,
       mode: era ? 'conquest' : scen,
@@ -2392,7 +2785,7 @@
     for (const u of own()
       .filter(u => u.hp / maxHP(u) < 0.55 && nearFriendlyStation(u))
       .sort((a, b) => a.hp / maxHP(a) - b.hp / maxHP(b))) {
-      if (e.credits - repairCost(u) >= 60) repair(g, u.id);
+      if (e.credits - repairCost(u, g) >= 60) repair(g, u.id);
     }
 
     // 2. Decide whether to save for a dreadnought (at most two alive, needs a tier-3 shipyard).
@@ -2587,6 +2980,10 @@
     MEDALS,
     officer,
     medalSlots,
+    moraleFloor,
+    recruited,
+    recruitReason,
+    recruitAdmiral,
     MAX_RATING,
     starCost,
     starReason,

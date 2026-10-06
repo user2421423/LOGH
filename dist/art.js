@@ -913,7 +913,54 @@ const ART = {
     return this.svg(name, this.frames[type] ?? 13, extra);
   },
   portrait(admiral, extra = '') {
+    if (this.officers[admiral] == null && this.looks[admiral])
+      return `<span class="portrait-art generated ${extra}" aria-hidden="true">${this.portraitSVG(admiral)}</span>`;
     return this.svg('portraits', this.officers[admiral] ?? 0, extra);
+  },
+  // Admirals without atlas art get a drawn placeholder bust: faction uniform, hair and initials.
+  looks: {
+    bittenfeld: { side: 'empire', hair: '#e07a2e', name: 'FJB' },
+    muller: { side: 'empire', hair: '#c9a46a', name: 'NM' },
+    fahrenheit: { side: 'empire', hair: '#9cc4d8', name: 'AF' },
+    kempff: { side: 'empire', hair: '#6b4a2b', name: 'KGK' },
+    eisenach: { side: 'empire', hair: '#b5442c', name: 'EE' },
+    oberstein: { side: 'empire', hair: '#d9d9d2', name: 'PO', grim: true },
+    wahlen: { side: 'empire', hair: '#5a3d24', name: 'ASW' },
+    lutz: { side: 'empire', hair: '#e8d9a8', name: 'CL' },
+    mecklinger: { side: 'empire', hair: '#4a3628', name: 'EM' },
+    kessler: { side: 'empire', hair: '#3a2c22', name: 'UK' },
+    steinmetz: { side: 'empire', hair: '#7a5232', name: 'KRS' },
+    lennenkampf: { side: 'empire', hair: '#8b8b86', name: 'HL' },
+    bucock: { side: 'alliance', hair: '#e6e6e0', name: 'AB' },
+    merkatz: { side: 'alliance', hair: '#cfcfc8', name: 'WJM' },
+    ulanhu: { side: 'alliance', hair: '#1f1a17', name: 'U' },
+    borodin: { side: 'alliance', hair: '#6a4a30', name: 'B' },
+    cazerne: { side: 'alliance', hair: '#3b2a20', name: 'AC' },
+    poplin: { side: 'alliance', hair: '#d6a24a', name: 'OP' },
+    konev: { side: 'alliance', hair: '#8a5a32', name: 'IK' },
+    murai: { side: 'alliance', hair: '#6d6d6a', name: 'M' },
+    patrichev: { side: 'alliance', hair: '#2d2a28', name: 'FP' },
+    nguyen: { side: 'alliance', hair: '#141210', name: 'NVH' },
+  },
+  portraitSVG(admiral) {
+    const l = this.looks[admiral],
+      emp = l.side === 'empire',
+      bg = emp ? ['#2a3550', '#c79a3a'] : ['#1d4a4e', '#6f8a3e'],
+      coat = emp ? '#1b1d24' : '#5d6b3a',
+      trim = emp ? '#c9cbd3' : '#e8e2c4',
+      id = 'pg-' + admiral;
+    return `<svg viewBox="0 0 60 80" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bg[0]}"/><stop offset="1" stop-color="${bg[1]}"/></linearGradient></defs><rect width="60" height="80" fill="url(#${id})"/><path d="M4 80 C6 60 16 54 30 54 C44 54 54 60 56 80Z" fill="${coat}"/><path d="M22 55 L30 66 L38 55" fill="none" stroke="${trim}" stroke-width="2"/><path d="M8 66 h10 M42 66 h10" stroke="${trim}" stroke-width="1.6"/><rect x="25" y="44" width="10" height="12" rx="3" fill="#e9c7a6"/><ellipse cx="30" cy="34" rx="12" ry="14" fill="#f1d2b2"/><path d="M17 34 C16 20 22 15 30 15 C38 15 44 20 43 34 C41 26 36 23 30 23 C24 23 19 26 17 34Z" fill="${l.hair}"/>${l.grim ? '<path d="M22 33 h6 M32 33 h6" stroke="#222" stroke-width="2"/>' : '<circle cx="25" cy="34" r="1.3" fill="#2a2a2a"/><circle cx="35" cy="34" r="1.3" fill="#2a2a2a"/>'}<path d="M26 42 q4 2 8 0" fill="none" stroke="#9a6a55" stroke-width="1.2"/>${emp ? `<path d="M15 21 C18 11 42 11 45 21 L45 24 L15 24Z" fill="#14161c"/><rect x="15" y="22" width="30" height="3" fill="${trim}"/><circle cx="30" cy="17" r="2.4" fill="${trim}"/>` : `<path d="M16 22 C18 13 42 13 44 22 L44 24 L16 24Z" fill="#4c5a2f"/><rect x="16" y="22" width="28" height="2.4" fill="#e8e2c4"/>`}<rect x="0" y="70" width="60" height="10" fill="#0008"/><text x="30" y="78" text-anchor="middle" font-family="Georgia,serif" font-size="8" font-weight="700" fill="#f3e3b0">${l.name}</text></svg>`;
+  },
+  portraitImages: {},
+  // Canvas copy of a placeholder bust, for the admiral pins drawn on the map.
+  portraitImage(admiral) {
+    if (typeof Image === 'undefined' || !this.looks[admiral]) return null;
+    if (!this.portraitImages[admiral]) {
+      const img = new Image();
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(this.portraitSVG(admiral));
+      this.portraitImages[admiral] = img;
+    }
+    return this.portraitImages[admiral];
   },
 };
 ART.load();

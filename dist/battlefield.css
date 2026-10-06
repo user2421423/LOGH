@@ -2079,3 +2079,15 @@ button.mini small {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Recruitable admirals not yet in the high command. */
+.locked-officer .officer-portrait {
+  filter: grayscale(0.7) brightness(0.8);
+}
+.locked-officer h3 {
+  color: #c9c2a0;
+}
+.portrait-art.generated > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

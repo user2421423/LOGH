@@ -348,7 +348,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3, 4, 5, 6, 7, 8]) {
+  for (const v of [undefined, 2, 3, 4, 5, 6, 7, 8, 9]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -694,4 +694,33 @@ test('Command tokens buy branch stars up to six, and the stars carry into every 
       E.officer(E.applyProfile(E.createGame('alliance', 'hard', mode, 3), profile), 'fischer').ratings.escort,
       6,
     );
+});
+test('Recruitable admirals cost command tokens once, start in no operation, and carry their abilities', () => {
+  const extra = Object.entries(E.ADMIRALS).filter(([, a]) => a.recruit);
+  assert.equal(extra.length, 22);
+  for (const mode of [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)])
+    for (const side of ['empire', 'alliance'])
+      assert(!E.createGame(side, 'normal', mode, 5).units.some(u => E.ADMIRALS[u.admiral]?.recruit), mode);
+  const g = blank(),
+    u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
+  g.economy.alliance.credits = 5000;
+  assert.match(E.assignReason(g, u, 'bucock'), /^Recruit for 300 command tokens first$/);
+  const p = { tokens: 250 };
+  assert.equal(E.recruitReason(g, p, 'bucock'), 'Need 50 more command tokens');
+  assert.equal(E.recruitReason(g, p, 'bittenfeld'), 'Serves the other side');
+  p.tokens = 500;
+  assert(E.recruitAdmiral(g, p, 'bucock').ok);
+  assert.equal(p.tokens, 200);
+  assert.equal(E.recruitReason(g, p, 'bucock'), 'Already recruited');
+  assert(E.assign(g, u.id, 'bucock').ok);
+  assert.equal(E.moraleFloor(g, u), 0);
+  const next = E.applyProfile(E.createGame('alliance', 'hard', 'iserlohn', 2), E.exportProfile(g, p));
+  assert(E.recruited(next, 'bucock'));
+  assert(!E.recruited(next, 'poplin'));
+  // Cazerne halves repair costs while he commands a fleet.
+  const c = E.newUnit(g, 'light', 'alliance', 5, 5);
+  const full = E.repairCost(c, g);
+  g.recruited.push('cazerne');
+  assert(E.assign(g, c.id, 'cazerne').ok);
+  assert.equal(E.repairCost(c, g), Math.max(10, Math.round(full / 2)));
 });
