@@ -772,3 +772,14 @@ test('Recruiting adds an admiral to the roster once; recruitable admirals start 
   assert(E.assign(g, c.id, 'cazerne').ok);
   assert.equal(E.repairCost(c, g), Math.max(10, Math.round(full / 2)));
 });
+test('A fleet whose only order is holding position has no orders left', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'heavy', 'alliance', 4, 4);
+  assert(E.hasOrders(g, u));
+  u.moved = true;
+  assert(!E.hasOrders(g, u));
+  E.newUnit(g, 'corvette', 'empire', 5, 4);
+  assert(E.hasOrders(g, u));
+  u.attacked = true;
+  assert(!E.hasOrders(g, u));
+});

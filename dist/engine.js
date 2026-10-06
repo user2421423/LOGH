@@ -1607,6 +1607,14 @@
     if (target) return target.side !== u.side && !(TYPES[u.type].branch === 'Artillery' && TYPES[target.type].air);
     return !!st && st.owner !== u.side && st.shield > 0;
   }
+  // Whether a fleet still has any order besides holding position: firing, moving, repairing, reinforcing or Confusion.
+  function hasOrders(g, u) {
+    if (!u || !isReady(g, u)) return false;
+    if (!u.attacked && targets(g, u).length) return true;
+    if (!u.moved && reachable(g, u).size) return true;
+    if (!repairReason(g, u) || !reinforceReason(g, u)) return true;
+    return u.admiral === 'yang' && !confuseReason(g, u);
+  }
   function targets(g, u) {
     return g.tiles.filter(p => hostileTarget(g, u, p) && inRange(u, p, g));
   }
@@ -3569,6 +3577,7 @@
     newUnit,
     movement,
     reachable,
+    hasOrders,
     targets,
     preview,
     move,

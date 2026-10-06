@@ -273,7 +273,17 @@ function statRow(u, t) {
   const range = rangeText(u);
   return `<span class="stat" title="Attack">${ICONS.use('atk')}${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</span><span class="stat" title="Armor">${ICONS.use('def')}${t.armor}</span><span class="stat" title="Movement">${ICONS.use('mov')}${E.movement(game, u)}</span><span class="stat" title="Range">${ICONS.use('rng')}${range}</span>`;
 }
+// Fleets that still have an order besides holding position, refreshed whenever the selection or map changes.
+let readyIds = new Set();
+function hasOrders(u) {
+  return game.phase === game.player ? readyIds.has(u.id) : !u.attacked;
+}
 function updateSelection() {
+  readyIds = new Set(
+    ownUnits()
+      .filter(u => E.hasOrders(game, u))
+      .map(u => u.id),
+  );
   const u = selectedUnit();
   readyCache = u && u.side === game.player ? E.reachable(game, u) : new Map();
   supplyCache =
@@ -293,7 +303,7 @@ function updateSelection() {
     '<button class="drawer-close small" data-action="details" aria-label="Close fleet orders">×</button>' + panel();
   $('side').classList.toggle('open', detailOpen);
   $('selection-dock').innerHTML = dockHTML();
-  const ready = ownUnits().filter(u => !u.attacked && u.morale > -3).length;
+  const ready = readyIds.size;
   $('turn-status').innerHTML = game.over
     ? 'Operation concluded'
     : `${ready} fleets ready <small>${E.FACTIONS[game.player].short} · ${E.DIFFICULTIES[game.difficulty]?.name || 'Normal'} · ${saveOk ? 'autosaved' : 'not saved'}</small>`;
@@ -303,7 +313,7 @@ function updateSelection() {
       : game.over
         ? 'Operation concluded'
         : u?.side === game.player
-          ? `${u.admiral ? E.ADMIRALS[u.admiral].short + ' · ' : ''}${E.TYPES[u.type].short} ×${u.stack}${u.morale <= -3 ? ' · In confusion' : u.attacked ? ' · Orders complete' : ''}`
+          ? `${u.admiral ? E.ADMIRALS[u.admiral].short + ' · ' : ''}${E.TYPES[u.type].short} ×${u.stack}${u.morale <= -3 ? ' · In confusion' : u.side === game.player && !hasOrders(u) ? ' · Orders complete' : ''}`
           : selectedStation()
             ? `${selectedStation().name} · ${selectedStation().owner === game.player ? 'Select Shipyard to build fleets' : 'Breach shields before capture'}`
             : 'Select a fleet to reveal movement and firing range.';
@@ -325,7 +335,7 @@ function panel() {
   const fleetPicker = `<label class="label" for="fleet-select">Your fleets</label><select class="select unit-select" id="fleet-select"><option value="">Select a fleet…</option>${ownUnits()
     .map(
       v =>
-        `<option value="${v.id}" ${u?.id === v.id ? 'selected' : ''}>${v.admiral ? E.ADMIRALS[v.admiral].short + ' · ' : ''}${E.TYPES[v.type].short} ×${v.stack} [${v.c},${v.r}]${v.attacked ? ' · spent' : ''}</option>`,
+        `<option value="${v.id}" ${u?.id === v.id ? 'selected' : ''}>${v.admiral ? E.ADMIRALS[v.admiral].short + ' · ' : ''}${E.TYPES[v.type].short} ×${v.stack} [${v.c},${v.r}]${!hasOrders(v) ? ' · spent' : ''}</option>`,
     )
     .join('')}</select>`;
   let main = '';
@@ -413,7 +423,7 @@ function selectStation(id, center = false) {
   if (center) centerOn(s);
 }
 function nextFleet() {
-  const ready = ownUnits().filter(u => !u.attacked && u.morale > -3);
+  const ready = ownUnits().filter(u => readyIds.has(u.id));
   if (!ready.length) {
     toast('All fleets have completed their orders. End the turn to continue.');
     return;
@@ -467,7 +477,7 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
 const pause = ms => new Promise(resolve => setTimeout(resolve, reducedMotion() ? 15 : ms));
 async function endTurn(force = false) {
   if (!interactive()) return;
-  const ready = ownUnits().filter(u => !u.attacked && u.morale > -3).length;
+  const ready = ownUnits().filter(u => E.hasOrders(game, u)).length;
   if (ready && !force) {
     modal.innerHTML = `<div class="overlay"><section class="dialog narrow" role="dialog" aria-modal="true" aria-label="End turn"><div class="eyebrow">Review orders</div><h2>${ready} fleets still have orders.</h2><p>You can end the turn now and leave them holding position, or return to issue their orders.</p><div class="dialog-footer"><button data-action="close">Return to the map</button><button class="primary" data-action="end-confirm">End turn</button></div></section></div>`;
     focusDialog();
@@ -495,7 +505,8 @@ async function endTurn(force = false) {
     moralePopups(before);
     for (const o of orders) {
       if (o.kind === 'attack') addCombatEffects(o, u);
-      else
+      else {
+        SFX.play(E.TYPES[u.type].air ? 'flyby' : 'move', enemy);
         effects.push({
           kind: 'move',
           unitId: id,
@@ -505,6 +516,7 @@ async function endTurn(force = false) {
           life: 0.5,
           max: 0.5,
         });
+      }
     }
     if (orders.length) {
       updateSelection();
@@ -734,7 +746,7 @@ function archiveDialog(branch = 'Escort') {
     .filter(([k, t]) => t.branch === branch)
     .map(
       ([k, t]) =>
-        `<article class="unit-card">${ART.ship(k, 'catalog-ship', game.player)}<span class="unit-code">${t.code} · Tier ${t.tier}</span><h3>${t.name}</h3><span class="label">${t.wc} equivalent</span>${t.weapon ? `<span class="weapon-focus">${t.weapon}</span>` : ''}<p style="margin-top:12px">${t.desc}</p><div class="unit-spec"><span>HP ${t.hp}</span><span>${ICONS.use('atk')}${t.attack}</span><span>${ICONS.use('def')}${t.armor}</span><span>${ICONS.use('mov')}${t.move}</span><span>${ICONS.use('rng')}${t.min === t.max ? t.max : t.min + '–' + t.max}</span></div><div class="cost">${costHTML({ credits: t.cost, industry: t.industry })}</div></article>`,
+        `<article class="unit-card">${ART.ship(k, 'catalog-ship', game.player)}<span class="unit-code">${t.code} · Tier ${t.tier}</span><h3>${t.name}</h3>${t.weapon ? `<span class="weapon-focus">${t.weapon}</span>` : ''}<p style="margin-top:12px">${t.desc}</p><div class="unit-spec"><span>HP ${t.hp}</span><span>${ICONS.use('atk')}${t.attack}</span><span>${ICONS.use('def')}${t.armor}</span><span>${ICONS.use('mov')}${t.move}</span><span>${ICONS.use('rng')}${t.min === t.max ? t.max : t.min + '–' + t.max}</span></div><div class="cost">${costHTML({ credits: t.cost, industry: t.industry })}</div></article>`,
     )
     .join('')}</div></section></div>`;
   focusDialog();
@@ -854,6 +866,7 @@ function activateHex(p) {
       const snapshot = JSON.stringify(game),
         result = E.move(game, u.id, p.c, p.r);
       if (result.ok) {
+        SFX.play(E.TYPES[u.type].air ? 'flyby' : 'move', u.side);
         undoStack.push({ snapshot, unitId: u.id });
         effects.push({
           kind: 'move',
@@ -1911,7 +1924,7 @@ function draw(time, dt) {
       t = E.TYPES[u.type],
       col = E.FACTIONS[u.side].color,
       sel = selection?.kind === 'unit' && selection.id === u.id,
-      spent = u.moved && u.attacked;
+      spent = u.side === game.player && game.phase === game.player ? !hasOrders(u) : u.moved && u.attacked;
     ctx.save();
     ctx.translate(p.x, p.y);
     drawPlate(u, scale);
@@ -1944,7 +1957,7 @@ function draw(time, dt) {
     ctx.globalAlpha = 1;
     if (!t.air && !ART.ready[artSide(u)]) outlinedText(t.code, 0, 3, 13, col, scale);
     drawStackBars(u.stack, u.side, scale);
-    if (!u.attacked && u.side === game.player && interactive()) {
+    if (u.side === game.player && interactive() && hasOrders(u)) {
       ctx.beginPath();
       ctx.arc(36, 8, Math.max(3, 2.4 / scale), 0, Math.PI * 2);
       ctx.fillStyle = '#6dffa5';
