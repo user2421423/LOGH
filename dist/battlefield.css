@@ -1991,3 +1991,91 @@ button.mini small {
 .gi-portrait {
   height: 330px;
 }
+/* General Info layout fixes: columns may shrink, rating cells stack name over stars, no overflow. */
+.dialog.wide.general-info {
+  width: min(980px, 100%);
+}
+.gi-body {
+  grid-template-columns: 270px minmax(0, 1fr);
+}
+.gi-body > *,
+.gi-ratings > * {
+  min-width: 0;
+}
+.gi-ratings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.gi-rating {
+  min-height: 72px;
+  gap: 10px;
+  padding: 8px 10px;
+}
+.gi-badge {
+  width: 48px;
+  height: 48px;
+}
+.gi-badge .ship-art {
+  width: 44px;
+  height: 44px;
+}
+.gi-rating-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.gi-name {
+  min-width: 0;
+  font-size: 12px;
+}
+.gi-stars {
+  font-size: 18px;
+  letter-spacing: 0;
+}
+.gi-rating .token-buy {
+  flex-shrink: 0;
+  padding: 4px 8px;
+}
+.gi-portrait {
+  height: 260px;
+}
+.gi-ladder {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid #16293b;
+}
+.gi-pips {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+.gi-pips i {
+  height: 10px;
+  border: 1px solid #5d8fc4;
+  background: #142434;
+  transform: skewX(-20deg);
+}
+.gi-pips i.done {
+  background: #3d7fd0;
+}
+.gi-pips i.now {
+  background: #ffd23f;
+  border-color: #fff3b0;
+  box-shadow: 0 0 6px #ffb300aa;
+}
+.gi-promote-row {
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+.gi-promote-row .token-buy {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .gi-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gi-ratings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
