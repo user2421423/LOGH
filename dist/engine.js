@@ -123,10 +123,11 @@
       crit: 0.18,
       pen: 0.42,
       breakthrough: true,
-      desc: 'Heavy armor penetration and 1–2 hex guns. Exchanges counter-fire; a kill triggers breakthrough.',
+      relentless: true,
+      desc: 'Heavy armor penetration and 1–2 hex guns. Exchanges counter-fire. Every kill lets it fire again; the first also refreshes its movement.',
     },
     flagship: {
-      name: 'Dreadnought / Fleet Flagship',
+      name: 'Dreadnought',
       short: 'Dreadnought',
       code: 'DN',
       branch: 'Battle Line',
@@ -143,7 +144,8 @@
       crit: 0.22,
       pen: 0.48,
       breakthrough: true,
-      desc: 'Brünhild or Hyperion-class command vessel. Immense armor, 1–2 hex guns, counter-fire and breakthrough.',
+      relentless: true,
+      desc: 'Super-heavy capital ship. Immense armor, 1–2 hex guns and counter-fire. Every kill lets it fire again; the first also refreshes its movement.',
     },
     beam: {
       name: 'Artillery Frigate',
@@ -1882,6 +1884,11 @@
       a.moved = false;
       a.sortie = false;
       breakthrough = true;
+    } else if (destroyed && a.hp > 0 && TYPES[a.type].relentless) {
+      // Battleships and dreadnoughts always fire again after a kill, beyond the breakthrough cap.
+      a.attacked = false;
+      a.sortie = false;
+      breakthrough = true;
     }
     log(
       g,
@@ -3455,7 +3462,7 @@
         if (m.ok) events.push({ kind: 'move', ...m, id });
       }
     }
-    for (let chain = 0; chain < 3 && !u.attacked && !g.over; chain++) {
+    for (let chain = 0; chain < 8 && !u.attacked && !g.over; chain++) {
       const shot = choose();
       if (!shot) break;
       const a = attack(g, id, shot.p.c, shot.p.r);

@@ -216,7 +216,7 @@ test('Unit reinforcement and repair spend actions and require station access', (
 });
 test('Breakthrough grants an extra move and attack after a kill but has a cap', () => {
   const g = blank(),
-    a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3);
+    a = E.newUnit(g, 'heavy', 'alliance', 2, 2, 3);
   const b = E.newUnit(g, 'corvette', 'empire', 3, 2);
   b.hp = 1;
   let r = E.attack(g, a.id, 3, 2);
@@ -227,6 +227,24 @@ test('Breakthrough grants an extra move and attack after a kill but has a cap', 
   r = E.attack(g, a.id, 2, 3);
   assert(!r.breakthrough);
   assert(a.attacked);
+});
+test('Battleships and dreadnoughts always fire again after a kill', () => {
+  for (const type of ['battleship', 'flagship']) {
+    const g = blank(),
+      a = E.newUnit(g, type, 'alliance', 4, 4, 1);
+    for (const [c, r] of [
+      [5, 4],
+      [3, 4],
+      [4, 3],
+      [4, 5],
+    ]) {
+      E.newUnit(g, 'corvette', 'empire', c, r).hp = 1;
+      const res = E.attack(g, a.id, c, r);
+      assert(res.destroyed && res.breakthrough, type + ' kill at ' + c + ',' + r);
+      assert(!a.attacked, type + ' may fire again');
+    }
+    assert(a.moved, 'movement refreshes only within the breakthrough cap');
+  }
 });
 test('Admirals have distinct movement, terrain, penetration and morale abilities', () => {
   const g = blank(),
