@@ -724,3 +724,15 @@ test('Recruitable admirals cost command tokens once, start in no operation, and 
   assert(E.assign(g, c.id, 'cazerne').ok);
   assert.equal(E.repairCost(c, g), Math.max(10, Math.round(full / 2)));
 });
+test('Air supply covers hexes within range of a friendly air base, and Carrier Operations widens it', () => {
+  const g = blank(),
+    s = station(g, 2, 2);
+  s.air = 0;
+  assert(!E.airSupplied(g, 'alliance', { c: 2, r: 3 }));
+  s.air = 1;
+  assert(E.airSupplied(g, 'alliance', { c: 4, r: 2 }));
+  assert(!E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
+  assert(!E.airSupplied(g, 'empire', { c: 2, r: 3 }));
+  g.tech.alliance['air.carrier'] = 1;
+  assert(E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
+});

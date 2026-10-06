@@ -1014,6 +1014,10 @@
   function unitTech(g, u, k) {
     return techValue(g, u.side, `${branchOf(u.type)}.${k}`);
   }
+  // A hex is in air supply when a friendly station with an air base lies within supply range.
+  function airSupplied(g, side, p) {
+    return g.stations.some(s => s.owner === side && (s.air || 0) > 0 && distance(s, p) <= airSupply(g, side));
+  }
   function airSupply(g, side) {
     return techLevel(g, side, 'air.carrier') >= 1 ? 5 : 3;
   }
@@ -2091,11 +2095,7 @@
       }
       const s = stationAt(g, u);
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
-      if (
-        TYPES[u.type].air &&
-        u.admiral !== 'konev' &&
-        !g.stations.some(s => s.owner === side && (s.air || 0) > 0 && distance(s, u) <= airSupply(g, side))
-      )
+      if (TYPES[u.type].air && u.admiral !== 'konev' && !airSupplied(g, side, u))
         u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.1));
     }
     g.strikes = [];
@@ -2899,11 +2899,7 @@
           sc -= Math.abs(nearestEnemy - TYPES[u.type].max) * 6;
         } else sc -= nearestEnemy * 2;
         // Air wings stay within supply range of a friendly air base.
-        if (
-          TYPES[u.type].air &&
-          !g.stations.some(s => s.owner === u.side && (s.air || 0) > 0 && distance(s, p) <= airSupply(g, u.side))
-        )
-          sc -= 80;
+        if (TYPES[u.type].air && !airSupplied(g, u.side, p)) sc -= 80;
         u.c = p.c;
         u.r = p.r;
         const shot = choose();
@@ -2974,6 +2970,7 @@
     fortressRecharge,
     rangeOf,
     airSupply,
+    airSupplied,
     RANKS,
     RANK_HP,
     PROMOTE_COST,

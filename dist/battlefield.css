@@ -2108,3 +2108,234 @@ button.mini small {
   object-fit: cover;
   object-position: center top;
 }
+
+/* ---- Campaign map ---- */
+.campaign {
+  margin: 18px 0 6px;
+}
+.camp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #c9d2b8;
+  font-size: 13px;
+}
+.campaign-map {
+  position: relative;
+  aspect-ratio: 16 / 6;
+  min-height: 220px;
+  border: 1px solid #798e8180;
+  border-radius: 4px;
+  overflow: hidden;
+  background:
+    radial-gradient(1px 1px at 12% 22%, #fff9 50%, transparent),
+    radial-gradient(1px 1px at 38% 78%, #fff8 50%, transparent),
+    radial-gradient(1.5px 1.5px at 66% 18%, #fffb 50%, transparent),
+    radial-gradient(1px 1px at 84% 84%, #fff8 50%, transparent),
+    radial-gradient(1px 1px at 52% 48%, #fff6 50%, transparent),
+    radial-gradient(ellipse at 20% 60%, #3a2a5a66, transparent 45%),
+    radial-gradient(ellipse at 75% 35%, #1f4a5a66, transparent 50%),
+    linear-gradient(135deg, #0a1424, #101c2e 60%, #0b1220);
+}
+.campaign-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.camp-path {
+  fill: none;
+  stroke: #6f8fae66;
+  stroke-width: 0.6;
+  stroke-dasharray: 1.6 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.camp-path.done {
+  stroke: #e7b937;
+  stroke-dasharray: none;
+  stroke-width: 2;
+}
+.campaign-map .camp-path {
+  stroke-width: 2;
+}
+.camp-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: none;
+  color: #dfe7ef;
+  width: 110px;
+  text-align: center;
+}
+.camp-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #6f8fae;
+  background: #142434;
+  font-weight: 800;
+  font-size: 13px;
+}
+.camp-node.done .camp-dot {
+  border-color: #e7b937;
+  background: #3a2e10;
+  color: #ffe08a;
+}
+.camp-node.selected .camp-dot {
+  box-shadow: 0 0 0 3px #3ff2c4aa;
+}
+.camp-node.recommended .camp-dot {
+  border-color: #3ff2c4;
+  animation: camp-pulse 1.6s ease-in-out infinite;
+}
+@keyframes camp-pulse {
+  50% {
+    box-shadow: 0 0 0 7px #3ff2c433;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camp-node.recommended .camp-dot {
+    animation: none;
+  }
+}
+.camp-name {
+  font-size: 11px;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px #000;
+}
+.camp-stars {
+  font-size: 11px;
+  color: #ffd23f;
+  letter-spacing: 1px;
+}
+.camp-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #ffe08a;
+}
+.camp-reward .cost-ico {
+  width: 12px;
+  height: 12px;
+}
+.camp-flag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1px 6px;
+  background: #3ff2c4;
+  color: #062018;
+  border-radius: 2px;
+  font-weight: 800;
+}
+.camp-advice {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #c9d2b8;
+}
+.camp-advice b {
+  color: #3ff2c4;
+}
+.camp-brief {
+  padding: 12px 14px;
+  border: 1px solid #798e8180;
+  background: #142234aa;
+  border-radius: 3px;
+}
+.camp-brief h3 {
+  margin: 4px 0 6px;
+  font-size: 20px;
+  color: #e5dfb8;
+}
+.camp-brief p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #bdcecb;
+}
+.camp-objective {
+  color: #ffd23f !important;
+}
+.camp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: #c9d2b8;
+}
+.camp-meta b {
+  color: #ffe08a;
+}
+.camp-meta .cost-ico {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+.camp-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 3px;
+  border: 1px solid #6f8fae;
+  font-size: 10px;
+  font-weight: 800;
+  color: #6f8fae;
+}
+.camp-pip.on {
+  border-color: #e7b937;
+  background: #e7b937;
+  color: #1b1405;
+}
+@media (max-width: 700px) {
+  .campaign-map {
+    aspect-ratio: auto;
+    height: 300px;
+  }
+  .camp-node {
+    width: 74px;
+  }
+  .camp-name {
+    font-size: 9px;
+  }
+  .camp-reward,
+  .camp-flag {
+    display: none;
+  }
+  .camp-node.recommended .camp-flag {
+    display: inline;
+  }
+}
+.campaign-map button.camp-node,
+.campaign-map button.camp-node:hover,
+.campaign-map button.camp-node:focus-visible {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.campaign-map button.camp-node:focus-visible .camp-dot {
+  outline: 2px solid #f1d27a;
+  outline-offset: 2px;
+}
+.camp-reward .cost-ico,
+.camp-meta .cost-ico {
+  position: static;
+  margin: 0;
+}
+.camp-kind {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7cc8ff;
+}

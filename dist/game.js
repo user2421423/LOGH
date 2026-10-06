@@ -22,6 +22,9 @@ let game = E.createGame('alliance'),
   aiToken = 0,
   pointer = null,
   readyCache = new Map(),
+  // Air wings: hexes inside friendly air supply, and an out-of-supply move awaiting a second click.
+  supplyCache = null,
+  airWarned = null,
   targetCache = new Set();
 let detailOpen = false,
   saveOk = true,
@@ -100,7 +103,7 @@ function newGame() {
 }
 function startMenu() {
   const saved = getSave();
-  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div><div class="setup-row"><div><label for="mode-select">Operation</label><select class="select" id="mode-select">${modeOptions()}</select>${modeNote()}</div><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select">${Object.entries(
+  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div>${campaignScreen()}<div class="setup-row"><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select">${Object.entries(
     E.DIFFICULTIES,
   )
     .map(
@@ -126,30 +129,80 @@ function starKey(mode, difficulty) {
 function starText(n) {
   return '★'.repeat(n) + '☆'.repeat(3 - n);
 }
-function modeOptions() {
-  const best = bestStars(),
-    cleared = loadProfile().cleared || {},
-    open = key => (cleared[`${key}:${setup.difficulty}`] ? '' : ' · ◆ reward'),
-    sel = v => (setup.mode === v || (v === 'conquest:frontier' && setup.mode === 'conquest') ? 'selected' : '');
-  const eras = Object.entries(E.ERAS)
-    .map(
-      ([k, e]) =>
-        `<option value="conquest:${k}" ${sel('conquest:' + k)}>${e.name} · ${e.year}${open('conquest:' + k)}</option>`,
-    )
-    .join('');
-  const scens = Object.entries(E.SCENARIOS)
-    .map(
-      ([k, sc]) =>
-        `<option value="${k}" ${sel(k)}>${sc.name} · ${sc.objective.turns} turns${best[starKey(k, setup.difficulty)] ? ' · ' + starText(best[starKey(k, setup.difficulty)]) : ''}${open(k)}</option>`,
-    )
-    .join('');
-  return `<optgroup label="Conquest · 17 × 11 galaxy">${eras}</optgroup><optgroup label="Scenarios">${scens}</optgroup>`;
+// Connected campaign: every operation as a node on one galaxy map, in story order.
+const CAMPAIGN = [
+  { mode: 'astarte', x: 7, y: 70 },
+  { mode: 'iserlohn', x: 18, y: 32 },
+  { mode: 'conquest:frontier', x: 30, y: 66 },
+  { mode: 'amritsar', x: 42, y: 28 },
+  { mode: 'conquest:astarte', x: 53, y: 70 },
+  { mode: 'conquest:amritsar', x: 63, y: 34 },
+  { mode: 'conquest:lippstadt', x: 73, y: 72 },
+  { mode: 'conquest:ragnarok', x: 83, y: 36 },
+  { mode: 'vermilion', x: 93, y: 68 },
+];
+function campaignOp(mode) {
+  const era = String(mode).startsWith('conquest') ? String(mode).split(':')[1] || 'frontier' : null,
+    sc = era ? null : E.SCENARIOS[mode];
+  return {
+    mode: era ? 'conquest:' + era : mode,
+    key: era ? 'conquest:' + era : mode,
+    era,
+    sc,
+    name: era ? E.ERAS[era].name : sc.name,
+    kind: era ? 'Conquest' : 'Scenario',
+    when: era ? E.ERAS[era].year : `${sc.objective.turns} turns`,
+    desc: era ? E.ERAS[era].desc : sc.desc,
+  };
 }
-function modeNote() {
-  const sc = E.SCENARIOS[setup.mode],
-    era = E.ERAS[String(setup.mode).split(':')[1] || (setup.mode === 'conquest' ? 'frontier' : '')];
-  const text = sc ? `${sc.desc}${sc.side ? ` Played as the ${E.FACTIONS[sc.side].name}.` : ''}` : era ? era.desc : '';
-  return text ? `<p class="mode-note">${text}</p>` : '';
+// Tokens still on offer for a first victory at this difficulty (before banked research).
+function campaignReward(op, difficulty, profile) {
+  if ((profile.cleared || {})[`${op.key}:${difficulty}`]) return 0;
+  const scale = E.DIFFICULTIES[difficulty]?.tokens || 1,
+    t = E.TOKEN_REWARD;
+  return Math.round((t.victory + (op.era ? t.conquest : t.star * 3)) * scale) + (profile.wins || 0 ? 0 : t.first);
+}
+function campaignScreen() {
+  const profile = loadProfile(),
+    cleared = profile.cleared || {},
+    best = bestStars(),
+    diff = setup.difficulty,
+    ops = CAMPAIGN.map(n => ({ ...n, ...campaignOp(n.mode) })),
+    done = (op, d = diff) => !!cleared[`${op.key}:${d}`],
+    levels = Object.keys(E.DIFFICULTIES),
+    nextLevel = levels[levels.indexOf(diff) + 1],
+    recommended = ops.find(op => !done(op)) || null,
+    selectedMode = setup.mode === 'conquest' ? 'conquest:frontier' : setup.mode,
+    sel = ops.find(op => op.mode === selectedMode) || recommended || ops[0],
+    stars = op => (op.sc ? best[starKey(op.mode, diff)] || 0 : 0);
+  const path = ops.map(op => `${op.x},${op.y}`).join(' '),
+    trail = ops.filter((op, i) => done(op) && (i === 0 || done(ops[i - 1]))).length,
+    donePath = ops
+      .slice(0, Math.max(0, trail))
+      .map(op => `${op.x},${op.y}`)
+      .join(' ');
+  const nodes = ops
+    .map((op, i) => {
+      const reward = campaignReward(op, diff, profile),
+        cls = [done(op) ? 'done' : '', op === recommended ? 'recommended' : '', op === sel ? 'selected' : ''].join(' ');
+      return `<button class="camp-node ${cls}" style="left:${op.x}%;top:${op.y}%" data-campaign="${op.mode}" aria-label="${esc(op.name)}${done(op) ? ', completed' : ''}${op === recommended ? ', recommended' : ''}"><span class="camp-dot">${done(op) ? '✓' : i + 1}</span><span class="camp-name">${op.name}</span>${op.era ? '<span class="camp-kind">Conquest</span>' : ''}${op.sc ? `<span class="camp-stars">${starText(stars(op))}</span>` : ''}${reward ? `<span class="camp-reward">${ICONS.use('token', 'cost-ico')}${reward}</span>` : ''}${op === recommended ? '<span class="camp-flag">Recommended</span>' : ''}</button>`;
+    })
+    .join('');
+  const selReward = campaignReward(sel, diff, profile),
+    pips = levels
+      .map(
+        d =>
+          `<span class="camp-pip ${done(sel, d) ? 'on' : ''}" title="${E.DIFFICULTIES[d].name}${done(sel, d) ? ' cleared' : ''}">${E.DIFFICULTIES[d].name[0]}</span>`,
+      )
+      .join(''),
+    completed = ops.filter(op => done(op)).length;
+  const brief = `<div class="camp-brief"><span class="label">${sel.kind} · ${sel.when}${sel.sc?.side ? ` · ${E.FACTIONS[sel.sc.side].short} only` : ''}</span><h3>${sel.name}</h3><p>${sel.desc}</p>${sel.sc ? `<p class="camp-objective">${sel.sc.objective.stars ? `★★★ by turn ${sel.sc.objective.stars[0]} · ★★ by turn ${sel.sc.objective.stars[1]}` : '★★★ with 70% of your fleets intact'}</p>` : ''}<div class="camp-meta"><span>Cleared ${pips}</span>${sel.sc ? `<span>Best ${starText(stars(sel))}</span>` : ''}<span>${selReward ? `Reward up to ${ICONS.use('token', 'cost-ico')} <b>${selReward}</b>` : 'Reward claimed at this difficulty'}</span></div></div>`;
+  const advice = recommended
+    ? `Recommended next: <b>${recommended.name}</b>${recommended === sel ? '' : ` <button class="small" data-campaign="${recommended.mode}">Select</button>`}`
+    : nextLevel
+      ? `Every operation cleared on ${E.DIFFICULTIES[diff].name}. Try <b>${E.DIFFICULTIES[nextLevel].name}</b> for more command tokens.`
+      : 'Every operation cleared on every difficulty. The galaxy is yours.';
+  return `<div class="campaign"><div class="camp-head"><span class="label">Campaign · ${E.DIFFICULTIES[diff].name}</span><span>${completed} / ${ops.length} operations complete</span></div><div class="campaign-map"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${path}" class="camp-path"/>${donePath.includes(' ') ? `<polyline points="${donePath}" class="camp-path done"/>` : ''}</svg>${nodes}</div><div class="camp-advice">${advice}</div>${brief}<input type="hidden" id="mode-select" value="${sel.mode}"></div>`;
 }
 function render() {
   const mapFocused = !!canvas && document.activeElement === canvas;
@@ -213,6 +266,11 @@ function statRow(u, t) {
 function updateSelection() {
   const u = selectedUnit();
   readyCache = u && u.side === game.player ? E.reachable(game, u) : new Map();
+  supplyCache =
+    u && u.side === game.player && E.TYPES[u.type].air
+      ? new Set(game.tiles.filter(t => E.airSupplied(game, u.side, t)).map(E.key))
+      : null;
+  airWarned = null;
   const st = selectedStation();
   targetCache = new Set(
     u && u.side === game.player && !u.attacked && u.morale > -3
@@ -776,6 +834,13 @@ function activateHex(p) {
       return;
     }
     if (readyCache.has(E.key(p))) {
+      if (supplyCache && !supplyCache.has(E.key(p)) && u.admiral !== 'konev' && airWarned !== E.key(p)) {
+        airWarned = E.key(p);
+        toast(
+          `⚠ Outside air supply (${E.airSupply(game, u.side)} hexes from an air base): this wing loses 10% hull each turn it starts there. Click again to move.`,
+        );
+        return;
+      }
       const snapshot = JSON.stringify(game),
         result = E.move(game, u.id, p.c, p.r);
       if (result.ok) {
@@ -829,11 +894,13 @@ function attachMap() {
         fort = selectedStation(),
         pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null;
       $('map-caption').textContent =
-        fort && u && targetCache.has(E.key(hover))
-          ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
-          : pr
-            ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
-            : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
+        supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
+          ? `⚠ Outside air supply · −10% hull at the start of each turn here · nearest coverage ${E.airSupply(game, own.side)} hexes from a friendly air base`
+          : fort && u && targetCache.has(E.key(hover))
+            ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
+            : pr
+              ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
+              : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
     }
   };
   canvas.onpointerup = e => {
@@ -989,7 +1056,7 @@ function frame(time) {
 let helpBack = 'game';
 document.addEventListener('change', e => {
   const id = e.target.id;
-  if (id === 'mode-select') {
+  if (id === 'mode-select' && e.target.tagName === 'SELECT') {
     setup.mode = e.target.value;
     startMenu();
     $('mode-select')?.focus();
@@ -1016,6 +1083,13 @@ document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
+  if (d.campaign) {
+    setup.mode = d.campaign;
+    const sc = E.SCENARIOS[d.campaign];
+    if (sc?.side) setup.side = sc.side;
+    startMenu();
+    return;
+  }
   if (d.faction) {
     setup.side = d.faction;
     setup.mode = $('mode-select').value;
@@ -1705,8 +1779,28 @@ function draw(time, dt) {
       ctx.globalAlpha = 1;
       outlinedText('×', p.x, p.y + 3, 11, '#93a6b66b', scale);
     }
-    const k = E.key(t);
-    if (readyCache.has(k)) {
+    const k = E.key(t),
+      unsupplied = supplyCache && !supplyCache.has(k) && selectedUnit()?.admiral !== 'konev';
+    // Air supply overlay: covered hexes glow blue; reachable hexes beyond coverage turn amber with a warning.
+    if (supplyCache?.has(k)) {
+      hexPath(p.x, p.y, R - 1);
+      ctx.fillStyle = '#4fb6ff22';
+      ctx.fill();
+      ctx.setLineDash([3 / scale, 3 / scale]);
+      ctx.strokeStyle = '#7cc8ff66';
+      ctx.lineWidth = 1 / scale;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (readyCache.has(k) && unsupplied) {
+      hexPath(p.x, p.y, R - 1.5);
+      ctx.fillStyle = '#ff9d2e3a';
+      ctx.fill();
+      ctx.strokeStyle = '#ffb35ccc';
+      ctx.lineWidth = 1.2 / scale;
+      ctx.stroke();
+      outlinedText('!', p.x, p.y + 5, 14, '#ffcf7a', scale);
+    } else if (readyCache.has(k)) {
       hexPath(p.x, p.y, R - 1.5);
       ctx.fillStyle = '#3ddc7a38';
       ctx.fill();
