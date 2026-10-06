@@ -376,122 +376,359 @@
       trait: 'boarding',
     },
   };
-  // Branch technology trees: Drives, Plating and Weapons for each branch, plus a Doctrine with class abilities.
+  // HQ technology, as in World Conqueror 4: bought with command tokens earned by winning operations, kept in the
+  // player's profile across every operation and side. Each level unlocks at a tier gated by total victories.
   const BRANCHES = { Escort: 'escort', 'Battle Line': 'line', Artillery: 'artillery', Air: 'air' };
+  const BRANCH_NAMES = { escort: 'Escort', line: 'Battle Line', artillery: 'Artillery', air: 'Aerospace' };
+  const TECH_TIERS = [0, 0, 2, 4, 7];
+  const pct = v => `${Math.round(v * 100)}%`;
   const TECH_TREE = {
     escort: {
       name: 'Escort',
-      tracks: {
-        drives: { name: 'Afterburner Drives', max: 2, base: 100, desc: '+1 movement per level for escorts.' },
-        plating: { name: 'Composite Plating', max: 3, base: 110, desc: 'Escorts take 8% less damage per level.' },
-        weapons: {
-          name: 'Rapid-Fire Lasers',
-          max: 3,
-          base: 120,
-          desc: 'Escorts gain +10% armor penetration and +0.15 critical multiplier per level.',
+      desc: 'Corvettes, frigates and destroyers: the screens and station raiders of the fleet.',
+      nodes: {
+        drives: {
+          name: 'Afterburner Drives',
+          values: [1, 2],
+          tiers: [1, 3],
+          costs: [60, 220],
+          text: v => `+${v} movement`,
         },
-        doctrine: {
+        guns: {
+          name: 'Pulse Laser Batteries',
+          values: [0.06, 0.12, 0.2, 0.3],
+          tiers: [1, 1, 2, 3],
+          costs: [40, 80, 160, 300],
+          text: v => `+${pct(v)} damage`,
+        },
+        hull: {
+          name: 'Composite Hulls',
+          values: [0.08, 0.16, 0.25, 0.35],
+          tiers: [1, 2, 2, 3],
+          costs: [40, 90, 150, 280],
+          text: v => `+${pct(v)} hull`,
+        },
+        torpedo: {
+          name: 'Torpedo Salvo',
+          values: [0.4, 0.5],
+          tiers: [1, 2],
+          costs: [90, 200],
+          req: ['guns', 1],
+          text: v => `+${pct(v)} damage to Battle Line hulls`,
+        },
+        nav: {
+          name: 'Nebula Navigation',
+          values: [1, 2],
+          tiers: [1, 2],
+          costs: [70, 150],
+          text: v => (v === 1 ? 'Asteroid fields cost 1 movement' : 'Every terrain costs 1 movement'),
+        },
+        shield: {
+          name: 'Particle Shields',
+          values: [0.75, 0.9],
+          tiers: [1, 3],
+          costs: [50, 120],
+          text: v => `−${pct(v)} nebula attrition`,
+        },
+        boarding: {
+          name: 'Boarding Charges',
+          values: [0.55, 0.7],
+          tiers: [2, 3],
+          costs: [140, 260],
+          req: ['torpedo', 1],
+          text: v => `+${pct(v)} damage to station defenses`,
+        },
+        picket: {
           name: 'Picket Screen',
-          max: 2,
-          base: 150,
-          levels: [
-            'Friendly artillery and air wings next to an escort take 15% less damage.',
-            'Escort counter-fire hits at full strength.',
-          ],
+          values: [1, 2],
+          tiers: [2, 3],
+          costs: [150, 280],
+          text: v =>
+            v === 1
+              ? 'Friendly artillery and air wings next to an escort take 15% less damage'
+              : 'Escort counter-fire hits at full strength',
+        },
+        armor: {
+          name: 'Ablative Armor',
+          values: [6],
+          tiers: [4],
+          costs: [400],
+          req: ['hull', 4],
+          text: v => `+${v} armor`,
         },
       },
     },
     line: {
       name: 'Battle Line',
-      tracks: {
+      desc: 'Cruisers, battleships and dreadnoughts: the armored wall that breaks the enemy line.',
+      nodes: {
+        armor: {
+          name: 'Liquid-Metal Armor',
+          values: [3, 6, 9, 13, 18],
+          tiers: [1, 1, 2, 3, 4],
+          costs: [50, 100, 170, 280, 420],
+          text: v => `+${v} armor`,
+        },
+        hull: {
+          name: 'Hull Frames',
+          values: [0.06, 0.12, 0.2, 0.3],
+          tiers: [1, 2, 3, 4],
+          costs: [50, 110, 200, 360],
+          text: v => `+${pct(v)} hull`,
+        },
+        guns: {
+          name: 'Main Batteries',
+          values: [0.05, 0.1, 0.16, 0.23, 0.32],
+          tiers: [1, 2, 2, 3, 4],
+          costs: [50, 100, 170, 280, 420],
+          text: v => `+${pct(v)} damage`,
+        },
         drives: {
-          name: 'Warp Drive Efficiency',
-          max: 2,
-          base: 115,
-          desc: '+1 movement per level for Battle Line hulls.',
+          name: 'Fusion Engines',
+          values: [1, 2],
+          tiers: [2, 4],
+          costs: [150, 380],
+          text: v => `+${v} movement`,
         },
-        plating: {
-          name: 'Liquid Metal Armor',
-          max: 3,
-          base: 125,
-          desc: 'Battle Line hulls take 8% less damage per level.',
+        secondary: {
+          name: 'Secondary Batteries',
+          values: [0.45, 0.55],
+          tiers: [2, 3],
+          costs: [120, 220],
+          req: ['guns', 1],
+          text: v => `+${pct(v)} damage to escorts`,
         },
-        weapons: {
-          name: 'Seft Armor-Piercing Lasers',
-          max: 3,
-          base: 135,
-          desc: 'Battle Line hulls gain +10% armor penetration and +0.15 critical multiplier per level.',
+        flak: {
+          name: 'Flak Screens',
+          values: [0.3, 0.35],
+          tiers: [2, 3],
+          costs: [110, 200],
+          text: v => `−${pct(v)} damage from air wings`,
         },
-        doctrine: {
-          name: 'Breakthrough Doctrine',
-          max: 2,
-          base: 160,
-          levels: [
-            'Battle Line fleets get one extra breakthrough refresh per turn.',
-            '+15% damage when next to another friendly Battle Line fleet.',
-          ],
+        assault: {
+          name: 'Assault Doctrine',
+          values: [0.75, 1],
+          tiers: [2, 4],
+          costs: [160, 400],
+          req: ['guns', 2],
+          text: v => `${pct(v)} chance a kill grants one more breakthrough than the cap`,
+        },
+        formation: {
+          name: 'Line of Battle',
+          values: [0.15],
+          tiers: [3],
+          costs: [240],
+          req: ['armor', 2],
+          text: v => `+${pct(v)} damage when next to another friendly Battle Line fleet`,
+        },
+        bulkheads: {
+          name: 'Reinforced Bulkheads',
+          values: [0.25],
+          tiers: [4],
+          costs: [320],
+          req: ['hull', 3],
+          text: v => `−${pct(v)} damage from fortress guns and Siege Cannons`,
         },
       },
     },
     artillery: {
       name: 'Artillery',
-      tracks: {
-        drives: { name: 'Fusion Thrusters', max: 2, base: 105, desc: '+1 movement per level for artillery.' },
-        plating: { name: 'Ablative Shielding', max: 3, base: 115, desc: 'Artillery takes 8% less damage per level.' },
-        weapons: {
-          name: 'Neutron Accelerators',
-          max: 3,
-          base: 135,
-          desc: 'Artillery gains +10% armor penetration and +0.15 critical multiplier per level.',
+      desc: 'Artillery Frigates, Artillery Cruisers and Siege Cannons: firepower that suppresses counter-fire.',
+      nodes: {
+        guns: {
+          name: 'Neutron Capacitors',
+          values: [0.05, 0.1, 0.18, 0.26, 0.35],
+          tiers: [1, 1, 2, 3, 4],
+          costs: [50, 100, 180, 300, 440],
+          text: v => `+${pct(v)} damage`,
         },
-        doctrine: {
+        hull: {
+          name: 'Gun Carriages',
+          values: [0.08, 0.16, 0.26],
+          tiers: [1, 2, 3],
+          costs: [40, 100, 200],
+          text: v => `+${pct(v)} hull`,
+        },
+        drives: {
+          name: 'Fusion Thrusters',
+          values: [1, 2],
+          tiers: [2, 4],
+          costs: [160, 400],
+          text: v => `+${v} movement`,
+        },
+        shells: {
+          name: 'Fragmentation Shells',
+          values: [0.45, 0.55],
+          tiers: [2, 3],
+          costs: [120, 220],
+          req: ['guns', 1],
+          text: v => `+${pct(v)} damage to escorts`,
+        },
+        fire: {
           name: 'Fire Control',
-          max: 2,
-          base: 160,
-          levels: [
-            '+20% damage against targets next to a friendly non-artillery fleet (spotted).',
-            '+1 maximum range for all artillery.',
-          ],
+          values: [1, 2],
+          tiers: [2, 4],
+          costs: [150, 450],
+          req: ['guns', 2],
+          text: v =>
+            v === 1
+              ? '+20% damage against targets next to a friendly non-artillery fleet'
+              : '+1 range for all artillery',
+        },
+        salvo: {
+          name: 'Saturation Salvos',
+          values: [0.15, 0.3],
+          tiers: [2, 3],
+          costs: [120, 240],
+          text: v => `Artillery Cruiser splash +${pct(v)} of the hit`,
+        },
+        armor: {
+          name: 'Sensor Baffles',
+          values: [5],
+          tiers: [4],
+          costs: [300],
+          req: ['hull', 2],
+          text: v => `+${v} armor`,
         },
       },
     },
     air: {
       name: 'Aerospace',
-      tracks: {
-        drives: { name: 'Spartanian Engines', max: 2, base: 105, desc: '+1 movement per level for air wings.' },
-        plating: { name: 'Reinforced Airframes', max: 3, base: 115, desc: 'Air wings take 8% less damage per level.' },
-        weapons: {
-          name: 'Guided Munitions',
-          max: 3,
-          base: 130,
-          desc: 'Air wings gain +10% armor penetration and +0.15 critical multiplier per level.',
+      desc: 'Fighter, bomber and strategic bomber wings flown from station air bases.',
+      nodes: {
+        guns: {
+          name: 'Avionics',
+          values: [0.06, 0.12, 0.2, 0.28, 0.38],
+          tiers: [1, 1, 2, 3, 4],
+          costs: [50, 100, 180, 300, 440],
+          text: v => `+${pct(v)} damage`,
         },
-        doctrine: {
+        hull: {
+          name: 'Reinforced Airframes',
+          values: [0.1, 0.2, 0.32],
+          tiers: [1, 2, 3],
+          costs: [40, 100, 200],
+          text: v => `+${pct(v)} hull`,
+        },
+        fuel: {
+          name: 'Fuel Cells',
+          values: [0.05, 0.1, 0.15],
+          tiers: [1, 2, 3],
+          costs: [60, 120, 220],
+          text: v => `Air wings cost ${pct(v)} less`,
+        },
+        carrier: {
           name: 'Carrier Operations',
-          max: 2,
-          base: 160,
-          levels: [
-            'Air supply range grows from 3 to 5 hexes.',
-            'Hit and run: an air wing that attacks before moving may still move.',
-          ],
+          values: [1, 2],
+          tiers: [2, 3],
+          costs: [140, 260],
+          text: v =>
+            v === 1
+              ? 'Air supply range grows from 3 to 5 hexes'
+              : 'Hit and run: a wing that attacks before moving may still move',
+        },
+        bombing: {
+          name: 'Bombing Doctrine',
+          values: [0.4, 0.6],
+          tiers: [2, 3],
+          costs: [130, 240],
+          req: ['guns', 1],
+          text: v => `+${pct(v)} damage to station defenses`,
+        },
+        guidance: {
+          name: 'Precision Guidance',
+          values: [0.3],
+          tiers: [3],
+          costs: [260],
+          req: ['guns', 2],
+          text: v => `Air wings take ${pct(v)} less counter-fire`,
+        },
+        stealth: {
+          name: 'Stealth Coating',
+          values: [0.2],
+          tiers: [4],
+          costs: [380],
+          req: ['guidance', 1],
+          text: v => `+${pct(v)} air attack damage`,
+        },
+      },
+    },
+    station: {
+      name: 'Stations',
+      desc: 'Station defenses, fortress main guns and point defense.',
+      nodes: {
+        fort: {
+          name: 'Fortification',
+          values: [20, 40, 70, 100, 150],
+          tiers: [1, 2, 2, 3, 4],
+          costs: [40, 80, 140, 220, 360],
+          text: v => `+${v} defense on your stations`,
+        },
+        thor: {
+          name: 'Thor Capacitors',
+          values: [0.1, 0.25],
+          tiers: [1, 2],
+          costs: [60, 140],
+          text: v => `+${pct(v)} fortress gun damage`,
+        },
+        flak: {
+          name: 'Point-Defense Grid',
+          values: [0.2, 0.35],
+          tiers: [1, 2],
+          costs: [60, 140],
+          text: v => `Fleets on or next to your stations take ${pct(v)} less damage from air wings`,
+        },
+        interceptors: {
+          name: 'Interceptor Missiles',
+          values: [1, 2],
+          tiers: [3, 4],
+          costs: [180, 320],
+          req: ['flak', 2],
+          text: v =>
+            v === 1
+              ? 'Strategic bombers deal 30% less damage to your stations'
+              : 'All air wings deal 50% less damage to your stations',
+        },
+        overcharge: {
+          name: 'Thor Overcharge',
+          values: [1, 2],
+          tiers: [3, 4],
+          costs: [240, 420],
+          req: ['thor', 2],
+          text: v =>
+            v === 1
+              ? 'Fortress guns recharge 1 turn faster'
+              : 'Fortress gun blasts hit enemies next to the target for 50%',
         },
       },
     },
   };
+  // Flat index: 'line.armor' → node, with its branch and id.
+  const TECH_NODES = Object.fromEntries(
+    Object.entries(TECH_TREE).flatMap(([b, tree]) =>
+      Object.entries(tree.nodes).map(([k, n]) => [
+        `${b}.${k}`,
+        { ...n, id: `${b}.${k}`, branch: b, max: n.values.length },
+      ]),
+    ),
+  );
   const TECHS = TECH_TREE;
-  function blankTech() {
-    return Object.fromEntries(
-      Object.entries(TECH_TREE).map(([b, d]) => [b, Object.fromEntries(Object.keys(d.tracks).map(k => [k, 0]))]),
-    );
-  }
   function branchOf(type) {
     return BRANCHES[TYPES[type].branch];
   }
-  function techLevel(g, side, branch, track) {
-    return g.tech?.[side]?.[branch]?.[track] || 0;
+  function techLevel(g, side, id) {
+    return g?.tech?.[side]?.[id] || 0;
+  }
+  function techValue(g, side, id) {
+    const l = techLevel(g, side, id);
+    return l ? TECH_NODES[id].values[l - 1] : 0;
+  }
+  // Branch-wide tech for a fleet, e.g. unitTech(g, u, 'guns') reads 'line.guns' for a cruiser.
+  function unitTech(g, u, k) {
+    return techValue(g, u.side, `${branchOf(u.type)}.${k}`);
   }
   function airSupply(g, side) {
-    return techLevel(g, side, 'air', 'doctrine') >= 1 ? 5 : 3;
+    return techLevel(g, side, 'air.carrier') >= 1 ? 5 : 3;
   }
 
   // Admiral development: ranks, branch ratings, upgradeable skills and medals. Progress persists between operations.
@@ -647,7 +884,7 @@
       (!Number.isInteger(stack) || stack < 1 || stack > 3 ? 'Choose 1–3 stacks' : null) ||
       (s.producedTurn === g.turn ? 'Already built here this turn' : null) ||
       (!recruitOptions(g, s, s.owner).length ? 'No free hex next to the station' : null) ||
-      shortfall(funds(g, s.owner), price(type, stack))
+      shortfall(funds(g, s.owner), price(type, stack, g, s.owner))
     );
   }
   function buildReason(g, s, kind) {
@@ -658,14 +895,25 @@
       shortfall(funds(g, s.owner), buildCost(s, kind))
     );
   }
-  function researchReason(g, side, branch, track) {
-    const t = TECH_TREE[branch]?.tracks[track];
-    if (!t) return 'Unavailable';
-    return (
-      turnReason(g, side) ||
-      (techLevel(g, side, branch, track) >= t.max ? 'Fully researched' : null) ||
-      shortfall(funds(g, side), researchCost(g, side, branch, track))
-    );
+  // HQ research works on the persistent profile: { tokens, wins, research: { 'line.armor': 2, ... } }.
+  function researchReason(profile, id) {
+    const n = TECH_NODES[id];
+    if (!n) return 'Unavailable';
+    const research = profile?.research || {},
+      l = research[id] || 0;
+    if (l >= n.max) return 'Fully researched';
+    const tier = n.tiers[l],
+      wins = profile?.wins || 0;
+    if (wins < TECH_TIERS[tier])
+      return `Tier ${tier}: win ${TECH_TIERS[tier] - wins} more operation${TECH_TIERS[tier] - wins > 1 ? 's' : ''}`;
+    if (n.req) {
+      const [k, need] = n.req,
+        rid = `${n.branch}.${k}`;
+      if ((research[rid] || 0) < need) return `Requires ${TECH_NODES[rid].name} ${ROMAN[need]}`;
+    }
+    const cost = researchCost(id, l),
+      have = profile?.tokens || 0;
+    return cost > have ? `Need ${cost - have} more command tokens` : null;
   }
   function assignReason(g, u, k) {
     const a = ADMIRALS[k];
@@ -719,7 +967,7 @@
   }
   function rateReason(g, k, branch) {
     const o = officer(g, k);
-    if (!TECH_TREE[branch]) return 'Unknown branch';
+    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
     return (
       officerReason(g, k) ||
       ((o.ratings[branch] || 0) >= 5 ? 'Already five stars' : null) ||
@@ -805,13 +1053,64 @@
         u.cmdRank = officer(g, u.admiral).rank;
         u.hp = maxHP(u);
       }
-    return g;
+    return applyTech(g, profile?.research);
   }
+  // Tokens, victories and HQ research live only in the profile; the game keeps a copy of the research.
   function exportProfile(g, profile = {}) {
     const officers = { ...(profile.officers || {}) };
     for (const [k, o] of Object.entries(g.officers || {}))
       if (ADMIRALS[k]?.side === g.player) officers[k] = JSON.parse(JSON.stringify(o));
-    return { officers, medals: [...(g.medalInventory || [])] };
+    return { ...profile, officers, medals: [...(g.medalInventory || [])] };
+  }
+  // Load HQ research into the player's side: hull bonuses keep each fleet's damage, station defenses follow.
+  function applyTech(g, research = {}) {
+    g.tech ||= {};
+    g.tech[g.player] = Object.fromEntries(
+      Object.entries(research || {})
+        .filter(([id, l]) => TECH_NODES[id] && Number.isInteger(l) && l > 0)
+        .map(([id, l]) => [id, Math.min(l, TECH_NODES[id].max)]),
+    );
+    for (const u of g.units) {
+      if (u.side !== g.player) continue;
+      const old = maxHP(u);
+      u.hpTech = unitTech(g, u, 'hull');
+      if (u.hp > 0) u.hp = Math.max(1, maxHP(u) - (old - u.hp));
+    }
+    g.stations.forEach(s => fortify(g, s));
+    return g;
+  }
+  // Fortification research raises the defenses of stations its owner holds.
+  function fortify(g, s) {
+    const bonus = techValue(g, s.owner, 'station.fort'),
+      old = s.fortBonus || 0;
+    if (bonus === old) return;
+    s.maxShield += bonus - old;
+    s.shield = clamp(s.shield + Math.max(0, bonus - old), 0, s.maxShield);
+    s.fortBonus = bonus;
+  }
+  const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+  function researchCost(id, level = 0) {
+    return TECH_NODES[id]?.costs[level] ?? Infinity;
+  }
+  function research(profile, id) {
+    const why = researchReason(profile, id);
+    if (why) return { ok: false, reason: why };
+    const l = profile.research?.[id] || 0;
+    profile.tokens -= researchCost(id, l);
+    (profile.research ||= {})[id] = l + 1;
+    return { ok: true, level: l + 1 };
+  }
+  // Command tokens for a won operation; the first victory ever earns a bonus. Banked research converts 5 : 1.
+  const TOKEN_REWARD = { victory: 250, star: 50, conquest: 150, first: 150, research: 5 };
+  function missionReward(g, wins = 0) {
+    if (!g.over || g.over.winner !== g.player) return { total: 0, parts: [] };
+    const parts = [['Victory', TOKEN_REWARD.victory]];
+    if (g.mode === 'conquest') parts.push(['Conquest', TOKEN_REWARD.conquest]);
+    else parts.push([`${g.over.stars || 1}★ rating`, TOKEN_REWARD.star * (g.over.stars || 1)]);
+    const banked = Math.floor((funds(g, g.player)?.science || 0) / TOKEN_REWARD.research);
+    if (banked) parts.push(['Banked research', banked]);
+    if (!wins) parts.push(['First victory', TOKEN_REWARD.first]);
+    return { total: parts.reduce((a, [, v]) => a + v, 0), parts };
   }
   const DIRS = [
     [1, 0],
@@ -860,11 +1159,13 @@
   }
   // Each admiral rank adds 6% hull to the fleet they command.
   function maxHP(u) {
-    return Math.round(TYPES[u.type].hp * (1 + 0.7 * (u.stack - 1)) * (1 + 0.06 * (u.cmdRank || 0)));
+    return Math.round(
+      TYPES[u.type].hp * (1 + 0.7 * (u.stack - 1)) * (1 + 0.06 * (u.cmdRank || 0)) * (1 + (u.hpTech || 0)),
+    );
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 7 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 8 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -885,6 +1186,7 @@
       xp: 0,
       confusionCD: 0,
     };
+    u.hpTech = unitTech(g, u, 'hull');
     u.hp = maxHP(u);
     g.units.push(u);
     return u;
@@ -892,7 +1194,7 @@
   function movement(g, u) {
     const t = TYPES[u.type];
     if (t.elite) return 1;
-    let n = t.move + techLevel(g, u.side, branchOf(u.type), 'drives');
+    let n = t.move + unitTech(g, u, 'drives');
     n += Math.max(0, skill(g, u.admiral, 'maneuver') - 1) + (wears(g, u.admiral, 'star') ? 1 : 0);
     if (u.admiral === 'reinhard' && t.branch === 'Battle Line') n++;
     if (u.admiral === 'mittermeyer') n += 2;
@@ -901,6 +1203,8 @@
   }
   function terrainCost(g, u, t) {
     if (u.admiral === 'yang' || TYPES[u.type].air || skill(g, u.admiral, 'maneuver') >= 1) return 1;
+    const nav = TYPES[u.type].branch === 'Escort' ? techLevel(g, u.side, 'escort.nav') : 0;
+    if (nav >= 2 || (nav >= 1 && t.terrain === 'asteroid')) return 1;
     return t.terrain === 'nebula' || t.terrain === 'asteroid' ? 2 : 1;
   }
   function canCapture(u) {
@@ -934,12 +1238,12 @@
     }
     return found;
   }
-  // Fire Control doctrine level 2 adds one hex of range to all artillery.
+  // Fire Control II adds one hex of range to all artillery.
   function rangeOf(g, u) {
     const t = TYPES[u.type];
     return {
       min: t.min,
-      max: t.max + (g && t.branch === 'Artillery' && techLevel(g, u.side, 'artillery', 'doctrine') >= 2 ? 1 : 0),
+      max: t.max + (g && t.branch === 'Artillery' && techLevel(g, u.side, 'artillery.fire') >= 2 ? 1 : 0),
     };
   }
   function inRange(a, p, g) {
@@ -977,6 +1281,7 @@
       u.morale = 1;
       funds(g, u.side).credits += 40;
       gainXP(g, u, 4);
+      fortify(g, s);
       if (s.capital) award(g, u.side, 'star', `${s.name} captured`);
       if (u.admiral === 'schonkopf') u.hp = Math.min(maxHP(u), u.hp + maxHP(u) * 0.3);
       log(g, `${ADMIRALS[u.admiral]?.short || TYPES[u.type].short} captures ${s.name}.`, u.side);
@@ -1009,36 +1314,43 @@
     if (victim?.air && t.branch === 'Escort') attack *= 1.5;
     if (t.shipKiller && (victim?.branch === 'Battle Line' || victim?.branch === 'Artillery')) attack *= t.shipKiller;
     attack *= officerAttack(g, u);
+    // HQ research: branch weapons, class counters and stealth.
+    attack *= 1 + unitTech(g, u, 'guns');
+    if (t.branch === 'Escort' && victim?.branch === 'Battle Line') attack *= 1 + techValue(g, u.side, 'escort.torpedo');
+    if (t.branch === 'Battle Line' && victim?.branch === 'Escort') attack *= 1 + techValue(g, u.side, 'line.secondary');
+    if (t.branch === 'Artillery' && victim?.branch === 'Escort') attack *= 1 + techValue(g, u.side, 'artillery.shells');
+    if (t.air) attack *= 1 + techValue(g, u.side, 'air.stealth');
     const friends = (side, at, test) =>
       g.units.some(v => v.hp > 0 && v.side === side && v.id !== u.id && distance(v, at) === 1 && test(TYPES[v.type]));
-    // Doctrines: Breakthrough (line formation) and Fire Control (spotted targets).
+    // Line of Battle (formation) and Fire Control (spotted targets).
     if (
       t.branch === 'Battle Line' &&
-      techLevel(g, u.side, 'line', 'doctrine') >= 2 &&
+      techLevel(g, u.side, 'line.formation') >= 1 &&
       friends(u.side, u, v => v.branch === 'Battle Line')
     )
       attack *= 1.15;
     if (
       t.branch === 'Artillery' &&
       target &&
-      techLevel(g, u.side, 'artillery', 'doctrine') >= 1 &&
+      techLevel(g, u.side, 'artillery.fire') >= 1 &&
       friends(u.side, target, v => v.branch !== 'Artillery')
     )
       attack *= 1.2;
-    const pen = clamp(
-      t.pen + techLevel(g, u.side, branchOf(u.type), 'weapons') * 0.1 + (u.admiral === 'reuenthal' ? 0.25 : 0),
-      0,
-      0.95,
-    );
-    const armor = target ? victim.armor : 35;
+    const pen = clamp(t.pen + (u.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95);
+    const armor = target ? victim.armor + unitTech(g, target, 'armor') : 35;
     attack *= 100 / (100 + armor * (1 - pen) * 2);
     if (target) {
-      attack *= 1 - techLevel(g, target.side, branchOf(target.type), 'plating') * 0.08;
       attack *= officerDefense(g, target);
+      if (t.air && victim.branch === 'Battle Line') attack *= 1 - techValue(g, target.side, 'line.flak');
+      if (t.air && g.stations.some(s => s.owner === target.side && distance(s, target) <= 1))
+        attack *= 1 - techValue(g, target.side, 'station.flak');
+      if (u.type === 'siege' && victim.branch === 'Battle Line')
+        attack *= 1 - techValue(g, target.side, 'line.bulkheads');
+      if (counter && victim.air) attack *= 1 - techValue(g, target.side, 'air.guidance');
       // Picket Screen: escorts shield neighbouring artillery and air wings.
       if (
         (victim.branch === 'Artillery' || victim.air) &&
-        techLevel(g, target.side, 'escort', 'doctrine') >= 1 &&
+        techLevel(g, target.side, 'escort.picket') >= 1 &&
         g.units.some(
           v => v.hp > 0 && v.side === target.side && TYPES[v.type].branch === 'Escort' && distance(v, target) === 1,
         )
@@ -1049,7 +1361,7 @@
       if (terrain === 'asteroid') attack *= 0.85;
       if (victim.evasion) attack *= 1 - victim.evasion * 0.5;
     }
-    if (counter) attack *= t.branch === 'Escort' && techLevel(g, u.side, 'escort', 'doctrine') >= 2 ? 1 : 0.65;
+    if (counter) attack *= t.branch === 'Escort' && techLevel(g, u.side, 'escort.picket') >= 2 ? 1 : 0.65;
     return Math.max(1, Math.round(attack));
   }
   function preview(g, id, c, r) {
@@ -1062,12 +1374,19 @@
     const base = power(g, a, d, s),
       shield = s && s.owner !== a.side && s.shield > 0;
     const unitDmg = d ? Math.round(base * (shield ? 0.55 : 1)) : 0;
+    // Boarding Charges and Bombing Doctrine raise station damage; Interceptor Missiles cut air raids.
+    const intercept = t.air ? techLevel(g, s?.owner, 'station.interceptors') : 0,
+      raid =
+        (1 + (t.branch === 'Escort' ? techValue(g, a.side, 'escort.boarding') : 0)) *
+        (1 + (t.air ? techValue(g, a.side, 'air.bombing') : 0)) *
+        (intercept >= 2 ? 0.5 : intercept >= 1 && a.type === 'strategic' ? 0.7 : 1);
     const shieldDmg = shield
       ? Math.round(
           base *
             (t.boarding && d && TYPES[d.type].branch !== 'Battle Line' ? 1.55 : 1) *
             (t.siege || 1) *
-            (d ? 0.8 : 1.45),
+            (d ? 0.8 : 1.45) *
+            raid,
         )
       : 0;
     // Air wings only draw return fire from escorts (point defense) and fighters.
@@ -1086,16 +1405,15 @@
       0,
       0.85,
     );
-    const weapons = techLevel(g, a.side, branchOf(a.type), 'weapons');
     return {
       unit: unitDmg,
       shield: shieldDmg,
       counter: counter ? power(g, d, a, stationAt(g, a), true) : 0,
       counterAllowed: counter,
       crit,
-      critMult: (t.critMult || 1.55) + weapons * 0.15,
-      splash: t.splash || 0,
-      armorPen: clamp(t.pen + weapons * 0.1 + (a.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95),
+      critMult: t.critMult || 1.55,
+      splash: t.splash ? t.splash + techValue(g, a.side, 'artillery.salvo') : 0,
+      armorPen: clamp(t.pen + (a.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95),
     };
   }
   function kill(g, v, attacker) {
@@ -1131,8 +1449,8 @@
       crit = random(g) < pr.crit,
       mult = (0.92 + random(g) * 0.16) * (crit ? pr.critMult : 1),
       hit = [];
-    // Carrier Operations level 2: an air wing that fires before moving may still move.
-    const sortie = !!TYPES[a.type].air && !a.moved && techLevel(g, a.side, 'air', 'doctrine') >= 2;
+    // Carrier Operations II: an air wing that fires before moving may still move.
+    const sortie = !!TYPES[a.type].air && !a.moved && techLevel(g, a.side, 'air.carrier') >= 2;
     a.attacked = true;
     a.moved = !sortie;
     a.sortie = sortie;
@@ -1169,10 +1487,13 @@
     }
     const destroyed = !!d && d.hp <= 0;
     if (destroyed) kill(g, d, a);
-    const cap =
-      (['mittermeyer', 'attenborough'].includes(a.admiral) ? 2 : 1) +
-      (TYPES[a.type].branch === 'Battle Line' && techLevel(g, a.side, 'line', 'doctrine') >= 1 ? 1 : 0) +
-      (skill(g, a.admiral, 'tactics') >= 3 ? 1 : 0);
+    let cap =
+      (['mittermeyer', 'attenborough'].includes(a.admiral) ? 2 : 1) + (skill(g, a.admiral, 'tactics') >= 3 ? 1 : 0);
+    // Assault Doctrine: a kill at the cap may still earn one more breakthrough.
+    if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain === cap) {
+      const chance = techValue(g, a.side, 'line.assault');
+      if (chance && random(g) < chance) cap++;
+    }
     let breakthrough = false;
     if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain < cap) {
       a.chain++;
@@ -1218,11 +1539,13 @@
       p => p && p.terrain !== 'rift' && !unitAt(g, p) && (!stationAt(g, p) || stationAt(g, p).owner === side),
     );
   }
-  function price(type, stack = 1) {
-    const t = TYPES[type];
+  // Fuel Cells research discounts the buyer's air wings.
+  function price(type, stack = 1, g = null, side = null) {
+    const t = TYPES[type],
+      off = t.air && g ? 1 - techValue(g, side, 'air.fuel') : 1;
     return {
-      credits: Math.round(t.cost * (1 + 0.85 * (stack - 1))),
-      industry: Math.round(t.industry * (1 + 0.85 * (stack - 1))),
+      credits: Math.round(t.cost * (1 + 0.85 * (stack - 1)) * off),
+      industry: Math.round(t.industry * (1 + 0.85 * (stack - 1)) * off),
     };
   }
   function canBuy(g, s, type, stack = 1) {
@@ -1235,7 +1558,7 @@
     const options = recruitOptions(g, s, s.owner);
     const p = position ? options.find(p => p.c === position.c && p.r === position.r) : options[0];
     if (!p) return { ok: false, reason: 'Deployment hex unavailable.' };
-    const cost = price(type, stack);
+    const cost = price(type, stack, g, s.owner);
     funds(g, s.owner).credits -= cost.credits;
     funds(g, s.owner).industry -= cost.industry;
     s.producedTurn = g.turn;
@@ -1279,7 +1602,11 @@
   }
   const BUILDINGS = {
     shipyard: { name: 'Shipyard', field: 'tier', desc: 'Unlocks larger hulls and produces industry (+10 per level).' },
-    lab: { name: 'Research station', field: 'lab', desc: 'Produces research (+8 per level).' },
+    lab: {
+      name: 'Research station',
+      field: 'lab',
+      desc: 'Produces research (+8 per level). Research banked when you win becomes command tokens.',
+    },
     air: {
       name: 'Air base',
       field: 'air',
@@ -1318,23 +1645,6 @@
   }
   function upgrade(g, id) {
     return build(g, id, 'shipyard');
-  }
-  function researchCost(g, side, branch, track) {
-    const t = TECH_TREE[branch]?.tracks[track],
-      l = techLevel(g, side, branch, track);
-    return { credits: (t?.base || 120) * (l + 1), science: 40 + 35 * l + (track === 'doctrine' ? 20 : 0) };
-  }
-  function research(g, branch, track) {
-    const why = researchReason(g, g.phase, branch, track);
-    if (why) return { ok: false, reason: why };
-    const e = funds(g, g.phase),
-      c = researchCost(g, g.phase, branch, track);
-    e.credits -= c.credits;
-    e.science -= c.science;
-    g.tech[g.phase][branch][track]++;
-    const t = TECH_TREE[branch].tracks[track];
-    log(g, `${TECH_TREE[branch].name}: ${t.name} reaches level ${g.tech[g.phase][branch][track]}.`, g.phase);
-    return { ok: true };
   }
   function assign(g, id, admiral) {
     const u = g.units.find(u => u.id === id),
@@ -1388,7 +1698,10 @@
         aura = auras.find(v => v.admiral === 'kircheis') || auras[0];
       if (aura && nearby < 3) u.morale = Math.min(1, u.morale + (aura.admiral === 'kircheis' ? 2 : 1));
       const t = tile(g, u.c, u.r);
-      if (t.terrain === 'nebula') u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.025));
+      if (t.terrain === 'nebula') {
+        const shielded = TYPES[u.type].branch === 'Escort' ? techValue(g, side, 'escort.shield') : 0;
+        u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.025 * (1 - shielded)));
+      }
       const s = stationAt(g, u);
       if (s?.owner === side) u.hp = Math.min(maxHP(u), u.hp + Math.round(maxHP(u) * 0.08));
       if (u.admiral && skill(g, u.admiral, 'logistics'))
@@ -1410,13 +1723,22 @@
   function fortressName(s) {
     return s.name === 'Iserlohn' ? "Thor's Hammer" : `${s.name} main cannon`;
   }
+  function fortressRecharge(g, s) {
+    return FORTRESS_GUN.recharge - (techLevel(g, s.owner, 'station.overcharge') >= 1 ? 1 : 0);
+  }
   function fortressReady(g, s) {
     return !!s?.fort && s.owner === g.phase && !g.over && s.shield > 0 && (s.gunReady || 0) <= g.turn;
   }
-  function fortressDamage(g, foe) {
+  // Thor Capacitors raise the owner's fortress gun damage; Reinforced Bulkheads shrug part of it off.
+  function fortressDamage(g, foe, owner = opponent(foe.side)) {
     return Math.max(
       1,
-      Math.round(maxHP(foe) * FORTRESS_GUN.share * (1 - techLevel(g, foe.side, branchOf(foe.type), 'plating') * 0.08)),
+      Math.round(
+        maxHP(foe) *
+          FORTRESS_GUN.share *
+          (1 + techValue(g, owner, 'station.thor')) *
+          (TYPES[foe.type].branch === 'Battle Line' ? 1 - techValue(g, foe.side, 'line.bulkheads') : 1),
+      ),
     );
   }
   function fortressTargets(g, s) {
@@ -1431,16 +1753,26 @@
     const foe = unitAt(g, { c, r });
     if (!foe || foe.side === s.owner || distance(s, foe) > FORTRESS_GUN.range)
       return { ok: false, reason: 'No enemy fleet within 3 hexes of the fortress.' };
-    const damage = fortressDamage(g, foe),
-      name = fortressName(s);
+    const damage = fortressDamage(g, foe, s.owner),
+      name = fortressName(s),
+      hit = [];
     foe.hp = Math.max(0, foe.hp - damage);
     foe.morale = Math.max(foe.admiral === 'reinhard' ? 0 : -3, foe.morale - 1);
-    s.gunReady = g.turn + FORTRESS_GUN.recharge;
+    s.gunReady = g.turn + fortressRecharge(g, s);
     log(g, `${name} strikes ${TYPES[foe.type].short} for ${damage}.`, s.owner);
     const destroyed = foe.hp <= 0;
+    // Thor Overcharge II: the blast also catches enemy fleets next to the target.
+    if (techLevel(g, s.owner, 'station.overcharge') >= 2)
+      for (const v of g.units) {
+        if (v.hp <= 0 || v.side === s.owner || v.id === foe.id || distance(v, foe) !== 1) continue;
+        const amount = Math.round(fortressDamage(g, v, s.owner) * 0.5);
+        v.hp = Math.max(0, v.hp - amount);
+        hit.push({ id: v.id, c: v.c, r: v.r, damage: amount });
+        kill(g, v, null);
+      }
     kill(g, foe, null);
     checkVictory(g);
-    return { ok: true, name, from: { c: s.c, r: s.r }, to: { c, r }, id: foe.id, damage, destroyed };
+    return { ok: true, name, from: { c: s.c, r: s.r }, to: { c, r }, id: foe.id, damage, destroyed, hit };
   }
   function checkVictory(g) {
     if (g.over) return g.over;
@@ -1714,7 +2046,7 @@
     if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 7,
+      rulesVersion: 8,
       player,
       difficulty,
       mode: era ? 'conquest' : scen,
@@ -1736,7 +2068,7 @@
         empire: { credits: 300, industry: 120, science: 40 },
         alliance: { credits: 300, industry: 120, science: 40 },
       },
-      tech: { empire: blankTech(), alliance: blankTech(), neutral: blankTech() },
+      tech: { empire: {}, alliance: {}, neutral: {} },
       officers: Object.fromEntries(Object.keys(ADMIRALS).map(k => [k, defaultOfficer(k)])),
       medalInventory: [],
       medalsEarned: [],
@@ -2012,15 +2344,6 @@
     const spendable = () => Math.max(0, e.credits - reserve);
     const affordable = c => c.credits <= spendable() && e.industry - (c.industry || 0) >= reserveInd;
 
-    // 3. Research every third turn when the treasury can spare it.
-    if (g.mode === 'conquest' && g.turn % 3 === 0 && !plan.saving) {
-      const branches = Object.keys(TECH_TREE),
-        b = branches[Math.floor(random(g) * branches.length)],
-        tracks = Object.keys(TECH_TREE[b].tracks),
-        k = tracks[Math.floor(random(g) * tracks.length)];
-      if (!researchReason(g, side, b, k) && affordable(researchCost(g, side, b, k))) research(g, b, k);
-    }
-
     // 4. Upgrade one building per turn when there is surplus: the lowest-level building at the safest station.
     if (!plan.saving && g.turn >= 2) {
       const options = bases
@@ -2173,9 +2496,18 @@
     ADMIRALS,
     TECHS,
     TECH_TREE,
+    TECH_NODES,
+    TECH_TIERS,
+    TOKEN_REWARD,
+    ROMAN,
     BRANCHES,
+    BRANCH_NAMES,
     branchOf,
     techLevel,
+    techValue,
+    applyTech,
+    missionReward,
+    fortressRecharge,
     rangeOf,
     airSupply,
     RANKS,

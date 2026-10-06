@@ -244,18 +244,48 @@ test('Admirals have distinct movement, terrain, penetration and morale abilities
   E.beginTurn(g, 'empire', false);
   assert.equal(r.morale, 0);
 });
-test('Research charges resources and affects current units immediately', () => {
+test('HQ research spends command tokens, respects tiers and prerequisites, and applies to the player only', () => {
+  const p = { tokens: 0, wins: 0, research: {} };
+  assert.equal(E.researchReason(p, 'line.armor'), 'Need 50 more command tokens');
+  p.tokens = 1000;
+  assert.match(E.researchReason(p, 'line.drives'), /^Tier 2: win 2 more operations$/);
+  p.wins = 2;
+  assert.equal(E.researchReason(p, 'line.secondary'), 'Requires Main Batteries I');
+  assert(E.research(p, 'line.guns').ok);
+  assert(E.research(p, 'line.hull').ok);
+  assert(E.research(p, 'line.drives').ok);
+  assert(E.research(p, 'station.fort').ok);
+  assert.equal(p.tokens, 1000 - 50 - 50 - 150 - 40);
+  assert.deepEqual(p.research, { 'line.guns': 1, 'line.hull': 1, 'line.drives': 1, 'station.fort': 1 });
   const g = blank(),
-    u = E.newUnit(g, 'heavy', 'alliance', 2, 2),
-    old = E.movement(g, u);
-  assert(E.research(g, 'line', 'drives').ok);
-  assert.equal(E.movement(g, u), old + 1);
-  assert.equal(g.tech.alliance.line.drives, 1);
-  const escort = E.newUnit(g, 'corvette', 'alliance', 5, 5);
-  assert.equal(E.movement(g, escort), E.TYPES.corvette.move);
-  E.research(g, 'line', 'drives');
-  assert.equal(E.researchReason(g, 'alliance', 'line', 'drives'), 'Fully researched');
-  assert(!E.research(g, 'line', 'drives').ok);
+    own = g.stations[0].maxShield,
+    foe = g.stations[1].maxShield;
+  E.applyTech(g, p.research);
+  assert.equal(g.stations[0].maxShield, own + 20);
+  assert.equal(g.stations[1].maxShield, foe);
+  const u = E.newUnit(g, 'heavy', 'alliance', 2, 2),
+    v = E.newUnit(g, 'heavy', 'empire', 5, 5);
+  assert.equal(E.movement(g, u), E.TYPES.heavy.move + 1);
+  assert.equal(E.movement(g, v), E.TYPES.heavy.move);
+  assert.equal(u.hp, Math.round(E.TYPES.heavy.hp * 1.06));
+  assert.equal(v.hp, E.TYPES.heavy.hp);
+  const next = E.applyProfile(E.createGame('alliance', 'normal', 'conquest', 4), p);
+  assert.deepEqual(next.tech.alliance, p.research);
+  assert.deepEqual(next.tech.empire, {});
+});
+test('Only victories pay command tokens, with a first-win bonus', () => {
+  const w = blank();
+  w.economy.alliance.science = 50;
+  w.stations[1].owner = 'alliance';
+  E.checkVictory(w);
+  assert.equal(E.missionReward(w, 0).total, 250 + 150 + 10 + 150);
+  assert.equal(E.missionReward(w, 3).total, 250 + 150 + 10);
+  const l = blank();
+  l.stations[0].owner = 'empire';
+  l.units = [];
+  E.checkVictory(l);
+  assert.equal(l.over.winner, 'empire');
+  assert.equal(E.missionReward(l, 0).total, 0);
 });
 test('Start of turn applies income, station regeneration, attrition, and resets actions', () => {
   const g = blank(),
@@ -318,7 +348,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3, 4, 5]) {
+  for (const v of [undefined, 2, 3, 4, 5, 6, 7]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -548,14 +578,14 @@ test('Disabled orders report a specific reason', () => {
     'Need 30 more credits and 5 more industry',
   );
 });
-test('Branch doctrines unlock class abilities', () => {
+test('HQ class abilities: Fire Control range and Carrier Operations hit-and-run', () => {
   const g = blank(),
     arty = E.newUnit(g, 'missile', 'alliance', 2, 2);
   assert.equal(E.rangeOf(g, arty).max, 2);
-  g.tech.alliance.artillery.doctrine = 2;
+  g.tech.alliance['artillery.fire'] = 2;
   assert.equal(E.rangeOf(g, arty).max, 3);
   assert.equal(E.airSupply(g, 'alliance'), 3);
-  g.tech.alliance.air.doctrine = 2;
+  g.tech.alliance['air.carrier'] = 2;
   assert.equal(E.airSupply(g, 'alliance'), 5);
   const wing = E.newUnit(g, 'fighter', 'alliance', 6, 6),
     foe = E.newUnit(g, 'corvette', 'empire', 7, 6);

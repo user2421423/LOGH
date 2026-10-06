@@ -38,6 +38,11 @@ const ICONS = (() => {
     airbase: `<path d="M4 25 14 7h4l10 18Z" fill="#3a4650" stroke="#c9d3da" stroke-width="1"/>
       <path d="M16 9v14" stroke="#ffe066" stroke-width="1.4" stroke-dasharray="2.4 2"/>
       <g color="#e9eef2">${jet(19, 13, 0.55)}</g>`,
+    // Command token: a bronze hexagonal medal with a gold star, spent on HQ research.
+    token: `<polygon points="${hex(16, 17, 14)}" fill="#5a3410"/>
+      <polygon points="${hex(16, 15.6, 14)}" fill="url(#ig-bronze)" stroke="#3a220a" stroke-width="1"/>
+      <polygon points="${hex(16, 15.6, 10)}" fill="#2a3f5c" stroke="#f1cf73" stroke-width="1"/>
+      <polygon points="${star(16, 15.8, 7, 3)}" fill="url(#ig-gold)" stroke="#6b3f05" stroke-width=".6"/>`,
     // WC4-style gold coin with an embossed dollar sign.
     credits: `<circle cx="16" cy="16.6" r="14" fill="#6b4208"/>
       <circle cx="16" cy="15.4" r="14" fill="url(#ig-gold)" stroke="#5c3a08" stroke-width="1"/>

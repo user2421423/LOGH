@@ -1513,3 +1513,87 @@ button.mini small {
   color: #8a9a96;
   border-style: dashed;
 }
+
+/* ---- Command HQ: tokens and persistent research ---- */
+.hq-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #c9a24a55;
+  background: #1b2a2c99;
+  border-radius: 3px;
+}
+.hq-summary b,
+.hq-balance b {
+  color: #f1d27a;
+}
+.hq-summary small {
+  color: #9fb0ad;
+}
+.hq-summary button {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.tier-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.tier {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border: 1px solid #4b625e;
+  color: #7f918d;
+  border-radius: 2px;
+}
+.tier.open {
+  border-color: #c9a24a;
+  color: #f1d27a;
+}
+.tech-card.hq p {
+  min-height: 0;
+}
+.tech-card.hq .doctrine {
+  margin-left: 0;
+  list-style: none;
+}
+.tech-card.hq .doctrine li b {
+  display: inline-block;
+  min-width: 26px;
+  color: #c9c58f;
+}
+.tech-card.hq .doctrine li small {
+  color: #6f8480;
+  white-space: nowrap;
+}
+.tech-card .req {
+  display: block;
+  margin-top: 8px;
+  color: #d9a86a;
+  font-size: 12px;
+}
+.reward {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #c9a24a66;
+  background: #2a261699;
+}
+.reward b {
+  font-size: 22px;
+  color: #f1d27a;
+}
+.reward small {
+  color: #c9c2a0;
+}
+@media (max-width: 700px) {
+  .tech-grid {
+    grid-template-columns: 1fr;
+  }
+}

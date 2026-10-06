@@ -90,7 +90,7 @@ const run = s => vm.runInContext(s, context);
     assert(node('side').innerHTML.includes('assets/' + (side === 'empire' ? 'alliance' : 'empire') + '-fleet.png'));
     run('nextFleet()');
     run('researchDialog()');
-    assert(node('modal-root').innerHTML.includes('Warp Drive Efficiency'));
+    assert(node('modal-root').innerHTML.includes('Afterburner Drives'));
     run('admiralDialog()');
     assert(node('modal-root').innerHTML.includes('Fleet admirals'));
     run('archiveDialog("Artillery")');
@@ -124,6 +124,11 @@ const run = s => vm.runInContext(s, context);
   assert.throws(() => registered[1].execute({ unitId: -1 }), /Invalid/);
   run('game.over={winner:game.player,reason:"Test victory"};resultDialog();');
   assert(node('modal-root').innerHTML.includes('The galaxy remembers.'));
+  assert(node('modal-root').innerHTML.includes('Command tokens earned'));
+  const tokens = JSON.parse(storage['galactic-command-officers']).tokens;
+  assert(tokens > 0);
+  run('resultDialog();');
+  assert.equal(JSON.parse(storage['galactic-command-officers']).tokens, tokens);
   console.log(
     'PASS: UI renders for both factions, controls open all dialogs, map draw completes, enemy turn completes, save/restore is coherent, structured-tool mock valid/invalid inputs pass.',
   );

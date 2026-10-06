@@ -14,16 +14,16 @@ https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `
 - **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and admirals appear as framed portraits with rank stars above their fleets.
 - **Combat juice:** synthesized weapon sounds per hull class and faction (🔊 button mutes), floating damage with red **CRIT!** numbers, blue station-defense tags, **MORALE ↓ / CONFUSED / LOW SUPPLY** alerts, and camera shake on heavy hits.
 - **Fortress main guns:** select your own Iserlohn (Thor's Hammer) or Geiersburg and click a red hex to strike an enemy fleet within 3 hexes for 40% of its hull. Two-turn recharge; silenced while shields are down. Nothing fires automatically.
-- **Station buildings:** every station has a Shipyard (larger hulls, +10 industry per level), a Research station (+8 research per level) and an Air base, each upgradable to level 3.
+- **Station buildings:** every station has a Shipyard (larger hulls, +10 industry per level), a Research station (+8 research per level; research banked at victory becomes command tokens) and an Air base, each upgradable to level 3.
 - **Air wings:** Fighter, Bomber and Strategic Bomber wings from air bases. They ignore terrain, cannot capture, are immune to artillery, only take return fire from escorts and fighters, and need a friendly air base within 3 hexes.
 - **Conquest start dates:** the standard frontier plus Astarte, the Amritsar offensive, the Lippstadt War (rebel stations and garrisons) and Operation Ragnarök.
 - **Scenarios:** Assault on Iserlohn, Battle of Astarte, Hold Amritsar and Battle of Vermilion, each with one objective, a turn limit and a saved 1–3 star rating.
-- **Branch technology trees:** Escort, Battle Line, Artillery and Aerospace each have Drives, Plating and Weapons upgrades plus a Doctrine with class abilities (Picket Screen, Breakthrough Doctrine, Fire Control with +1 artillery range, Carrier Operations with hit-and-run air wings).
+- **HQ research with command tokens:** as in World Conqueror 4, technology is bought at Command HQ with command tokens and kept across every operation and side. Tokens come only from wins (250 per victory, 50 per star or 150 for a Conquest, 1 per 5 research banked, 150 extra for the first win). 37 technologies in five trees: Escort, Battle Line, Artillery, Aerospace and Stations. They cover weapons, armor, hull, engines, class counters, Assault Doctrine breakthroughs, Fire Control, Carrier Operations, Fortification and Thor Overcharge. Tiers II–IV open after 2, 4 and 7 victories.
 - **Admiral development:** XP from combat, five ranks (+6% fleet hull each), skill points for six upgradeable skills or branch star ratings, and five medals to earn and wear. Officer records are saved in the browser and carry between operations.
 - **Clear disabled orders:** unaffordable costs turn red on the resource you are short of; other unavailable buttons say why, e.g. "Already fired", "No friendly station nearby".
 - **Economy:** both sides start with 300 credits and 250/turn. Escorts give the most firepower per credit, flagships the most per hex at about two turns of income; extra stacks cost 85% of a hull, field reinforcement a full hull, repairs a fifth of the fleet's price.
 
-Saves from earlier versions are not loaded (rules version 7).
+Saves from earlier versions are not loaded (rules version 8).
 
 ## Run the game
 
