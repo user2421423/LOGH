@@ -1547,6 +1547,7 @@
     n += wears(g, u, 'star') ? 1 : 0;
     if (u.admiral === 'reinhard' && t.branch === 'Battle Line') n++;
     if (u.admiral === 'mittermeyer') n += 2;
+    if (g?.rules?.blitz && u.side === g.rules.blitz.side && g.turn <= g.rules.blitz.turns) n++;
     if (['attenborough', 'fischer'].includes(u.admiral)) n++;
     return n;
   }
@@ -1631,6 +1632,11 @@
     const s = stationAt(g, u);
     let captured = null;
     if (s && s.owner !== u.side && canCapture(u)) {
+      // Lippstadt War: rebel strongholds pay a bounty when taken.
+      if (s.owner === 'neutral' && g.rules?.rebelBounty) {
+        funds(g, u.side).credits += g.rules.rebelBounty;
+        log(g, `Rebel stronghold ${s.name} taken: +${g.rules.rebelBounty} credits bounty.`, u.side);
+      }
       s.owner = u.side;
       s.shield = 0;
       s.capturedTurn = g.turn;
@@ -2111,6 +2117,10 @@
         aura = auras.find(v => v.admiral === 'kircheis') || auras[0];
       if (aura && nearby < 3) u.morale = Math.min(1, u.morale + (aura.admiral === 'kircheis' ? 2 : 1));
       const t = tile(g, u.c, u.r);
+      // Amritsar offensive: overextended fleets far from a friendly station run out of supplies.
+      const over = g.rules?.overextended;
+      if (over && over.side === side && !g.stations.some(s => s.owner === side && distance(s, u) <= over.range))
+        u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * over.pct));
       if (t.terrain === 'nebula') {
         const shielded = TYPES[u.type].branch === 'Escort' ? techValue(g, side, 'escort.shield') : 0;
         u.hp = Math.max(1, u.hp - Math.round(maxHP(u) * 0.025 * (1 - shielded)));
@@ -2268,11 +2278,18 @@
       name: 'The galactic frontier',
       year: 'Standard',
       desc: 'A balanced start: both powers mass at the three corridor crossings.',
+      rulesText: 'Standard rules. The rift is crossed at Iserlohn, Vermilion and Fezzan.',
     },
     astarte: {
       name: 'Battle of Astarte',
       year: 'UC 487 · RC 796',
       desc: 'The Empire holds Iserlohn. Three Alliance fleets close in from beyond the corridor.',
+      rulesText:
+        'No rift: the Astarte asteroid belt fills the middle of the galaxy instead (costly to cross, −15% damage inside). Reinhard’s fleets open with high morale.',
+      rift: null,
+      band: { cols: [7, 8, 9], terrain: 'asteroid', chance: 0.55 },
+      terrain: { nebula: 0.05, asteroid: 0.06 },
+      rules: { morale: { side: 'empire', value: 1 } },
       owners: { Iserlohn: 'empire' },
       units: [
         ['empire', 'flagship', 6, 3, 1, 'reinhard'],
@@ -2305,6 +2322,10 @@
       desc: 'The Alliance has overrun Iserlohn, Kempff and Vermilion, but its supply lines are stretched thin against the full Imperial counterattack.',
       owners: { Iserlohn: 'alliance', Kempff: 'alliance', Vermilion: 'alliance' },
       economy: { empire: [450, 160], alliance: [150, 80] },
+      rulesText:
+        'Scorched earth: Alliance fleets more than 2 hexes from a friendly station lose 4% hull each turn. The Imperial frontier is choked with nebulae.',
+      terrain: { nebula: 0.17, asteroid: 0.05 },
+      rules: { overextended: { side: 'alliance', range: 2, pct: 0.04 } },
       units: [
         ['empire', 'flagship', 2, 5, 1, 'reinhard'],
         ['empire', 'heavy', 3, 4, 2, 'mittermeyer'],
@@ -2334,6 +2355,10 @@
       name: 'Lippstadt War',
       year: 'UC 488 · RC 797',
       desc: 'Civil war on both sides. Lippstadt nobles hold Geiersburg and Valhalla; the Military Congress holds Rantemario and Doria. Crush the rebels before your rival does.',
+      rulesText:
+        'Civil war: rebel strongholds have 50% stronger defenses, and capturing one pays a 150-credit bounty. A dense asteroid field fills the frontier.',
+      terrain: { nebula: 0.07, asteroid: 0.14 },
+      rules: { rebelBounty: 150, rebelShield: 1.5 },
       owners: {
         Iserlohn: 'alliance',
         Geiersburg: 'neutral',
@@ -2382,6 +2407,12 @@
       owners: { Iserlohn: 'alliance', Fezzan: 'empire' },
       economy: { empire: [500, 180], alliance: [250, 90] },
       retired: ['kircheis'],
+      rulesText:
+        'Two corridors only: the Vermilion crossing is closed, leaving Iserlohn and Fezzan. Ragnarök blitz: Imperial fleets get +1 movement for the first 6 turns.',
+      rift: { col: 8, open: [2, 8] },
+      removeStations: ['Vermilion'],
+      terrain: { nebula: 0.06, asteroid: 0.06 },
+      rules: { blitz: { side: 'empire', turns: 6 } },
       units: [
         ['empire', 'flagship', 7, 8, 1, 'reinhard'],
         ['empire', 'heavy', 9, 8, 3, 'mittermeyer'],
@@ -3089,11 +3120,16 @@
       stats: {},
     };
     const enemy = opponent(player);
+    // Each Conquest start date has its own geography: terrain mix, rift crossings and asteroid belts.
+    const eraSpec = era ? ERAS[era] : null,
+      mix = eraSpec?.terrain || { nebula: 0.085, asteroid: 0.075 },
+      rift = eraSpec ? (eraSpec.rift === undefined ? { col: 8, open: [2, 5, 8] } : eraSpec.rift) : null;
     for (let r = 0; r < g.rows; r++)
       for (let c = 0; c < g.cols; c++) {
         const n = random(g);
-        let terrain = n < 0.085 ? 'nebula' : n < 0.16 ? 'asteroid' : 'space';
-        if (era && c === 8 && ![2, 5, 8].includes(r)) terrain = 'rift';
+        let terrain = n < mix.nebula ? 'nebula' : n < mix.nebula + mix.asteroid ? 'asteroid' : 'space';
+        if (rift && c === rift.col && !rift.open.includes(r)) terrain = 'rift';
+        if (eraSpec?.band?.cols.includes(c) && random(g) < eraSpec.band.chance) terrain = eraSpec.band.terrain;
         g.tiles.push({
           c,
           r,
@@ -3166,25 +3202,37 @@
       kempff.industry += ally.industry - imp.industry;
       valhalla.science += ally.science - imp.science;
       const spec = ERAS[era];
+      g.rules = spec.rules || null;
+      for (const name of spec.removeStations || []) {
+        const gone = g.stations.find(s => s.name === name);
+        if (rift && gone.c === rift.col) tile(g, gone.c, gone.r).terrain = 'rift';
+        g.stations = g.stations.filter(s => s !== gone);
+      }
+      g.stations.forEach((s, i) => (s.id = i));
       for (const [name, owner] of Object.entries(spec.owners || {})) {
         const s = g.stations.find(s => s.name === name);
         s.owner = owner;
         claim(s, owner);
+        if (owner === 'neutral' && g.rules?.rebelShield)
+          s.maxShield = s.shield = Math.round(s.maxShield * g.rules.rebelShield);
       }
       if (spec.units) spec.units.forEach(place);
-      else
-        for (const side of ['empire', 'alliance']) {
-          const mirror = c => (side === 'empire' ? c : 16 - c);
-          newUnit(g, 'flagship', side, mirror(4), 5, 1, side === 'empire' ? 'reinhard' : 'yang');
-          newUnit(g, 'heavy', side, mirror(5), 3, 2, side === 'empire' ? 'mittermeyer' : 'attenborough');
-          newUnit(g, 'light', side, mirror(5), 7, 2);
-          newUnit(g, 'beam', side, mirror(4), 4, 2);
-          newUnit(g, 'siege', side, mirror(5), 1, 1);
-          newUnit(g, 'missile', side, mirror(3), 6, 1);
-          newUnit(g, 'frigate', side, mirror(6), 2, 1);
-          newUnit(g, 'corvette', side, mirror(6), 8, 2);
-          newUnit(g, 'destroyer', side, mirror(3), 9, 1);
-        }
+      if (g.rules?.morale)
+        for (const u of g.units)
+          if (u.side === g.rules.morale.side) u.morale = g.rules.morale.value;
+          else
+            for (const side of ['empire', 'alliance']) {
+              const mirror = c => (side === 'empire' ? c : 16 - c);
+              newUnit(g, 'flagship', side, mirror(4), 5, 1, side === 'empire' ? 'reinhard' : 'yang');
+              newUnit(g, 'heavy', side, mirror(5), 3, 2, side === 'empire' ? 'mittermeyer' : 'attenborough');
+              newUnit(g, 'light', side, mirror(5), 7, 2);
+              newUnit(g, 'beam', side, mirror(4), 4, 2);
+              newUnit(g, 'siege', side, mirror(5), 1, 1);
+              newUnit(g, 'missile', side, mirror(3), 6, 1);
+              newUnit(g, 'frigate', side, mirror(6), 2, 1);
+              newUnit(g, 'corvette', side, mirror(6), 8, 2);
+              newUnit(g, 'destroyer', side, mirror(3), 9, 1);
+            }
       setEconomy(spec.economy);
     } else if (def?.layout) {
       const L = def.layout;
@@ -3310,6 +3358,7 @@
       alliance: g.units.filter(u => u.side === 'alliance').length,
     };
     log(g, era ? ERAS[era].desc : def.desc, player);
+    if (era && ERAS[era].rulesText) log(g, ERAS[era].rulesText, player);
     return g;
   }
   // Enemy high command, run once at the start of each AI turn before its fleets act:
