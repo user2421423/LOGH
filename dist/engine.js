@@ -1167,10 +1167,10 @@
         (wears(g, u, 'campaign') ? 0.96 : 1),
     );
   }
-  // Movement rating: 1 star −1 hex, 2–3 stars ±0, 4–5 stars +1, 6 stars +2.
+  // Movement rating: 2 stars ±0, then +1 hex per star (3 stars +1 … 6 stars +4); 1 star −1.
   function moveBonus(o, k) {
     const n = o?.ratings?.move ?? RATINGS[k]?.move ?? 3;
-    return n >= 6 ? 2 : n >= 4 ? 1 : n <= 1 ? -1 : 0;
+    return n - 2;
   }
   function auraRange(g, a) {
     return a && ['eisenach', 'merkatz'].includes(a.admiral) ? 2 : 1;

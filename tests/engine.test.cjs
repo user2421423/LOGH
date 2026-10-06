@@ -726,7 +726,7 @@ test('Every admiral has a Movement rating out of 6 stars that adds hexes', () =>
   for (const k of Object.keys(E.ADMIRALS)) assert(E.officer(fresh, k).ratings.move > 0, k);
   assert.deepEqual(
     [1, 2, 3, 4, 5, 6].map(n => E.moveBonus({ ratings: { move: n } })),
-    [-1, 0, 0, 1, 1, 2],
+    [-1, 0, 1, 2, 3, 4],
   );
   // Older profiles without a Movement rating get the admiral's default.
   const p = {
@@ -740,7 +740,7 @@ test('Every admiral has a Movement rating out of 6 stars that adds hexes', () =>
   const g = E.applyProfile(blank(), p),
     u = E.newUnit(g, 'heavy', 'alliance', 4, 4, 1, 'yang');
   u.personal = true;
-  assert.equal(E.movement(g, u), E.TYPES.heavy.move + 1);
+  assert.equal(E.movement(g, u), E.TYPES.heavy.move + 2);
 });
 test('Scenario commanders are fixed; your own version can serve beside them', () => {
   const p = { tokens: 1000 };
