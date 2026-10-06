@@ -783,6 +783,11 @@ test('A fleet whose only order is holding position has no orders left', () => {
   assert(E.hasOrders(g, u));
   u.attacked = true;
   assert(!E.hasOrders(g, u));
+  // Yang's free Confusion does not keep a fleet that has moved and fired (or held position) active.
+  u.admiral = 'yang';
+  assert(!E.hasOrders(g, u));
+  u.attacked = false;
+  assert(E.hasOrders(g, u));
 });
 test('Conquest is a WC4-scale mirrored galaxy; Lippstadt and Ragnarok are campaign chapters', () => {
   const g = E.createGame('empire', 'normal', 'conquest', 3);
