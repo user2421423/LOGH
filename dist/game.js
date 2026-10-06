@@ -605,11 +605,15 @@ function admiralDialog() {
           .map(m => `${m.name} (${m.earn.toLowerCase()})`)
           .join(' · ') +
         '</small>'
-  }</div><div class="admiral-grid officers">${Object.entries(E.ADMIRALS)
-    .filter(([k, a]) => a.side === game.player)
-    .sort(([k1], [k2]) => E.recruited(game, k2) - E.recruited(game, k1))
-    .map(([k, a]) => (E.recruited(game, k) ? officerCard(k, a, own, counts) : recruitCard(k, a)))
-    .join('')}</div></section></div>`;
+  }</div><h3 class="officer-section">Your admirals</h3><div class="admiral-grid officers">${Object.entries(E.ADMIRALS)
+    .filter(([k, a]) => a.side === game.player && E.recruited(game, k))
+    .map(([k, a]) => officerCard(k, a, own, counts))
+    .join('')}</div>${(() => {
+    const locked = Object.entries(E.ADMIRALS).filter(([k, a]) => a.side === game.player && !E.recruited(game, k));
+    return locked.length
+      ? `<h3 class="officer-section">Recruitable admirals · ${locked.length}</h3><p class="description">Recruit once with command tokens (${ICONS.use('token', 'cost-ico')} ${count(loadProfile().tokens || 0)} available); they stay in your high command for every operation.</p><div class="admiral-grid officers">${locked.map(([k, a]) => recruitCard(k, a)).join('')}</div>`
+      : '';
+  })()}</section></div>`;
   focusDialog();
 }
 // A not-yet-recruited admiral: signature ability, starting stars and a one-time token price.
