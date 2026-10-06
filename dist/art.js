@@ -801,9 +801,9 @@ const ART = {
     if (this.airWings[type]) return this.drawAir(context, type, side, x, y, width);
     return this.draw(context, side, this.frames[type], x, y, width, height, side === 'alliance');
   },
-  // Air wings are rendered formations (tools/air-art.cjs → assets/air/); the vector fallback covers loading.
+  // Air wings are painted formation sprites in assets/air/; the vector fallback covers loading.
   airUrl(type, side) {
-    return `assets/air/${side === 'alliance' ? 'alliance' : 'empire'}-${type}.svg`;
+    return `assets/air/${side === 'alliance' ? 'alliance' : 'empire'}-${type}.png`;
   },
   airWings: {
     fighter: { count: 3, size: 0.2, span: 0.55 },
