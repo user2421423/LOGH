@@ -1421,6 +1421,22 @@ button small.why {
   color: #f2b48a;
   font-weight: 700;
 }
+/* A button's reason or cost sits on its own line under the label (side by side only in panel action rows). */
+button > small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  white-space: normal;
+}
+.actions button > small {
+  margin-top: 0;
+  text-align: right;
+}
+button.mini > small.why {
+  display: none;
+}
 .doctrine {
   margin: 8px 0 0 18px;
   padding: 0;
