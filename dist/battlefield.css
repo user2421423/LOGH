@@ -2384,3 +2384,56 @@ button.mini small {
     align-items: stretch;
   }
 }
+/* Your generals versus scenario commanders. */
+.gi-kind {
+  margin-top: 2px;
+  padding: 3px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: #c9d2b8;
+  border: 1px dashed #5d8fc4;
+}
+.gi-kind.mine {
+  color: #1b1405;
+  background: #e7b937;
+  border: 1px solid #fff3b0;
+}
+.gi-medals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #16293b;
+}
+.scenario-commanders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.scenario-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid #798e8180;
+  background: #142234aa;
+}
+.scenario-chip .chip-portrait {
+  width: 36px;
+  height: 46px;
+}
+.scenario-chip span {
+  display: flex;
+  flex-direction: column;
+}
+.scenario-chip small {
+  color: #9fb0ad;
+}
+.hq-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}

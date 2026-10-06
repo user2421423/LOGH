@@ -366,7 +366,7 @@ test('Saves from earlier rules versions are rejected; current saves load unchang
   const g = E.createGame('alliance', 'normal', 'conquest', 9);
   const once = JSON.stringify(g);
   assert.equal(JSON.stringify(E.migrateSave(JSON.parse(once))), once);
-  for (const v of [undefined, 2, 3, 4, 5, 6, 7, 8, 9]) {
+  for (const v of [undefined, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const old = JSON.parse(once);
     if (v === undefined) delete old.rulesVersion;
     else old.rulesVersion = v;
@@ -564,7 +564,7 @@ test('Scenario objectives award 1–3 stars by speed, or by fleets kept when hol
   lost.stations.find(s => s.name === 'Amritsar').owner = 'empire';
   assert.equal(E.checkVictory(lost).winner, 'empire');
 });
-test('Admirals who have fallen by a start date cannot be appointed', () => {
+test('Admirals outside your roster cannot be appointed', () => {
   const g = E.createGame('empire', 'normal', 'conquest:ragnarok', 5),
     u = g.units.find(u => u.side === 'empire' && !u.admiral);
   g.economy.empire.credits = 9999;
@@ -610,38 +610,6 @@ test('HQ class abilities: Fire Control range and Carrier Operations hit-and-run'
   assert(E.attack(g, wing.id, foe.c, foe.r).ok);
   assert(!wing.moved && wing.attacked);
   assert(E.reachable(g, wing).size > 0);
-});
-test('Admirals promote through naval ranks with command tokens for the listed hull bonus, and wear medals', () => {
-  const g = blank(),
-    u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
-  g.economy.alliance.credits = 5000;
-  assert.equal(E.RANKS.length, 11);
-  assert.deepEqual(E.RANK_HP, [1.12, 1.16, 1.2, 1.24, 1.28, 1.33, 1.38, 1.43, 1.48, 1.54, 1.6]);
-  assert(E.assign(g, u.id, 'fischer').ok);
-  const o = E.officer(g, 'fischer');
-  assert.equal(o.rank, 0);
-  assert.equal(u.cmdRank, 0);
-  assert.equal(E.maxHP(u), Math.round(E.TYPES.heavy.hp * 1.12));
-  assert.equal(u.hp, E.maxHP(u));
-  const p = { tokens: 10 };
-  assert.equal(E.promoteReason(g, p, 'fischer'), 'Need 40 more command tokens');
-  p.tokens = 200;
-  assert(E.promote(g, p, 'fischer').ok);
-  assert.equal(p.tokens, 150);
-  assert.equal(o.rank, 1);
-  assert.equal(E.RANKS[o.rank], 'Lieutenant JG');
-  assert.equal(E.maxHP(u), Math.round(E.TYPES.heavy.hp * 1.16));
-  assert.equal(u.hp, E.maxHP(u));
-  assert.match(E.promoteReason(g, p, 'reinhard'), /Not your officer/);
-  g.medalInventory = ['valor'];
-  assert(E.equipMedal(g, 'fischer', 'valor').ok);
-  assert.deepEqual(g.medalInventory, []);
-  assert.equal(E.equipReason(g, 'fischer', 'valor'), 'Not in your medal case');
-  const profile = E.exportProfile(g, p);
-  assert.equal(profile.officers.fischer.rank, 1);
-  const next = E.applyProfile(E.createGame('alliance', 'normal', 'conquest', 4), profile);
-  assert.equal(E.officer(next, 'fischer').rank, 1);
-  assert.deepEqual(E.officer(next, 'fischer').medals, ['valor']);
 });
 test('Medals are awarded for defeating an enemy admiral and for winning', () => {
   const g = blank(),
@@ -692,56 +660,6 @@ test('Hard and Challenge strengthen only the enemy, and tokens are paid only for
   assert.equal(again.total, 0);
   assert(again.repeat);
 });
-test('Command tokens buy branch stars up to six, and the stars carry into every mode', () => {
-  const g = blank(),
-    p = { tokens: 100 };
-  assert.equal(E.officer(g, 'fischer').ratings.escort, 4);
-  assert.equal(E.starCost(g, 'fischer', 'escort'), 220);
-  assert.equal(E.starReason(g, p, 'fischer', 'escort'), 'Need 120 more command tokens');
-  p.tokens = 1000;
-  assert(E.buyStar(g, p, 'fischer', 'escort').ok);
-  assert(E.buyStar(g, p, 'fischer', 'escort').ok);
-  assert.equal(E.officer(g, 'fischer').ratings.escort, 6);
-  assert.equal(p.tokens, 1000 - 220 - 360);
-  assert.equal(E.starReason(g, p, 'fischer', 'escort'), 'Already 6 stars');
-  assert.match(E.starReason(g, p, 'reinhard', 'line'), /Not your officer/);
-  const profile = E.exportProfile(g, p);
-  assert.equal(profile.tokens, 1000 - 220 - 360);
-  for (const mode of ['conquest:astarte', 'iserlohn', 'amritsar'])
-    assert.equal(
-      E.officer(E.applyProfile(E.createGame('alliance', 'hard', mode, 3), profile), 'fischer').ratings.escort,
-      6,
-    );
-});
-test('Recruitable admirals cost command tokens once, start in no operation, and carry their abilities', () => {
-  const extra = Object.entries(E.ADMIRALS).filter(([, a]) => a.recruit);
-  assert.equal(extra.length, 22);
-  for (const mode of [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)])
-    for (const side of ['empire', 'alliance'])
-      assert(!E.createGame(side, 'normal', mode, 5).units.some(u => E.ADMIRALS[u.admiral]?.recruit), mode);
-  const g = blank(),
-    u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
-  g.economy.alliance.credits = 5000;
-  assert.match(E.assignReason(g, u, 'bucock'), /^Recruit for 300 command tokens first$/);
-  const p = { tokens: 250 };
-  assert.equal(E.recruitReason(g, p, 'bucock'), 'Need 50 more command tokens');
-  assert.equal(E.recruitReason(g, p, 'bittenfeld'), 'Serves the other side');
-  p.tokens = 500;
-  assert(E.recruitAdmiral(g, p, 'bucock').ok);
-  assert.equal(p.tokens, 200);
-  assert.equal(E.recruitReason(g, p, 'bucock'), 'Already recruited');
-  assert(E.assign(g, u.id, 'bucock').ok);
-  assert.equal(E.moraleFloor(g, u), 0);
-  const next = E.applyProfile(E.createGame('alliance', 'hard', 'iserlohn', 2), E.exportProfile(g, p));
-  assert(E.recruited(next, 'bucock'));
-  assert(!E.recruited(next, 'poplin'));
-  // Cazerne halves repair costs while he commands a fleet.
-  const c = E.newUnit(g, 'light', 'alliance', 5, 5);
-  const full = E.repairCost(c, g);
-  g.recruited.push('cazerne');
-  assert(E.assign(g, c.id, 'cazerne').ok);
-  assert.equal(E.repairCost(c, g), Math.max(10, Math.round(full / 2)));
-});
 test('Air supply covers hexes within range of a friendly air base, and Carrier Operations widens it', () => {
   const g = blank(),
     s = station(g, 2, 2);
@@ -773,4 +691,84 @@ test('Each side has a campaign of its own scenarios, every chapter legal for tha
   dead.units.find(u => u.admiral === 'yang').hp = 0;
   assert.equal(E.checkVictory(dead).winner, 'empire');
   assert(E.createGame('empire', 'normal', 'rantemario', 4).retired.includes('kircheis'));
+});
+test('Your generals start with two per side, promote and buy stars with tokens, and keep their records', () => {
+  const p = { tokens: 10 };
+  assert.deepEqual(Object.keys(E.roster(p)).sort(), ['attenborough', 'mittermeyer', 'reinhard', 'yang']);
+  assert.equal(E.RANKS.length, 11);
+  assert.deepEqual(E.RANK_HP, [1.12, 1.16, 1.2, 1.24, 1.28, 1.33, 1.38, 1.43, 1.48, 1.54, 1.6]);
+  assert.equal(E.roster(p).attenborough.rank, 0);
+  assert.equal(E.promoteReason(p, 'attenborough'), 'Need 40 more command tokens');
+  assert.match(E.promoteReason(p, 'fischer'), /^Recruit for 300 command tokens first$/);
+  p.tokens = 1000;
+  assert(E.promote(p, 'attenborough').ok);
+  assert.equal(E.roster(p).attenborough.rank, 1);
+  assert.equal(E.starCost(p, 'attenborough', 'line'), 220);
+  assert(E.buyStar(p, 'attenborough', 'line').ok);
+  assert(E.buyStar(p, 'attenborough', 'line').ok);
+  assert.equal(E.roster(p).attenborough.ratings.line, 6);
+  assert.equal(E.starReason(p, 'attenborough', 'line'), 'Already 6 stars');
+  assert.equal(p.tokens, 1000 - 50 - 220 - 360);
+  p.medals = ['valor'];
+  assert(E.equipMedal(p, 'attenborough', 'valor').ok);
+  assert.deepEqual(p.medals, []);
+  assert.equal(E.equipReason(p, 'attenborough', 'valor'), 'Not in your medal case');
+  const saved = JSON.parse(JSON.stringify(p));
+  for (const mode of ['conquest:astarte', 'iserlohn', 'corridor_a']) {
+    const g = E.applyProfile(E.createGame('alliance', 'hard', mode, 3), saved);
+    assert.equal(g.roster.attenborough.rank, 1);
+    assert.equal(g.roster.attenborough.ratings.line, 6);
+  }
+});
+test('Scenario commanders are fixed; your own version can serve beside them', () => {
+  const p = { tokens: 1000 };
+  E.promote(p, 'yang');
+  E.promote(p, 'yang');
+  const g = E.applyProfile(E.createGame('alliance', 'normal', 'iserlohn', 4), p),
+    scenarioYang = g.units.find(u => u.admiral === 'yang');
+  assert(scenarioYang && !scenarioYang.personal);
+  assert.equal(E.officerOf(g, scenarioYang).rank, E.officer(g, 'yang').rank);
+  const fleet = g.units.find(u => u.side === 'alliance' && !u.admiral);
+  g.economy.alliance.credits = 5000;
+  assert.equal(E.assignReason(g, fleet, 'yang'), null);
+  assert(E.assign(g, fleet.id, 'yang').ok);
+  assert(fleet.personal);
+  assert.equal(fleet.cmdRank, 3);
+  assert.equal(E.maxHP(fleet), Math.round(E.TYPES[fleet.type].hp * (1 + 0.7 * (fleet.stack - 1)) * E.RANK_HP[3]));
+  assert.notEqual(scenarioYang.cmdRank, fleet.cmdRank);
+  assert.match(
+    E.assignReason(
+      g,
+      g.units.find(u => u.side === 'alliance' && !u.admiral),
+      'yang',
+    ),
+    /^Commanding /,
+  );
+  assert.match(E.assignReason(g, fleet, 'fischer'), /^Not one of your generals/);
+});
+test('Recruiting adds a general to the roster once; recruitable admirals start in no operation', () => {
+  assert.equal(Object.values(E.ADMIRALS).filter(a => a.recruit).length, 22);
+  for (const mode of [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)])
+    for (const side of ['empire', 'alliance'])
+      assert(!E.createGame(side, 'normal', mode, 5).units.some(u => E.ADMIRALS[u.admiral]?.recruit), mode);
+  const p = { tokens: 250 };
+  assert.equal(E.recruitReason(p, 'bucock'), 'Need 50 more command tokens');
+  assert.equal(E.recruitPrice('kircheis'), 300);
+  assert.equal(E.recruitPrice('reuenthal'), 400);
+  p.tokens = 500;
+  assert(E.recruitAdmiral(p, 'bucock').ok);
+  assert.equal(p.tokens, 200);
+  assert.equal(E.recruitReason(p, 'bucock'), 'Already one of your generals');
+  const g = E.applyProfile(blank(), p),
+    u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
+  g.economy.alliance.credits = 5000;
+  assert(E.assign(g, u.id, 'bucock').ok);
+  assert.equal(E.moraleFloor(g, u), 0);
+  // Cazerne halves repair costs while he commands a fleet.
+  const c = E.newUnit(g, 'light', 'alliance', 5, 5),
+    full = E.repairCost(c, g);
+  E.recruitAdmiral(Object.assign(p, { tokens: 500 }), 'cazerne');
+  E.applyRoster(g, p);
+  assert(E.assign(g, c.id, 'cazerne').ok);
+  assert.equal(E.repairCost(c, g), Math.max(10, Math.round(full / 2)));
 });

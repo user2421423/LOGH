@@ -1086,16 +1086,52 @@
     patrichev: { escort: 3, line: 4, artillery: 3, air: 3 },
     nguyen: { escort: 4, line: 4, artillery: 3, air: 3 },
   };
+  // Two kinds of admiral. Scenario commanders come with an operation, sit on their fleets with fixed stats
+  // (g.officers) and are never upgraded. Your generals (profile.roster) are bought once, upgraded in HQ, kept
+  // between operations and assignable in any operation, even beside the scenario's own version (u.personal).
+  const STARTERS = { empire: ['reinhard', 'mittermeyer'], alliance: ['yang', 'attenborough'] };
+  function recruitPrice(k) {
+    const a = ADMIRALS[k];
+    return a?.recruit ?? (a?.stars >= 5 ? 400 : 300);
+  }
   function defaultOfficer(k) {
     return { rank: ADMIRALS[k].stars >= 5 ? 1 : 0, ratings: { ...RATINGS[k] }, medals: [] };
+  }
+  function cleanOfficer(k, rec) {
+    const base = defaultOfficer(k);
+    if (!rec) return base;
+    return {
+      rank: clamp(Number.isInteger(rec.rank) ? rec.rank : base.rank, 0, RANKS.length - 1),
+      ratings: Object.fromEntries(
+        Object.entries({ ...base.ratings, ...(rec.ratings || {}) }).map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
+      ),
+      medals: (rec.medals || []).filter(m => MEDALS[m]),
+    };
+  }
+  // The persistent roster, created on first use: the two starters per side, plus anyone recruited before.
+  function roster(profile) {
+    if (!profile.roster) {
+      profile.roster = {};
+      const keep = [...STARTERS.empire, ...STARTERS.alliance, ...(profile.recruited || [])];
+      for (const k of keep) if (ADMIRALS[k]) profile.roster[k] = cleanOfficer(k, profile.officers?.[k]);
+    }
+    return profile.roster;
+  }
+  function owns(profile, k) {
+    return !!roster(profile)[k];
   }
   function officer(g, k) {
     if (!k || !ADMIRALS[k]) return null;
     g.officers ||= {};
     return (g.officers[k] ||= defaultOfficer(k));
   }
-  function wears(g, k, medal) {
-    return !!k && !!officer(g, k)?.medals.includes(medal);
+  // The record behind a fleet's admiral: your general for personal fleets, the scenario commander otherwise.
+  function officerOf(g, u) {
+    if (!u?.admiral) return null;
+    return (u.personal && g.roster?.[u.admiral]) || officer(g, u.admiral);
+  }
+  function wears(g, u, medal) {
+    return !!officerOf(g, u)?.medals?.includes(medal);
   }
   function medalSlots(o) {
     return 1 + Math.floor(o.rank / 4);
@@ -1103,21 +1139,21 @@
   // Damage dealt and taken by an admiral's fleet: branch rating and medals.
   function officerAttack(g, u) {
     if (!u.admiral) return 1;
-    const o = officer(g, u.admiral);
+    const o = officerOf(g, u);
     return (
       (1 + 0.04 * ((o.ratings[branchOf(u.type)] || 3) - 3)) *
-      (wears(g, u.admiral, 'valor') ? 1.08 : 1) *
-      (wears(g, u.admiral, 'campaign') ? 1.04 : 1)
+      (wears(g, u, 'valor') ? 1.08 : 1) *
+      (wears(g, u, 'campaign') ? 1.04 : 1)
     );
   }
   function officerDefense(g, u) {
     if (!u.admiral) return 1;
-    const o = officer(g, u.admiral);
+    const o = officerOf(g, u);
     return Math.max(
       0.5,
       (1 - 0.03 * ((o.ratings[branchOf(u.type)] || 3) - 3)) *
-        (wears(g, u.admiral, 'laurel') ? 0.92 : 1) *
-        (wears(g, u.admiral, 'campaign') ? 0.96 : 1),
+        (wears(g, u, 'laurel') ? 0.92 : 1) *
+        (wears(g, u, 'campaign') ? 0.96 : 1),
     );
   }
   function auraRange(g, a) {
@@ -1128,25 +1164,92 @@
     if (['reinhard', 'wahlen', 'bucock'].includes(v.admiral)) return 0;
     return g.units.some(m => m.hp > 0 && m.side === v.side && m.admiral === 'murai' && distance(m, v) <= 1) ? -1 : -3;
   }
-  function recruited(g, k) {
-    return !ADMIRALS[k]?.recruit || (g.recruited || []).includes(k);
-  }
-  function recruitReason(g, profile, k) {
-    const a = ADMIRALS[k];
-    if (!a?.recruit) return 'Not recruitable';
-    if (a.side !== g.player) return 'Serves the other side';
-    if ((profile?.recruited || []).includes(k) || recruited(g, k)) return 'Already recruited';
+  // ---- HQ generals: every action below works on the profile, outside or inside an operation ----
+  function tokenShort(profile, cost) {
     const have = profile?.tokens || 0;
-    return a.recruit > have ? `Need ${a.recruit - have} more command tokens` : null;
+    return cost > have ? `Need ${cost - have} more command tokens` : null;
   }
-  // Recruiting is permanent: the admiral joins the profile and is assignable in every operation on their side.
-  function recruitAdmiral(g, profile, k) {
-    const why = recruitReason(g, profile, k);
+  function recruitReason(profile, k) {
+    if (!ADMIRALS[k]) return 'Unknown admiral';
+    if (owns(profile, k)) return 'Already one of your generals';
+    return tokenShort(profile, recruitPrice(k));
+  }
+  function recruitAdmiral(profile, k) {
+    const why = recruitReason(profile, k);
     if (why) return { ok: false, reason: why };
-    profile.tokens -= ADMIRALS[k].recruit;
-    (profile.recruited ||= []).push(k);
-    (g.recruited ||= []).push(k);
-    log(g, `${ADMIRALS[k].name} joins the high command.`, ADMIRALS[k].side);
+    profile.tokens -= recruitPrice(k);
+    roster(profile)[k] = defaultOfficer(k);
+    return { ok: true };
+  }
+  function ownedReason(profile, k) {
+    if (!ADMIRALS[k]) return 'Unknown admiral';
+    return owns(profile, k) ? null : `Recruit for ${recruitPrice(k)} command tokens first`;
+  }
+  function promoteCost(o) {
+    return PROMOTE_COST[o.rank + 1] ?? Infinity;
+  }
+  function promoteReason(profile, k) {
+    const why = ownedReason(profile, k);
+    if (why) return why;
+    const o = roster(profile)[k];
+    return o.rank >= RANKS.length - 1 ? 'Highest rank reached' : tokenShort(profile, promoteCost(o));
+  }
+  function promote(profile, k) {
+    const why = promoteReason(profile, k);
+    if (why) return { ok: false, reason: why };
+    const o = roster(profile)[k];
+    profile.tokens -= promoteCost(o);
+    o.rank++;
+    return { ok: true, rank: o.rank };
+  }
+  // As in WC4, command tokens (the medals of this game) buy extra branch stars, up to six.
+  const MAX_RATING = 6;
+  const STAR_COST = [0, 0, 0, 60, 120, 220, 360];
+  function starCost(profile, k, branch) {
+    const o = roster(profile)[k] || defaultOfficer(k);
+    return STAR_COST[(o.ratings[branch] || 0) + 1] ?? Infinity;
+  }
+  function starReason(profile, k, branch) {
+    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
+    const why = ownedReason(profile, k);
+    if (why) return why;
+    return (roster(profile)[k].ratings[branch] || 0) >= MAX_RATING
+      ? `Already ${MAX_RATING} stars`
+      : tokenShort(profile, starCost(profile, k, branch));
+  }
+  function buyStar(profile, k, branch) {
+    const why = starReason(profile, k, branch);
+    if (why) return { ok: false, reason: why };
+    profile.tokens -= starCost(profile, k, branch);
+    const o = roster(profile)[k];
+    o.ratings[branch]++;
+    return { ok: true, stars: o.ratings[branch] };
+  }
+  function equipReason(profile, k, medal) {
+    const why = ownedReason(profile, k);
+    if (why) return why;
+    const o = roster(profile)[k];
+    return (
+      (!(profile.medals || []).includes(medal) ? 'Not in your medal case' : null) ||
+      (o.medals.includes(medal) ? 'Already wearing this medal' : null) ||
+      (o.medals.length >= medalSlots(o) ? `All ${medalSlots(o)} medal slots in use` : null)
+    );
+  }
+  function equipMedal(profile, k, medal) {
+    const why = equipReason(profile, k, medal);
+    if (why) return { ok: false, reason: why };
+    profile.medals.splice(profile.medals.indexOf(medal), 1);
+    roster(profile)[k].medals.push(medal);
+    return { ok: true };
+  }
+  function unequipMedal(profile, k, medal) {
+    const why = ownedReason(profile, k);
+    if (why) return { ok: false, reason: why };
+    const o = roster(profile)[k],
+      i = o.medals.indexOf(medal);
+    if (i < 0) return { ok: false, reason: 'Not wearing that medal' };
+    o.medals.splice(i, 1);
+    (profile.medals ||= []).push(medal);
     return { ok: true };
   }
   function award(g, side, id, reason) {
@@ -1250,12 +1353,12 @@
       have = profile?.tokens || 0;
     return cost > have ? `Need ${cost - have} more command tokens` : null;
   }
+  // Only your own generals can be assigned; a scenario's commanders stay on the fleets they came with.
   function assignReason(g, u, k) {
     const a = ADMIRALS[k];
     if (!a) return 'Unknown admiral';
-    if ((g.retired || []).includes(k)) return 'Fallen in this era';
-    if (!recruited(g, k)) return `Recruit for ${a.recruit} command tokens first`;
-    const busy = g.units.find(v => v.hp > 0 && v.admiral === k);
+    if (!g.roster?.[k]) return `Not one of your generals: recruit in HQ for ${recruitPrice(k)} command tokens`;
+    const busy = g.units.find(v => v.hp > 0 && v.personal && v.admiral === k);
     if (busy) return `Commanding ${TYPES[busy.type].short}`;
     if (!u) return 'Select one of your fleets first';
     return (
@@ -1274,124 +1377,25 @@
       (!g.units.some(v => v.hp > 0 && v.side !== u.side && distance(u, v) <= 2) ? 'No enemy within 2 hexes' : null)
     );
   }
-  function promoteCost(o) {
-    return PROMOTE_COST[o.rank + 1] ?? Infinity;
-  }
-  function officerReason(g, k) {
-    const a = ADMIRALS[k];
-    if (!a) return 'Unknown admiral';
-    if (a.side !== g.player) return 'Not your officer';
-    if (!recruited(g, k)) return `Recruit for ${a.recruit} command tokens first`;
-    return turnReason(g, a.side);
-  }
-  function promoteReason(g, profile, k) {
-    const o = officer(g, k);
-    if (!o) return 'Unknown admiral';
-    const cost = promoteCost(o),
-      have = profile?.tokens || 0;
-    return (
-      officerReason(g, k) ||
-      (o.rank >= RANKS.length - 1 ? 'Highest rank reached' : null) ||
-      (cost > have ? `Need ${cost - have} more command tokens` : null)
-    );
-  }
-  // As in WC4, command tokens (the medals of this game) buy extra branch stars, up to six. Stars are part of the
-  // officer record, so they carry into every operation and mode the officer serves in.
-  const MAX_RATING = 6;
-  const STAR_COST = [0, 0, 0, 60, 120, 220, 360];
-  function starCost(g, k, branch) {
-    return STAR_COST[(officer(g, k)?.ratings[branch] || 0) + 1] ?? Infinity;
-  }
-  function starReason(g, profile, k, branch) {
-    const o = officer(g, k);
-    if (!o) return 'Unknown admiral';
-    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
-    const cost = starCost(g, k, branch),
-      have = profile?.tokens || 0;
-    return (
-      officerReason(g, k) ||
-      ((o.ratings[branch] || 0) >= MAX_RATING ? `Already ${MAX_RATING} stars` : null) ||
-      (cost > have ? `Need ${cost - have} more command tokens` : null)
-    );
-  }
-  function buyStar(g, profile, k, branch) {
-    const why = starReason(g, profile, k, branch);
-    if (why) return { ok: false, reason: why };
-    profile.tokens -= starCost(g, k, branch);
-    const o = officer(g, k);
-    o.ratings[branch]++;
-    log(g, `${ADMIRALS[k].short} rises to ${o.ratings[branch]}★ in ${BRANCH_NAMES[branch]}.`, ADMIRALS[k].side);
-    return { ok: true, stars: o.ratings[branch] };
-  }
-  function equipReason(g, k, medal) {
-    const o = officer(g, k);
-    return (
-      officerReason(g, k) ||
-      (!(g.medalInventory || []).includes(medal) ? 'Not in your medal case' : null) ||
-      (o.medals.includes(medal) ? 'Already wearing this medal' : null) ||
-      (o.medals.length >= medalSlots(o) ? `All ${medalSlots(o)} medal slots in use` : null)
-    );
-  }
-  function promote(g, profile, k) {
-    const why = promoteReason(g, profile, k);
-    if (why) return { ok: false, reason: why };
-    const o = officer(g, k);
-    profile.tokens -= promoteCost(o);
-    o.rank++;
-    const u = g.units.find(u => u.hp > 0 && u.admiral === k);
-    if (u) {
-      const old = maxHP(u);
-      u.cmdRank = o.rank;
-      u.hp += maxHP(u) - old;
-    }
-    log(g, `${ADMIRALS[k].short} is promoted to ${RANKS[o.rank]}.`, ADMIRALS[k].side);
-    return { ok: true };
-  }
-  function equipMedal(g, k, medal) {
-    const why = equipReason(g, k, medal);
-    if (why) return { ok: false, reason: why };
-    g.medalInventory.splice(g.medalInventory.indexOf(medal), 1);
-    officer(g, k).medals.push(medal);
-    return { ok: true };
-  }
-  function unequipMedal(g, k, medal) {
-    const why = officerReason(g, k),
-      o = officer(g, k);
-    if (why) return { ok: false, reason: why };
-    const i = o.medals.indexOf(medal);
-    if (i < 0) return { ok: false, reason: 'Not wearing that medal' };
-    o.medals.splice(i, 1);
-    (g.medalInventory ||= []).push(medal);
-    return { ok: true };
-  }
-  // Officer records carry between operations: load them for the player's side, and export them afterwards.
-  function applyProfile(g, profile) {
-    for (const [k, rec] of Object.entries(profile?.officers || {})) {
-      if (!ADMIRALS[k] || ADMIRALS[k].side !== g.player || !rec) continue;
-      const base = defaultOfficer(k);
-      g.officers[k] = {
-        rank: clamp(Number.isInteger(rec.rank) ? rec.rank : base.rank, 0, RANKS.length - 1),
-        ratings: Object.fromEntries(
-          Object.entries({ ...base.ratings, ...(rec.ratings || {}) }).map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
-        ),
-        medals: (rec.medals || []).filter(m => MEDALS[m]),
-      };
-    }
-    g.medalInventory = (profile?.medals || []).filter(m => MEDALS[m]);
-    g.recruited = (profile?.recruited || []).filter(k => ADMIRALS[k]?.recruit);
-    for (const u of g.units)
-      if (u.admiral) {
-        u.cmdRank = officer(g, u.admiral).rank;
-        u.hp = maxHP(u);
-      }
+  // Bring the profile into an operation: a copy of your generals (for assignment and personal fleets) and research.
+  function applyProfile(g, profile = {}) {
+    applyRoster(g, profile);
     return applyTech(g, profile?.research);
   }
-  // Tokens, victories and HQ research live only in the profile; the game keeps a copy of the research.
+  // Refresh your generals inside an operation, e.g. after an HQ promotion; personal fleets keep their damage.
+  function applyRoster(g, profile = {}) {
+    g.roster = Object.fromEntries(Object.entries(roster(profile)).map(([k, rec]) => [k, cleanOfficer(k, rec)]));
+    for (const u of g.units) {
+      if (!u.admiral) continue;
+      const old = maxHP(u);
+      u.cmdRank = officerOf(g, u).rank;
+      if (u.hp > 0) u.hp = Math.max(1, maxHP(u) - (old - u.hp));
+    }
+    return g;
+  }
+  // Profiles are edited directly; the game never writes officer records back.
   function exportProfile(g, profile = {}) {
-    const officers = { ...(profile.officers || {}) };
-    for (const [k, o] of Object.entries(g.officers || {}))
-      if (ADMIRALS[k]?.side === g.player) officers[k] = JSON.parse(JSON.stringify(o));
-    return { ...profile, officers, medals: [...(g.medalInventory || [])] };
+    return { ...profile };
   }
   // Load HQ research into the player's side: hull bonuses keep each fleet's damage, station defenses follow.
   function applyTech(g, research = {}) {
@@ -1510,7 +1514,7 @@
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 10 || !Array.isArray(g.units)) return null;
+    if (!g || g.version !== 2 || g.rulesVersion !== 11 || !Array.isArray(g.units)) return null;
     return g.units.every(u => TYPES[u.type]) ? g : null;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -1540,7 +1544,7 @@
     const t = TYPES[u.type];
     if (t.elite) return 1;
     let n = t.move + unitTech(g, u, 'drives');
-    n += wears(g, u.admiral, 'star') ? 1 : 0;
+    n += wears(g, u, 'star') ? 1 : 0;
     if (u.admiral === 'reinhard' && t.branch === 'Battle Line') n++;
     if (u.admiral === 'mittermeyer') n += 2;
     if (['attenborough', 'fischer'].includes(u.admiral)) n++;
@@ -1786,7 +1790,7 @@
         (a.admiral === 'reinhard' && t.branch === 'Battle Line' ? 0.3 : 0) +
         (a.admiral === 'lutz' ? 0.2 : 0) +
         (a.admiral === 'poplin' ? 0.25 : 0) +
-        (wears(g, a.admiral, 'marksman') ? 0.08 : 0),
+        (wears(g, a, 'marksman') ? 0.08 : 0),
       0,
       0.85,
     );
@@ -2046,7 +2050,8 @@
     funds(g, u.side).credits -= a.cost;
     const old = maxHP(u);
     u.admiral = admiral;
-    u.cmdRank = officer(g, admiral).rank;
+    u.personal = true;
+    u.cmdRank = g.roster[admiral].rank;
     u.hp += maxHP(u) - old;
     log(g, `${a.short} assumes command of ${TYPES[u.type].short}.`, u.side);
     return { ok: true };
@@ -3043,7 +3048,7 @@
     if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 10,
+      rulesVersion: 11,
       player,
       difficulty,
       mode: era ? 'conquest' : scen,
@@ -3067,6 +3072,7 @@
       },
       tech: { empire: {}, alliance: {}, neutral: {} },
       officers: Object.fromEntries(Object.keys(ADMIRALS).map(k => [k, defaultOfficer(k)])),
+      roster: {},
       medalInventory: [],
       medalsEarned: [],
       over: null,
@@ -3520,7 +3526,12 @@
     officer,
     medalSlots,
     moraleFloor,
-    recruited,
+    STARTERS,
+    recruitPrice,
+    roster,
+    owns,
+    officerOf,
+    applyRoster,
     recruitReason,
     recruitAdmiral,
     MAX_RATING,
