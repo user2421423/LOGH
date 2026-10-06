@@ -1100,17 +1100,28 @@
     (profile.research ||= {})[id] = l + 1;
     return { ok: true, level: l + 1 };
   }
-  // Command tokens for a won operation; the first victory ever earns a bonus. Banked research converts 5 : 1.
+  // Command tokens are paid only for the first victory in each operation at each difficulty (Hard ×1.5,
+  // Challenge ×2); the first victory ever earns a bonus. Banked research converts 5 : 1.
   const TOKEN_REWARD = { victory: 250, star: 50, conquest: 150, first: 150, research: 5 };
-  function missionReward(g, wins = 0) {
+  function operationKey(g) {
+    return `${g.mode === 'conquest' ? 'conquest:' + (g.era || 'frontier') : g.mode}:${DIFFICULTIES[g.difficulty] ? g.difficulty : 'normal'}`;
+  }
+  function missionReward(g, wins = 0, cleared = {}) {
     if (!g.over || g.over.winner !== g.player) return { total: 0, parts: [] };
+    if (cleared[operationKey(g)]) return { total: 0, parts: [], repeat: true };
     const parts = [['Victory', TOKEN_REWARD.victory]];
     if (g.mode === 'conquest') parts.push(['Conquest', TOKEN_REWARD.conquest]);
     else parts.push([`${g.over.stars || 1}★ rating`, TOKEN_REWARD.star * (g.over.stars || 1)]);
     const banked = Math.floor((funds(g, g.player)?.science || 0) / TOKEN_REWARD.research);
     if (banked) parts.push(['Banked research', banked]);
-    if (!wins) parts.push(['First victory', TOKEN_REWARD.first]);
-    return { total: parts.reduce((a, [, v]) => a + v, 0), parts };
+    const scale = DIFFICULTIES[g.difficulty]?.tokens || 1;
+    if (scale !== 1) parts.push([`${DIFFICULTIES[g.difficulty].name} ×${scale}`, 0]);
+    let total = Math.round(parts.reduce((a, [, v]) => a + v, 0) * scale);
+    if (!wins) {
+      parts.push(['First victory', TOKEN_REWARD.first]);
+      total += TOKEN_REWARD.first;
+    }
+    return { total, parts };
   }
   const DIRS = [
     [1, 0],
@@ -1674,7 +1685,7 @@
     if (collect) {
       const inc = income(g, side),
         e = funds(g, side),
-        modifier = side !== g.player ? (g.difficulty === 'hard' ? 1.2 : g.difficulty === 'easy' ? 0.8 : 1) : 1;
+        modifier = side !== g.player ? DIFFICULTIES[g.difficulty]?.income || 1 : 1;
       e.credits += Math.round(inc.credits * modifier);
       e.industry += Math.round(inc.industry * modifier);
       e.science += Math.round(inc.science * modifier);
@@ -2034,6 +2045,88 @@
       timeout: 'Imperial reinforcements arrived. Brünhild escaped.',
     },
   };
+  // Operation difficulty, as in WC4. Normal is the operation as designed. Hard gives every enemy side all tier I–II
+  // HQ research, upgrades every other enemy fleet one class and adds one fleet per four. Challenge gives them all
+  // research, upgrades every fleet (with an extra stack), adds one fleet per two and a richer treasury.
+  const DIFFICULTIES = {
+    normal: { name: 'Normal', level: 0, tokens: 1, desc: 'The operation as designed.' },
+    hard: {
+      name: 'Hard',
+      level: 1,
+      tokens: 1.5,
+      techTier: 2,
+      upgradeEvery: 2,
+      extraPer: 4,
+      ranks: 1,
+      income: 1,
+      desc: 'Enemies have all tier I–II research, half their fleets are upgraded a class and there are more of them.',
+    },
+    challenge: {
+      name: 'Challenge',
+      level: 2,
+      tokens: 2,
+      techTier: 4,
+      upgradeEvery: 1,
+      extraPer: 2,
+      stack: true,
+      ranks: 2,
+      income: 1.25,
+      desc: 'Enemies have every technology, every fleet is upgraded with an extra stack, and their numbers swell.',
+    },
+  };
+  // One class up within each branch: an escort becomes a light cruiser, a cruiser a heavier hull, and so on.
+  const UPGRADE = {
+    corvette: 'frigate',
+    frigate: 'light',
+    destroyer: 'light',
+    light: 'heavy',
+    heavy: 'battleship',
+    battleship: 'flagship',
+    beam: 'missile',
+    missile: 'siege',
+    fighter: 'bomber',
+    bomber: 'strategic',
+  };
+  function techUpToTier(tier) {
+    return Object.fromEntries(
+      Object.values(TECH_NODES)
+        .map(n => [n.id, n.tiers.filter(t => t <= tier).length])
+        .filter(([, l]) => l > 0),
+    );
+  }
+  function harden(g, d) {
+    const foes = ['empire', 'alliance', 'neutral'].filter(side => side !== g.player),
+      enemyUnits = g.units.filter(u => foes.includes(u.side));
+    for (const side of foes) {
+      g.tech[side] = techUpToTier(d.techTier);
+      if (g.economy[side]) g.economy[side].credits = Math.round(g.economy[side].credits * d.income);
+    }
+    for (const [k, a] of Object.entries(ADMIRALS))
+      if (a.side !== g.player) g.officers[k].rank = Math.min(RANKS.length - 1, g.officers[k].rank + d.ranks);
+    enemyUnits.forEach((u, i) => {
+      if (i % d.upgradeEvery === 0 && UPGRADE[u.type] && !(u.admiral && u.type === 'battleship'))
+        u.type = UPGRADE[u.type];
+      if (d.stack && !TYPES[u.type].elite) u.stack = Math.min(3, u.stack + 1);
+    });
+    // Reinforcements: copies of existing enemy fleets (never dreadnoughts) on free hexes beside them.
+    const extra = Math.ceil(enemyUnits.length / d.extraPer);
+    for (let n = 0, tries = 0; n < extra && tries < extra * 6; tries++) {
+      const src = enemyUnits[Math.floor(random(g) * enemyUnits.length)],
+        spot = adjacent(g, src).find(
+          p => p.terrain !== 'rift' && !unitAt(g, p) && (!stationAt(g, p) || stationAt(g, p).owner === src.side),
+        );
+      if (!spot) continue;
+      const v = newUnit(g, src.type === 'flagship' ? 'battleship' : src.type, src.side, spot.c, spot.r, src.stack);
+      if (src.art) v.art = src.art;
+      n++;
+    }
+    for (const u of g.units)
+      if (foes.includes(u.side)) {
+        u.hpTech = unitTech(g, u, 'hull');
+        u.hp = maxHP(u);
+      }
+    g.stations.forEach(st => fortify(g, st));
+  }
   // mode: 'conquest' or 'conquest:<era>' for a Conquest start date; a scenario id (or 'scenario:<id>') otherwise.
   function createGame(player = 'alliance', difficulty = 'normal', mode = 'conquest', seed = 246801) {
     let era = null,
@@ -2274,19 +2367,12 @@
       setEconomy({ alliance: [250, 90], empire: [220, 80] });
     }
     for (const u of g.units) tile(g, u.c, u.r).terrain = 'space';
-    // Enemy officers are veterans on Fleet Marshal difficulty.
-    if (difficulty === 'hard')
-      for (const [k, a] of Object.entries(ADMIRALS))
-        if (a.side === enemy) g.officers[k].rank = Math.min(4, g.officers[k].rank + 1);
+    if (DIFFICULTIES[difficulty]?.level) harden(g, DIFFICULTIES[difficulty]);
     for (const u of g.units)
       if (u.admiral) {
         u.cmdRank = g.officers[u.admiral].rank;
         u.hp = maxHP(u);
       }
-    if (difficulty === 'easy') {
-      g.economy[player].credits += 150;
-      g.economy[player].industry += 50;
-    }
     g.startFleets = {
       empire: g.units.filter(u => u.side === 'empire').length,
       alliance: g.units.filter(u => u.side === 'alliance').length,
@@ -2499,6 +2585,9 @@
     TECH_NODES,
     TECH_TIERS,
     TOKEN_REWARD,
+    DIFFICULTIES,
+    UPGRADE,
+    operationKey,
     ROMAN,
     BRANCHES,
     BRANCH_NAMES,

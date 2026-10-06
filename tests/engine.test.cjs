@@ -637,3 +637,40 @@ test('Medals are awarded for defeating an enemy admiral and for winning', () => 
   assert.equal(g.over.winner, 'alliance');
   assert(g.medalInventory.includes('campaign'));
 });
+test('Hard and Challenge strengthen only the enemy, and tokens are paid only for the first clear', () => {
+  const n = E.createGame('alliance', 'normal', 'iserlohn', 7),
+    h = E.createGame('alliance', 'hard', 'iserlohn', 7),
+    c = E.createGame('alliance', 'challenge', 'iserlohn', 7),
+    foes = g => g.units.filter(u => u.side === 'empire'),
+    own = g => g.units.filter(u => u.side === 'alliance').map(u => u.type + u.stack);
+  assert(foes(h).length > foes(n).length);
+  assert(foes(c).length > foes(h).length);
+  assert(foes(h).some(u => u.type === 'siege') && !foes(n).some(u => u.type === 'siege'));
+  assert.deepEqual(own(h), own(n));
+  assert.deepEqual(h.tech.alliance, {});
+  assert.equal(h.tech.empire['line.armor'], 3);
+  assert.equal(h.tech.empire['line.drives'], 1);
+  assert.equal(c.tech.empire['line.armor'], 5);
+  assert.equal(c.tech.empire['station.overcharge'], 2);
+  for (const mode of [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)])
+    for (const level of ['hard', 'challenge']) {
+      const g = E.createGame('empire', level, mode, 11),
+        keys = new Set();
+      for (const u of g.units) {
+        assert(!keys.has(E.key(u)), mode + ' ' + level + ' duplicate ' + E.key(u));
+        keys.add(E.key(u));
+        assert.notEqual(E.tile(g, u.c, u.r).terrain, 'rift');
+        assert.equal(u.hp, E.maxHP(u));
+      }
+      assert.equal(E.checkVictory(g), null, mode + ' ' + level);
+    }
+  const w = blank();
+  w.difficulty = 'hard';
+  w.economy.alliance.science = 0;
+  w.stations[1].owner = 'alliance';
+  E.checkVictory(w);
+  assert.equal(E.missionReward(w, 3).total, Math.round((250 + 150) * 1.5));
+  const again = E.missionReward(w, 3, { [E.operationKey(w)]: true });
+  assert.equal(again.total, 0);
+  assert(again.repeat);
+});
