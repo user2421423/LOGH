@@ -83,7 +83,7 @@
       crit: 0.12,
       pen: 0.2,
       breakthrough: true,
-      desc: 'Balanced early combatant. A kill refreshes its attack and movement once per turn.',
+      desc: 'Balanced early combatant. A kill lets it fire once more per turn (no extra movement).',
     },
     heavy: {
       name: 'Heavy Cruiser',
@@ -103,7 +103,7 @@
       crit: 0.14,
       pen: 0.3,
       breakthrough: true,
-      desc: 'The fleet backbone. Heavy armor and breakthrough on a kill.',
+      desc: 'The fleet backbone. Heavy armor; a kill lets it fire once more per turn (no extra movement).',
     },
     battleship: {
       name: 'Battleship',
@@ -314,7 +314,7 @@
       role: 'Battle Line',
       hull: 'Beowulf',
       skill: 'Gale Wolf',
-      desc: '+2 movement. Battle Line can refresh actions twice per turn.',
+      desc: '+2 movement. Battle Line can fire again after a kill twice per turn.',
       trait: 'gale',
     },
     reuenthal: {
@@ -350,7 +350,7 @@
       role: 'Battle Line',
       hull: 'Triglaph',
       skill: 'Flexible Command',
-      desc: '+1 movement, +15% damage. Breakthrough-capable hulls refresh actions twice per turn.',
+      desc: '+1 movement, +15% damage. Battle Line can fire again after a kill twice per turn.',
       trait: 'flexible',
     },
     fischer: {
@@ -660,7 +660,7 @@
       role: 'Battle Line',
       hull: 'Iserlohn detachment flagship',
       skill: 'Aggressive Raider',
-      desc: '+20% damage when attacking; Battle Line can refresh actions twice per turn.',
+      desc: '+20% damage when attacking; Battle Line can fire again after a kill twice per turn.',
       trait: 'raider',
       recruit: 200,
     },
@@ -1891,9 +1891,11 @@
     }
     let breakthrough = false;
     if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain < cap) {
+      // Breakthrough: a kill lets the hull fire again. Cruisers get no extra movement; battleships and
+      // dreadnoughts also regain movement on their first kill.
       a.chain++;
       a.attacked = false;
-      a.moved = false;
+      if (TYPES[a.type].relentless) a.moved = false;
       a.sortie = false;
       breakthrough = true;
     } else if (destroyed && a.hp > 0 && TYPES[a.type].relentless) {

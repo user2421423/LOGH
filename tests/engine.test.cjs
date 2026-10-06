@@ -214,14 +214,14 @@ test('Unit reinforcement and repair spend actions and require station access', (
   assert(E.repair(g, u.id).ok);
   assert(u.moved && u.attacked);
 });
-test('Breakthrough grants an extra move and attack after a kill but has a cap', () => {
+test('A cruiser kill grants one extra shot (no extra movement), up to the cap', () => {
   const g = blank(),
     a = E.newUnit(g, 'heavy', 'alliance', 2, 2, 3);
   const b = E.newUnit(g, 'corvette', 'empire', 3, 2);
   b.hp = 1;
   let r = E.attack(g, a.id, 3, 2);
   assert(r.breakthrough);
-  assert(!a.moved && !a.attacked);
+  assert(a.moved && !a.attacked);
   const c = E.newUnit(g, 'corvette', 'empire', 2, 3);
   c.hp = 1;
   r = E.attack(g, a.id, 2, 3);
