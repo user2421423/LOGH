@@ -77,6 +77,9 @@ for (const file of ['engine.js', 'art.js', 'icons.js', 'audio.js', 'game.js'])
 const run = s => vm.runInContext(s, context);
 (async () => {
   assert(node('modal-root').innerHTML.includes('One galaxy.'));
+  assert(node('modal-root').innerHTML.includes('campaign'));
+  assert(node('modal-root').innerHTML.includes('conquest-select'));
+  assert(node('modal-root').innerHTML.includes('Win chapter 1 first'));
   for (const side of ['empire', 'alliance']) {
     run(`setup={side:'${side}',mode:'conquest',difficulty:'normal'};newGame();draw(0,.016);`);
     assert(node('app').innerHTML.includes('The galactic frontier'));
@@ -120,7 +123,7 @@ const run = s => vm.runInContext(s, context);
     run('draw(16,.016)');
   }
   run('setup={side:"alliance",mode:"iserlohn",difficulty:"normal"};newGame();');
-  assert(node('app').innerHTML.includes('Assault on Iserlohn'));
+  assert(node('app').innerHTML.includes('Seventh Battle of Iserlohn'));
   run('selectUnit(game.units.find(u=>u.type==="siege"&&u.side===game.player).id);');
   assert(node('side').innerHTML.includes('Siege Cannon'));
   const read = registered[0].execute({});

@@ -2205,6 +2205,13 @@
       if (!alive(foe).length) win(def.win, byTurn());
     } else if (o.type === 'kill') {
       if (!g.units.some(u => u.hp > 0 && u.admiral === o.admiral)) win(def.win, byTurn());
+    } else if (o.type === 'survive') {
+      if (o.admiral && !g.units.some(u => u.hp > 0 && u.admiral === o.admiral))
+        lose(`${ADMIRALS[o.admiral].short}'s flagship has been destroyed.`);
+      else if (g.turn > o.turns) {
+        const kept = alive(P).length / Math.max(1, g.startFleets?.[P] || 1);
+        win(def.win, kept >= 0.6 ? 3 : kept >= 0.35 ? 2 : 1);
+      }
     } else if (o.type === 'hold') {
       if (!o.stations.every(owned)) lose(`${o.stations.join(' and ')} has fallen.`);
       else if (g.turn > o.turns) {
@@ -2213,17 +2220,21 @@
       }
     }
     if (!g.over && !alive(P).length) lose('Your last fleet has been destroyed.');
-    if (!g.over && o.type !== 'hold' && g.turn > o.turns) lose(def.timeout);
+    if (!g.over && o.type !== 'hold' && o.type !== 'survive' && g.turn > o.turns) lose(def.timeout);
     return g.over;
   }
   function objectiveText(g) {
     if (g.mode === 'conquest')
       return `Capture ${g.player === 'alliance' ? 'Odin' : 'Heinessen'} while holding your own capital.`;
     const o = g.objective,
-      stars = o.stars ? ` ★★★ by turn ${o.stars[0]}.` : ' ★★★ with 70% of your fleets intact.';
+      stars = o.stars
+        ? ` ★★★ by turn ${o.stars[0]}.`
+        : ` ★★★ with ${o.type === 'survive' ? 60 : 70}% of your fleets intact.`;
     if (o.type === 'capture') return `Capture ${o.stations.join(' and ')} by turn ${o.turns}.${stars}`;
     if (o.type === 'destroy') return `Destroy every enemy fleet by turn ${o.turns}.${stars}`;
     if (o.type === 'kill') return `Destroy ${ADMIRALS[o.admiral].name}'s flagship by turn ${o.turns}.${stars}`;
+    if (o.type === 'survive')
+      return `${o.admiral ? `Keep ${ADMIRALS[o.admiral].name} alive` : 'Keep a fleet alive'} through turn ${o.turns}.${stars}`;
     return `Hold ${o.stations.join(' and ')} through turn ${o.turns}.${stars}`;
   }
   function modeTitle(g) {
@@ -2380,8 +2391,9 @@
   // Scenarios: a fixed map, a single objective, a turn limit and a 1–3 star rating.
   const SCENARIOS = {
     iserlohn: {
-      name: 'Assault on Iserlohn',
-      side: null,
+      name: 'Seventh Battle of Iserlohn',
+      side: 'alliance',
+      year: 'RC 796',
       cols: 11,
       rows: 9,
       desc: 'Breach the fortress shields, eliminate the garrison, then occupy Iserlohn with an Escort or Battle Line fleet.',
@@ -2392,6 +2404,7 @@
     astarte: {
       name: 'Battle of Astarte',
       side: 'empire',
+      year: 'UC 487 · RC 796',
       cols: 13,
       rows: 9,
       desc: 'Three Alliance fleets converge on Reinhard. Strike each before they can unite.',
@@ -2402,6 +2415,7 @@
     amritsar: {
       name: 'Hold Amritsar',
       side: 'alliance',
+      year: 'RC 796',
       cols: 12,
       rows: 9,
       desc: 'The Imperial counteroffensive falls on Amritsar. Hold the station until the evacuation is complete.',
@@ -2412,6 +2426,7 @@
     vermilion: {
       name: 'Battle of Vermilion',
       side: 'alliance',
+      year: 'RC 799',
       cols: 13,
       rows: 9,
       desc: 'Brünhild is within reach. Break through the Imperial screen and destroy Reinhard’s flagship before Mittermeyer arrives.',
@@ -2419,6 +2434,513 @@
       win: 'Brünhild is lost. The Imperial offensive collapses.',
       timeout: 'Imperial reinforcements arrived. Brünhild escaped.',
     },
+    // Data-built scenarios: territory splits at a column, then stations and fleets are placed from the layout.
+    tiamat: {
+      name: 'Third Battle of Tiamat',
+      side: 'empire',
+      year: 'UC 486 · RC 795',
+      cols: 12,
+      rows: 9,
+      desc: 'UC 486. The Alliance 11th Fleet charges the Imperial line. Reinhard’s detachment strikes its flank: destroy every Alliance fleet.',
+      objective: { type: 'destroy', turns: 14, stars: [8, 11] },
+      win: 'The 11th Fleet is shattered on Reinhard’s flank.',
+      timeout: 'The Alliance fleet broke contact and escaped.',
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 6,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Imperial Picket', 0, 4, 'empire', 1, true, false],
+          ['Tiamat Relay', 11, 6, 'alliance', 1, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'flagship', 2, 4, 1, 'reinhard'],
+          ['empire', 'frigate', 3, 3, 2, 'kircheis'],
+          ['empire', 'heavy', 3, 5, 2],
+          ['empire', 'light', 2, 2, 2],
+          ['empire', 'light', 2, 6, 2],
+          ['empire', 'beam', 1, 4, 2],
+          ['empire', 'missile', 1, 3, 1],
+          ['empire', 'corvette', 4, 4, 2],
+          ['empire', 'destroyer', 3, 7, 1],
+          ['alliance', 'heavy', 9, 3, 2],
+          ['alliance', 'heavy', 9, 5, 2],
+          ['alliance', 'battleship', 10, 4, 1],
+          ['alliance', 'light', 8, 2, 1],
+          ['alliance', 'light', 8, 6, 1],
+          ['alliance', 'beam', 10, 3, 1],
+          ['alliance', 'missile', 10, 5, 1],
+          ['alliance', 'corvette', 8, 4, 1],
+          ['alliance', 'frigate', 11, 4, 1],
+        ],
+        economy: { empire: [200, 80], alliance: [120, 40] },
+      },
+    },
+    amritsar_e: {
+      name: 'Amritsar Counteroffensive',
+      side: 'empire',
+      year: 'UC 487 · RC 796',
+      cols: 13,
+      rows: 9,
+      desc: 'RC 796. The Alliance invasion has outrun its supplies. Strike back and take the Alliance base at Amritsar.',
+      objective: { type: 'capture', stations: ['Amritsar'], turns: 16, stars: [10, 13] },
+      win: 'Amritsar falls. The invasion of the Empire is over.',
+      timeout: 'The Alliance held Amritsar long enough to withdraw.',
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Imperial Rally', 0, 4, 'empire', 2, true, false],
+          ['Amritsar', 10, 4, 'alliance', 2, false, false, 260],
+          ['Alliance Depot', 12, 1, 'alliance', 1, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'flagship', 1, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 3, 3, 2, 'mittermeyer'],
+          ['empire', 'battleship', 3, 5, 2, 'reuenthal'],
+          ['empire', 'frigate', 2, 2, 2, 'kircheis'],
+          ['empire', 'heavy', 2, 6, 1],
+          ['empire', 'light', 4, 4, 2],
+          ['empire', 'missile', 1, 3, 1],
+          ['empire', 'siege', 1, 5, 1],
+          ['empire', 'corvette', 4, 2, 2],
+          ['empire', 'destroyer', 4, 6, 1],
+          ['alliance', 'heavy', 9, 3, 2],
+          ['alliance', 'heavy', 9, 5, 1],
+          ['alliance', 'battleship', 10, 5, 1],
+          ['alliance', 'light', 8, 4, 2],
+          ['alliance', 'beam', 10, 3, 2],
+          ['alliance', 'missile', 11, 4, 1],
+          ['alliance', 'corvette', 8, 2, 1],
+          ['alliance', 'corvette', 8, 6, 1],
+          ['alliance', 'frigate', 11, 5, 1],
+          ['alliance', 'destroyer', 9, 7, 1],
+        ],
+        economy: { empire: [220, 90], alliance: [100, 40] },
+      },
+    },
+    geiersburg: {
+      name: 'Eighth Battle of Iserlohn',
+      side: 'empire',
+      year: 'UC 489 · RC 798',
+      cols: 12,
+      rows: 9,
+      desc: 'UC 489. The fortress Geiersburg has been warped to the corridor. Use its main gun to break Iserlohn’s defenders, then take the fortress.',
+      objective: { type: 'capture', stations: ['Iserlohn'], turns: 18, stars: [11, 15] },
+      win: 'Iserlohn falls to the fortress-versus-fortress gambit.',
+      timeout: 'Alliance reinforcements arrived. The gambit failed.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 6,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Geiersburg', 3, 4, 'empire', 3, false, true],
+          ['Iserlohn', 9, 4, 'alliance', 3, false, true],
+          ['Corridor Outpost', 10, 1, 'alliance', 1, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'battleship', 4, 3, 2],
+          ['empire', 'heavy', 4, 5, 2],
+          ['empire', 'heavy', 2, 3, 1],
+          ['empire', 'light', 5, 4, 2],
+          ['empire', 'siege', 2, 5, 1],
+          ['empire', 'missile', 2, 4, 1],
+          ['empire', 'beam', 4, 6, 1],
+          ['empire', 'corvette', 5, 2, 2],
+          ['empire', 'frigate', 5, 6, 2],
+          ['empire', 'destroyer', 1, 4, 1],
+          ['alliance', 'battleship', 8, 3, 1],
+          ['alliance', 'heavy', 8, 5, 2],
+          ['alliance', 'light', 7, 4, 2],
+          ['alliance', 'beam', 9, 3, 2],
+          ['alliance', 'missile', 9, 5, 1],
+          ['alliance', 'corvette', 7, 2, 1],
+          ['alliance', 'corvette', 7, 6, 1],
+          ['alliance', 'frigate', 10, 4, 1],
+          ['alliance', 'heavy', 10, 5, 1],
+        ],
+        economy: { empire: [220, 90], alliance: [140, 60] },
+      },
+    },
+    ragnarok_e: {
+      name: 'Operation Ragnarök',
+      side: 'empire',
+      year: 'UC 489 · RC 798',
+      cols: 13,
+      rows: 9,
+      desc: 'UC 489. Mittermeyer drives through the Fezzan corridor while the Alliance rushes a task force to stop him. Seize Fezzan.',
+      objective: { type: 'capture', stations: ['Fezzan'], turns: 14, stars: [8, 11] },
+      win: 'Fezzan is in Imperial hands. The road to Heinessen is open.',
+      timeout: 'The Alliance sealed the Fezzan corridor.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 6,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Imperial Staging', 0, 4, 'empire', 2, true, false],
+          ['Fezzan', 8, 4, 'neutral', 2, false, false, 200],
+          ['Alliance Gate', 12, 4, 'alliance', 2, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'heavy', 2, 4, 2, 'mittermeyer'],
+          ['empire', 'flagship', 1, 5, 1, 'reinhard'],
+          ['empire', 'battleship', 2, 6, 1],
+          ['empire', 'heavy', 3, 3, 2],
+          ['empire', 'light', 3, 5, 2],
+          ['empire', 'destroyer', 4, 4, 2],
+          ['empire', 'beam', 1, 3, 2],
+          ['empire', 'missile', 1, 4, 1],
+          ['empire', 'corvette', 4, 2, 2],
+          ['neutral', 'heavy', 8, 3, 1, null, 'empire'],
+          ['neutral', 'light', 8, 5, 1, null, 'empire'],
+          ['alliance', 'heavy', 11, 3, 2],
+          ['alliance', 'heavy', 11, 5, 2],
+          ['alliance', 'battleship', 12, 5, 1],
+          ['alliance', 'light', 10, 4, 2],
+          ['alliance', 'beam', 12, 3, 1],
+          ['alliance', 'missile', 11, 6, 1],
+          ['alliance', 'corvette', 10, 2, 1],
+          ['alliance', 'destroyer', 10, 6, 1],
+        ],
+        economy: { empire: [240, 90], alliance: [180, 70] },
+      },
+    },
+    vermilion_e: {
+      name: 'Vermilion: Hold the Line',
+      side: 'empire',
+      year: 'UC 490 · RC 799',
+      cols: 13,
+      rows: 9,
+      desc: 'UC 490. Yang has caught Brünhild with a thin screen. Keep Reinhard alive until Mittermeyer arrives.',
+      objective: { type: 'survive', admiral: 'reinhard', turns: 12 },
+      win: 'Mittermeyer’s fleet arrives. Brünhild is saved.',
+      timeout: 'Brünhild has been destroyed.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Brünhild Anchorage', 0, 4, 'empire', 2, true, false],
+          ['Alliance Forward', 12, 4, 'alliance', 1, true, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'flagship', 1, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 2, 3, 2],
+          ['empire', 'heavy', 2, 5, 2],
+          ['empire', 'battleship', 3, 4, 1],
+          ['empire', 'light', 3, 2, 2],
+          ['empire', 'light', 3, 6, 2],
+          ['empire', 'beam', 1, 3, 1],
+          ['empire', 'missile', 1, 5, 1],
+          ['empire', 'corvette', 4, 3, 1],
+          ['empire', 'corvette', 4, 5, 1],
+          ['empire', 'destroyer', 2, 4, 1],
+          ['alliance', 'flagship', 10, 4, 1, 'yang'],
+          ['alliance', 'heavy', 9, 3, 2, 'attenborough'],
+          ['alliance', 'light', 9, 5, 2, 'fischer'],
+          ['alliance', 'heavy', 10, 3, 1],
+          ['alliance', 'heavy', 10, 5, 1],
+          ['alliance', 'missile', 11, 4, 1],
+          ['alliance', 'beam', 11, 3, 2],
+          ['alliance', 'corvette', 8, 4, 2],
+          ['alliance', 'destroyer', 9, 4, 1],
+        ],
+        economy: { empire: [120, 40], alliance: [200, 80] },
+      },
+    },
+    rantemario: {
+      name: 'Battle of Rantemario',
+      side: 'empire',
+      year: 'UC 490 · RC 799',
+      cols: 13,
+      rows: 9,
+      desc: 'UC 490. The last Alliance main fleet makes its stand before Heinessen. Destroy it and the war is won.',
+      objective: { type: 'destroy', turns: 15, stars: [9, 12] },
+      win: 'The Alliance main fleet is gone. Heinessen lies open.',
+      timeout: 'The Alliance fleet withdrew to fight again.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Imperial Vanguard', 0, 4, 'empire', 2, true, false],
+          ['Rantemario', 12, 4, 'alliance', 2, true, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'flagship', 1, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 2, 2, 2, 'mittermeyer'],
+          ['empire', 'battleship', 2, 6, 2, 'reuenthal'],
+          ['empire', 'heavy', 3, 3, 2],
+          ['empire', 'heavy', 3, 5, 2],
+          ['empire', 'light', 4, 4, 2],
+          ['empire', 'missile', 1, 2, 1],
+          ['empire', 'siege', 1, 6, 1],
+          ['empire', 'beam', 2, 4, 2],
+          ['empire', 'corvette', 4, 2, 2],
+          ['empire', 'destroyer', 4, 6, 1],
+          ['alliance', 'battleship', 10, 4, 2],
+          ['alliance', 'heavy', 9, 3, 2],
+          ['alliance', 'heavy', 9, 5, 2],
+          ['alliance', 'light', 8, 4, 2],
+          ['alliance', 'missile', 11, 3, 1],
+          ['alliance', 'beam', 11, 5, 2],
+          ['alliance', 'corvette', 8, 2, 1],
+          ['alliance', 'corvette', 8, 6, 1],
+          ['alliance', 'frigate', 10, 2, 1],
+          ['alliance', 'destroyer', 10, 6, 1],
+          ['alliance', 'heavy', 11, 4, 1],
+        ],
+        economy: { empire: [200, 80], alliance: [180, 70] },
+      },
+    },
+    corridor_e: {
+      name: 'Battle of the Corridor',
+      side: 'empire',
+      year: 'UC 491 · RC 800',
+      cols: 13,
+      rows: 9,
+      desc: 'UC 491. Yang holds the Iserlohn corridor with the last free fleet. Break through and destroy Hyperion.',
+      objective: { type: 'kill', admiral: 'yang', turns: 18, stars: [11, 15] },
+      win: 'Hyperion is destroyed. The corridor belongs to the Empire.',
+      timeout: 'Yang held the corridor. The campaign stalls.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['empire', 'alliance'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Imperial Front', 0, 4, 'empire', 3, true, false],
+          ['Iserlohn', 11, 4, 'alliance', 3, false, true],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['empire', 'flagship', 1, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 2, 3, 2, 'mittermeyer'],
+          ['empire', 'battleship', 2, 5, 2, 'reuenthal'],
+          ['empire', 'battleship', 3, 4, 1],
+          ['empire', 'heavy', 3, 2, 2],
+          ['empire', 'heavy', 3, 6, 2],
+          ['empire', 'siege', 1, 3, 1],
+          ['empire', 'siege', 1, 5, 1],
+          ['empire', 'missile', 2, 7, 1],
+          ['empire', 'light', 4, 3, 2],
+          ['empire', 'light', 4, 5, 2],
+          ['empire', 'corvette', 4, 1, 2],
+          ['empire', 'destroyer', 4, 7, 1],
+          ['alliance', 'flagship', 10, 4, 1, 'yang'],
+          ['alliance', 'heavy', 9, 3, 2, 'attenborough'],
+          ['alliance', 'light', 9, 5, 2, 'fischer'],
+          ['alliance', 'frigate', 10, 5, 2, 'schonkopf'],
+          ['alliance', 'heavy', 10, 3, 1],
+          ['alliance', 'beam', 11, 3, 2],
+          ['alliance', 'missile', 11, 5, 1],
+          ['alliance', 'corvette', 8, 4, 2],
+          ['alliance', 'destroyer', 9, 4, 1],
+          ['alliance', 'battleship', 12, 4, 1],
+        ],
+        economy: { empire: [260, 100], alliance: [160, 60] },
+      },
+    },
+    astarte_a: {
+      name: 'Astarte: The Second Fleet',
+      side: 'alliance',
+      year: 'UC 487 · RC 796',
+      cols: 13,
+      rows: 9,
+      desc: 'RC 796. The 2nd Fleet’s commander is down and Reinhard is closing in. Take command and keep Yang alive until the fleet can withdraw.',
+      objective: { type: 'survive', admiral: 'yang', turns: 10 },
+      win: 'The 2nd Fleet fought Reinhard to a standstill and withdrew intact.',
+      timeout: 'Yang’s flagship has been destroyed.',
+      layout: {
+        owners: ['alliance', 'empire'],
+        split: 6,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Second Fleet Rally', 0, 4, 'alliance', 1, true, false],
+          ['Imperial Picket', 12, 4, 'empire', 1, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['alliance', 'flagship', 1, 4, 1, 'yang'],
+          ['alliance', 'heavy', 2, 3, 2],
+          ['alliance', 'heavy', 2, 5, 1],
+          ['alliance', 'light', 3, 4, 2],
+          ['alliance', 'beam', 1, 3, 1],
+          ['alliance', 'missile', 1, 5, 1],
+          ['alliance', 'corvette', 3, 2, 1],
+          ['alliance', 'corvette', 3, 6, 1],
+          ['alliance', 'destroyer', 2, 7, 1],
+          ['empire', 'flagship', 10, 4, 1, 'reinhard'],
+          ['empire', 'frigate', 9, 3, 2, 'kircheis'],
+          ['empire', 'heavy', 9, 5, 2],
+          ['empire', 'battleship', 10, 5, 1],
+          ['empire', 'light', 8, 3, 2],
+          ['empire', 'light', 8, 5, 2],
+          ['empire', 'beam', 10, 3, 2],
+          ['empire', 'missile', 11, 4, 1],
+          ['empire', 'corvette', 8, 4, 2],
+          ['empire', 'destroyer', 11, 5, 1],
+        ],
+        economy: { alliance: [120, 40], empire: [180, 70] },
+      },
+    },
+    iserlohn_def: {
+      name: 'Defense of Iserlohn',
+      side: 'alliance',
+      year: 'UC 489 · RC 798',
+      cols: 12,
+      rows: 9,
+      desc: 'RC 798. The Empire has warped the fortress Geiersburg into the corridor. Hold Iserlohn until Yang returns.',
+      objective: { type: 'hold', stations: ['Iserlohn'], turns: 12 },
+      win: 'Iserlohn holds. Geiersburg’s gambit has failed.',
+      timeout: 'Iserlohn has fallen.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['alliance', 'empire'],
+        split: 6,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Iserlohn', 3, 4, 'alliance', 3, false, true],
+          ['Corridor Depot', 0, 1, 'alliance', 1, false, false],
+          ['Geiersburg', 9, 4, 'empire', 3, false, true],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['alliance', 'heavy', 4, 3, 2, 'attenborough'],
+          ['alliance', 'light', 4, 5, 2, 'fischer'],
+          ['alliance', 'frigate', 3, 5, 2, 'schonkopf'],
+          ['alliance', 'heavy', 4, 4, 1],
+          ['alliance', 'beam', 2, 3, 2],
+          ['alliance', 'missile', 2, 5, 1],
+          ['alliance', 'corvette', 5, 4, 2],
+          ['alliance', 'destroyer', 3, 3, 1],
+          ['alliance', 'battleship', 2, 4, 1],
+          ['empire', 'battleship', 8, 3, 2],
+          ['empire', 'heavy', 8, 5, 2],
+          ['empire', 'heavy', 7, 4, 2],
+          ['empire', 'light', 7, 2, 2],
+          ['empire', 'light', 7, 6, 2],
+          ['empire', 'siege', 9, 3, 1],
+          ['empire', 'missile', 9, 5, 1],
+          ['empire', 'beam', 10, 4, 2],
+          ['empire', 'corvette', 6, 4, 2],
+          ['empire', 'frigate', 8, 7, 1],
+          ['empire', 'destroyer', 8, 1, 1],
+        ],
+        economy: { alliance: [180, 70], empire: [220, 90] },
+      },
+    },
+    maradetta: {
+      name: 'Battle of Mar-Adetta',
+      side: 'alliance',
+      year: 'UC 491 · RC 800',
+      cols: 13,
+      rows: 9,
+      desc: 'RC 800. The Alliance’s last fleet stands at Mar-Adetta against Reinhard’s armada. Make the Empire pay for every hex and survive.',
+      objective: { type: 'survive', turns: 12 },
+      win: 'The old guard held. The Empire pays dearly for Mar-Adetta.',
+      timeout: 'The last Alliance fleet is gone.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['alliance', 'empire'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Mar-Adetta', 0, 4, 'alliance', 2, true, false],
+          ['Imperial Grand Fleet', 12, 1, 'empire', 2, false, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['alliance', 'battleship', 1, 4, 2],
+          ['alliance', 'heavy', 2, 3, 2],
+          ['alliance', 'heavy', 2, 5, 2],
+          ['alliance', 'light', 3, 4, 2],
+          ['alliance', 'beam', 1, 3, 1],
+          ['alliance', 'missile', 1, 5, 1],
+          ['alliance', 'corvette', 3, 2, 2],
+          ['alliance', 'corvette', 3, 6, 2],
+          ['alliance', 'destroyer', 2, 7, 1],
+          ['alliance', 'frigate', 2, 1, 1],
+          ['empire', 'flagship', 11, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 10, 3, 2, 'mittermeyer'],
+          ['empire', 'battleship', 10, 5, 2, 'reuenthal'],
+          ['empire', 'heavy', 9, 2, 2],
+          ['empire', 'heavy', 9, 6, 2],
+          ['empire', 'light', 9, 4, 2],
+          ['empire', 'missile', 11, 3, 1],
+          ['empire', 'siege', 11, 5, 1],
+          ['empire', 'beam', 12, 4, 2],
+          ['empire', 'corvette', 8, 3, 2],
+          ['empire', 'corvette', 8, 5, 2],
+          ['empire', 'destroyer', 10, 7, 1],
+        ],
+        economy: { alliance: [150, 60], empire: [220, 90] },
+      },
+    },
+    corridor_a: {
+      name: 'Battle of the Corridor',
+      side: 'alliance',
+      year: 'UC 491 · RC 800',
+      cols: 13,
+      rows: 9,
+      desc: 'RC 800. Reinhard’s whole armada comes for Iserlohn. Hold the fortress and keep the fleet alive.',
+      objective: { type: 'hold', stations: ['Iserlohn'], turns: 14 },
+      win: 'Iserlohn stands. Reinhard agrees to talk.',
+      timeout: 'Iserlohn has fallen.',
+      retired: ['kircheis'],
+      layout: {
+        owners: ['alliance', 'empire'],
+        split: 7,
+        // [name, c, r, owner, tier, capital, fort, shield]
+        stations: [
+          ['Iserlohn', 2, 4, 'alliance', 3, false, true],
+          ['Imperial Front', 12, 1, 'empire', 3, true, false],
+        ],
+        // [side, type, c, r, stack, admiral, art]
+        units: [
+          ['alliance', 'flagship', 3, 4, 1, 'yang'],
+          ['alliance', 'heavy', 3, 3, 2, 'attenborough'],
+          ['alliance', 'light', 3, 5, 2, 'fischer'],
+          ['alliance', 'frigate', 4, 4, 2, 'schonkopf'],
+          ['alliance', 'heavy', 2, 3, 1],
+          ['alliance', 'beam', 1, 3, 2],
+          ['alliance', 'missile', 1, 5, 1],
+          ['alliance', 'battleship', 2, 5, 1],
+          ['alliance', 'corvette', 4, 2, 1],
+          ['alliance', 'destroyer', 4, 6, 1],
+          ['empire', 'flagship', 11, 4, 1, 'reinhard'],
+          ['empire', 'heavy', 10, 3, 2, 'mittermeyer'],
+          ['empire', 'battleship', 10, 5, 2, 'reuenthal'],
+          ['empire', 'battleship', 9, 4, 2],
+          ['empire', 'heavy', 9, 2, 2],
+          ['empire', 'heavy', 9, 6, 2],
+          ['empire', 'siege', 11, 3, 1],
+          ['empire', 'siege', 11, 5, 1],
+          ['empire', 'missile', 12, 4, 1],
+          ['empire', 'light', 8, 3, 2],
+          ['empire', 'light', 8, 5, 2],
+          ['empire', 'corvette', 8, 1, 2],
+          ['empire', 'destroyer', 8, 7, 1],
+        ],
+        economy: { alliance: [200, 80], empire: [260, 100] },
+      },
+    },
+  };
+  // WC4-style campaigns: each side plays its chapters in order; a chapter unlocks when the previous one is won.
+  const CAMPAIGNS = {
+    empire: ['tiamat', 'astarte', 'amritsar_e', 'geiersburg', 'ragnarok_e', 'vermilion_e', 'rantemario', 'corridor_e'],
+    alliance: ['astarte_a', 'iserlohn', 'amritsar', 'iserlohn_def', 'vermilion', 'maradetta', 'corridor_a'],
   };
   // Operation difficulty, as in WC4. Normal is the operation as designed. Hard gives every enemy side all tier I–II
   // HQ research, upgrades every other enemy fleet one class and adds one fleet per four. Challenge gives them all
@@ -2520,7 +3042,7 @@
       mode: era ? 'conquest' : scen,
       era,
       objective: def ? { ...def.objective } : null,
-      retired: (era && ERAS[era].retired) || [],
+      retired: (era && ERAS[era].retired) || def?.retired || [],
       seed,
       cols: def ? def.cols : 17,
       rows: def ? def.rows : 11,
@@ -2641,6 +3163,18 @@
           newUnit(g, 'destroyer', side, mirror(3), 9, 1);
         }
       setEconomy(spec.economy);
+    } else if (def?.layout) {
+      const L = def.layout;
+      g.tiles.forEach(t => (t.owner = t.c < L.split ? L.owners[0] : L.owners[1]));
+      for (const [name, c, r, owner, tier, capital = false, fort = false, shield] of L.stations) {
+        const st = station(name, c, r, owner, tier, capital, fort);
+        if (shield) st.maxShield = st.shield = shield;
+        claim(st, owner);
+      }
+      L.units.forEach(place);
+      g.economy[L.owners[0]] = { credits: 0, industry: 0, science: 0 };
+      g.economy[L.owners[1]] = { credits: 0, industry: 0, science: 0 };
+      setEconomy(L.economy);
     } else if (scen === 'iserlohn') {
       g.tiles.forEach(t => (t.owner = t.c < 4 ? player : enemy));
       station('Forward Base', 1, 4, player, 3, true);
@@ -2947,6 +3481,7 @@
     fireFortress,
     ERAS,
     SCENARIOS,
+    CAMPAIGNS,
     objectiveText,
     modeTitle,
     TYPES,

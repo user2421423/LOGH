@@ -2339,3 +2339,48 @@ button.mini small {
   letter-spacing: 0.08em;
   color: #7cc8ff;
 }
+/* Side campaigns: locked chapters and the separate Conquest picker. */
+.campaign-map button.camp-node.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.camp-node.locked .camp-dot {
+  font-size: 12px;
+  border-style: dashed;
+}
+.camp-node.won .camp-dot {
+  border-color: #c9a24a;
+}
+.camp-launch {
+  margin-top: 10px;
+}
+.conquest-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #798e8180;
+  border-radius: 3px;
+  background: #101c2c99;
+}
+.conquest-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.conquest-row label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.conquest-row button {
+  flex-shrink: 0;
+  margin-bottom: 14px;
+}
+@media (max-width: 700px) {
+  .conquest-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

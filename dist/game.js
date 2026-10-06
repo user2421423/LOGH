@@ -15,7 +15,7 @@ let game = E.createGame('alliance'),
   offset = { x: 0, y: 0 },
   mapSize = { w: 0, h: 0 },
   effects = [],
-  setup = { side: 'alliance', mode: 'conquest', difficulty: 'normal' },
+  setup = { side: 'alliance', mode: 'conquest', difficulty: 'normal', chapter: {}, conquest: 'conquest:frontier' },
   shop = { station: null, branch: 'Escort', stack: 1 },
   lastTime = 0,
   toastTimer,
@@ -103,7 +103,7 @@ function newGame() {
 }
 function startMenu() {
   const saved = getSave();
-  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div>${campaignScreen()}<div class="setup-row"><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select">${Object.entries(
+  modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div>${campaignScreen()}${conquestRow()}<div class="setup-row"><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select">${Object.entries(
     E.DIFFICULTIES,
   )
     .map(
@@ -112,7 +112,7 @@ function startMenu() {
     )
     .join(
       '',
-    )}</select><p class="mode-note">${E.DIFFICULTIES[setup.difficulty]?.desc || ''}</p></div><div class="hq-summary"><span class="label">Command HQ</span><b>${ICONS.use('token', 'cost-ico')} ${loadProfile().tokens || 0} tokens</b><small>${loadProfile().wins || 0} victories · ${Object.values(loadProfile().research || {}).reduce((a, l) => a + l, 0)} research levels</small><button class="small" data-action="research">HQ research</button></div></div><div class="badge-row"><span class="badge">13 fleet classes</span><span class="badge">${Object.keys(E.ADMIRALS).length} admirals · ${Object.values(E.ADMIRALS).filter(a => a.recruit).length} to recruit</span><span class="badge">${Object.keys(E.TECH_NODES).length} HQ technologies</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div><button class="primary" data-action="start">Launch operation</button>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
+    )}</select><p class="mode-note">${E.DIFFICULTIES[setup.difficulty]?.desc || ''}</p></div><div class="hq-summary"><span class="label">Command HQ</span><b>${ICONS.use('token', 'cost-ico')} ${loadProfile().tokens || 0} tokens</b><small>${loadProfile().wins || 0} victories · ${Object.values(loadProfile().research || {}).reduce((a, l) => a + l, 0)} research levels</small><button class="small" data-action="research">HQ research</button></div></div><div class="badge-row"><span class="badge">13 fleet classes</span><span class="badge">${Object.keys(E.ADMIRALS).length} admirals · ${Object.values(E.ADMIRALS).filter(a => a.recruit).length} to recruit</span><span class="badge">${Object.keys(E.TECH_NODES).length} HQ technologies</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
   focusDialog();
 }
 function bestStars() {
@@ -129,80 +129,89 @@ function starKey(mode, difficulty) {
 function starText(n) {
   return '★'.repeat(n) + '☆'.repeat(3 - n);
 }
-// Connected campaign: every operation as a node on one galaxy map, in story order.
-const CAMPAIGN = [
-  { mode: 'astarte', x: 7, y: 70 },
-  { mode: 'iserlohn', x: 18, y: 32 },
-  { mode: 'conquest:frontier', x: 30, y: 66 },
-  { mode: 'amritsar', x: 42, y: 28 },
-  { mode: 'conquest:astarte', x: 53, y: 70 },
-  { mode: 'conquest:amritsar', x: 63, y: 34 },
-  { mode: 'conquest:lippstadt', x: 73, y: 72 },
-  { mode: 'conquest:ragnarok', x: 83, y: 36 },
-  { mode: 'vermilion', x: 93, y: 68 },
-];
-function campaignOp(mode) {
-  const era = String(mode).startsWith('conquest') ? String(mode).split(':')[1] || 'frontier' : null,
-    sc = era ? null : E.SCENARIOS[mode];
-  return {
-    mode: era ? 'conquest:' + era : mode,
-    key: era ? 'conquest:' + era : mode,
-    era,
-    sc,
-    name: era ? E.ERAS[era].name : sc.name,
-    kind: era ? 'Conquest' : 'Scenario',
-    when: era ? E.ERAS[era].year : `${sc.objective.turns} turns`,
-    desc: era ? E.ERAS[era].desc : sc.desc,
-  };
+// WC4-style campaigns: one chapter path per side. A chapter unlocks once the previous chapter is won on any
+// difficulty; Conquest start dates are picked separately from a dropdown.
+function clearedAny(id, profile = loadProfile()) {
+  return Object.keys(E.DIFFICULTIES).some(d => (profile.cleared || {})[`${id}:${d}`]);
+}
+function chapterUnlocked(side, i, profile = loadProfile()) {
+  return i === 0 || clearedAny(E.CAMPAIGNS[side][i - 1], profile);
 }
 // Tokens still on offer for a first victory at this difficulty (before banked research).
-function campaignReward(op, difficulty, profile) {
-  if ((profile.cleared || {})[`${op.key}:${difficulty}`]) return 0;
+function campaignReward(key, conquest, difficulty, profile) {
+  if ((profile.cleared || {})[`${key}:${difficulty}`]) return 0;
   const scale = E.DIFFICULTIES[difficulty]?.tokens || 1,
     t = E.TOKEN_REWARD;
-  return Math.round((t.victory + (op.era ? t.conquest : t.star * 3)) * scale) + (profile.wins || 0 ? 0 : t.first);
+  return Math.round((t.victory + (conquest ? t.conquest : t.star * 3)) * scale) + (profile.wins || 0 ? 0 : t.first);
+}
+function objectiveFor(id, side) {
+  return E.objectiveText({ mode: id, objective: E.SCENARIOS[id].objective, player: side });
 }
 function campaignScreen() {
   const profile = loadProfile(),
-    cleared = profile.cleared || {},
-    best = bestStars(),
+    side = setup.side,
     diff = setup.difficulty,
-    ops = CAMPAIGN.map(n => ({ ...n, ...campaignOp(n.mode) })),
-    done = (op, d = diff) => !!cleared[`${op.key}:${d}`],
+    best = bestStars(),
+    ids = E.CAMPAIGNS[side],
+    done = (id, d = diff) => !!(profile.cleared || {})[`${id}:${d}`],
     levels = Object.keys(E.DIFFICULTIES),
     nextLevel = levels[levels.indexOf(diff) + 1],
-    recommended = ops.find(op => !done(op)) || null,
-    selectedMode = setup.mode === 'conquest' ? 'conquest:frontier' : setup.mode,
-    sel = ops.find(op => op.mode === selectedMode) || recommended || ops[0],
-    stars = op => (op.sc ? best[starKey(op.mode, diff)] || 0 : 0);
-  const path = ops.map(op => `${op.x},${op.y}`).join(' '),
-    trail = ops.filter((op, i) => done(op) && (i === 0 || done(ops[i - 1]))).length,
-    donePath = ops
-      .slice(0, Math.max(0, trail))
-      .map(op => `${op.x},${op.y}`)
+    unlocked = ids.map((id, i) => chapterUnlocked(side, i, profile)),
+    recommended = ids.find((id, i) => unlocked[i] && !done(id)) || null,
+    chosen = setup.chapter?.[side],
+    sel = chosen && unlocked[ids.indexOf(chosen)] ? chosen : recommended || ids[unlocked.lastIndexOf(true)],
+    selIndex = ids.indexOf(sel),
+    stars = id => best[starKey(id, diff)] || 0,
+    pos = i => ({ x: 6 + (88 * i) / Math.max(1, ids.length - 1), y: i % 2 ? 32 : 68 });
+  const path = ids.map((_, i) => `${pos(i).x},${pos(i).y}`).join(' '),
+    trail = ids.findIndex(id => !clearedAny(id, profile)),
+    reached = trail < 0 ? ids.length : trail + 1,
+    donePath = ids
+      .slice(0, reached)
+      .map((_, i) => `${pos(i).x},${pos(i).y}`)
       .join(' ');
-  const nodes = ops
-    .map((op, i) => {
-      const reward = campaignReward(op, diff, profile),
-        cls = [done(op) ? 'done' : '', op === recommended ? 'recommended' : '', op === sel ? 'selected' : ''].join(' ');
-      return `<button class="camp-node ${cls}" style="left:${op.x}%;top:${op.y}%" data-campaign="${op.mode}" aria-label="${esc(op.name)}${done(op) ? ', completed' : ''}${op === recommended ? ', recommended' : ''}"><span class="camp-dot">${done(op) ? '✓' : i + 1}</span><span class="camp-name">${op.name}</span>${op.era ? '<span class="camp-kind">Conquest</span>' : ''}${op.sc ? `<span class="camp-stars">${starText(stars(op))}</span>` : ''}${reward ? `<span class="camp-reward">${ICONS.use('token', 'cost-ico')}${reward}</span>` : ''}${op === recommended ? '<span class="camp-flag">Recommended</span>' : ''}</button>`;
+  const nodes = ids
+    .map((id, i) => {
+      const sc = E.SCENARIOS[id],
+        p = pos(i),
+        reward = unlocked[i] ? campaignReward(id, false, diff, profile) : 0,
+        cls = [
+          done(id) ? 'done' : clearedAny(id, profile) ? 'won' : '',
+          unlocked[i] ? '' : 'locked',
+          id === recommended ? 'recommended' : '',
+          id === sel ? 'selected' : '',
+        ].join(' ');
+      return `<button class="camp-node ${cls}" style="left:${p.x}%;top:${p.y}%" data-campaign="${id}" ${unlocked[i] ? '' : `disabled title="Win chapter ${i} first"`} aria-label="Chapter ${i + 1}: ${esc(sc.name)}${done(id) ? ', completed' : ''}${unlocked[i] ? '' : ', locked'}"><span class="camp-dot">${!unlocked[i] ? '🔒' : done(id) ? '✓' : i + 1}</span><span class="camp-name">${sc.name}</span>${unlocked[i] ? `<span class="camp-stars">${starText(stars(id))}</span>` : ''}${reward ? `<span class="camp-reward">${ICONS.use('token', 'cost-ico')}${reward}</span>` : ''}${id === recommended ? '<span class="camp-flag">Next</span>' : ''}</button>`;
     })
     .join('');
-  const selReward = campaignReward(sel, diff, profile),
+  const sc = E.SCENARIOS[sel],
+    selReward = campaignReward(sel, false, diff, profile),
     pips = levels
       .map(
         d =>
           `<span class="camp-pip ${done(sel, d) ? 'on' : ''}" title="${E.DIFFICULTIES[d].name}${done(sel, d) ? ' cleared' : ''}">${E.DIFFICULTIES[d].name[0]}</span>`,
       )
       .join(''),
-    completed = ops.filter(op => done(op)).length;
-  const brief = `<div class="camp-brief"><span class="label">${sel.kind} · ${sel.when}${sel.sc?.side ? ` · ${E.FACTIONS[sel.sc.side].short} only` : ''}</span><h3>${sel.name}</h3><p>${sel.desc}</p>${sel.sc ? `<p class="camp-objective">${sel.sc.objective.stars ? `★★★ by turn ${sel.sc.objective.stars[0]} · ★★ by turn ${sel.sc.objective.stars[1]}` : '★★★ with 70% of your fleets intact'}</p>` : ''}<div class="camp-meta"><span>Cleared ${pips}</span>${sel.sc ? `<span>Best ${starText(stars(sel))}</span>` : ''}<span>${selReward ? `Reward up to ${ICONS.use('token', 'cost-ico')} <b>${selReward}</b>` : 'Reward claimed at this difficulty'}</span></div></div>`;
+    completed = ids.filter(id => clearedAny(id, profile)).length;
   const advice = recommended
-    ? `Recommended next: <b>${recommended.name}</b>${recommended === sel ? '' : ` <button class="small" data-campaign="${recommended.mode}">Select</button>`}`
+    ? `Next chapter: <b>${E.SCENARIOS[recommended].name}</b>${recommended === sel ? '' : ` <button class="small" data-campaign="${recommended}">Select</button>`}`
     : nextLevel
-      ? `Every operation cleared on ${E.DIFFICULTIES[diff].name}. Try <b>${E.DIFFICULTIES[nextLevel].name}</b> for more command tokens.`
-      : 'Every operation cleared on every difficulty. The galaxy is yours.';
-  return `<div class="campaign"><div class="camp-head"><span class="label">Campaign · ${E.DIFFICULTIES[diff].name}</span><span>${completed} / ${ops.length} operations complete</span></div><div class="campaign-map"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${path}" class="camp-path"/>${donePath.includes(' ') ? `<polyline points="${donePath}" class="camp-path done"/>` : ''}</svg>${nodes}</div><div class="camp-advice">${advice}</div>${brief}<input type="hidden" id="mode-select" value="${sel.mode}"></div>`;
+      ? `Campaign complete on ${E.DIFFICULTIES[diff].name}. Replay it on <b>${E.DIFFICULTIES[nextLevel].name}</b> for more command tokens.`
+      : 'Campaign complete on every difficulty.';
+  return `<div class="campaign"><div class="camp-head"><span class="label">${E.FACTIONS[side].name} campaign · ${E.DIFFICULTIES[diff].name}</span><span>${completed} / ${ids.length} chapters won</span></div><div class="campaign-map"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${path}" class="camp-path"/>${reached > 1 ? `<polyline points="${donePath}" class="camp-path done"/>` : ''}</svg>${nodes}</div><div class="camp-advice">${advice}</div><div class="camp-brief"><span class="label">Chapter ${selIndex + 1} of ${ids.length} · ${sc.year || ''} · ${sc.objective.turns} turns</span><h3>${sc.name}</h3><p>${sc.desc}</p><p class="camp-objective">${objectiveFor(sel, side)}</p><div class="camp-meta"><span>Cleared ${pips}</span><span>Best ${starText(stars(sel))}</span><span>${selReward ? `Reward up to ${ICONS.use('token', 'cost-ico')} <b>${selReward}</b>` : 'Reward claimed at this difficulty'}</span></div><div class="camp-launch"><button class="primary" data-action="start-chapter" data-chapter="${sel}">Launch chapter ${selIndex + 1}</button></div></div><input type="hidden" id="mode-select" value="${sel}"></div>`;
+}
+function conquestRow() {
+  const profile = loadProfile(),
+    pick = String(setup.conquest || 'conquest:frontier'),
+    era = pick.split(':')[1] || 'frontier',
+    reward = campaignReward('conquest:' + era, true, setup.difficulty, profile);
+  return `<div class="conquest-row"><div><label for="conquest-select">Conquest · 17 × 11 galaxy</label><select class="select" id="conquest-select">${Object.entries(
+    E.ERAS,
+  )
+    .map(([k, e]) => `<option value="conquest:${k}" ${era === k ? 'selected' : ''}>${e.name} · ${e.year}</option>`)
+    .join(
+      '',
+    )}</select><p class="mode-note">${E.ERAS[era].desc} Played as the ${E.FACTIONS[setup.side].name}.${reward ? ` First win: up to ${reward} command tokens.` : ''}</p></div><button data-action="start-conquest">Launch conquest</button></div>`;
 }
 function render() {
   const mapFocused = !!canvas && document.activeElement === canvas;
@@ -730,7 +739,7 @@ function archiveDialog(branch = 'Escort') {
   focusDialog();
 }
 function helpDialog() {
-  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Field manual"><div class="dialog-head"><div><div class="eyebrow">Field manual</div><h2>War on a hex grid</h2></div><button class="small close" data-action="help-close">Close</button></div><div class="help-grid"><div><b>Movement & firing</b><p>Every fleet can move once, then attack once per turn. Attacking spends its movement too. Select a fleet, click a green hex to move, and click a red hex to attack at once; hover a red hex to see the expected damage. Undo (Z) returns a fleet that moved but has not fired.</p></div><div><b>Capture stations</b><p>Destroy station defenses and remove its garrison, then move an Escort or Battle Line fleet onto the hex. Artillery cannot capture. Friendly stations produce resources and repair garrisons by 8% HP each turn.</p></div><div><b>Artillery & counter-fire</b><p>Artillery Frigates fire at range 1. Artillery Cruisers and Siege Cannons fire at exactly 2 hexes and cannot hit adjacent targets, so screen them with escorts. Artillery Cruisers splash enemies next to the target for 45% damage; Siege Cannons deal +100% station damage. All artillery attacks suppress enemy counter-fire. Escorts and Battle Line hulls exchange counter-fire when in range. Only Battleships and Dreadnoughts have range 2 in the Battle Line; all escorts and other cruisers have range 1.</p></div><div><b>Stacking & breakthroughs</b><p>Build 1–3-stack fleets. Each extra stack adds 70% HP and 45% attack. Add stacks near friendly stations. Battle Line kills refresh movement and fire once per turn; Mittermeyer and Attenborough allow two refreshes.</p></div><div><b>Admirals & morale</b><p>Attach officers to any fleet. Each admiral has one signature ability and branch ratings (up to 6 stars) that raise damage and cut damage taken for that branch. Click any portrait for General Info: command tokens buy stars and promote admirals through eleven naval ranks, Ensign to Fleet Admiral, raising their fleet's hull from 112% to 160%. Records carry into every mode. Twenty-two more admirals (Bittenfeld, Müller, Bucock, Poplin and others) can be recruited once with command tokens (300 for four-star, 200 for three-star) from the Admirals menu, then assigned in any operation. High morale grants +25% damage; low −25%, diminished −50%. Confused fleets cannot act or retaliate. Two adjacent enemies lower morale; three diminish it. Yang’s Confusion reduces nearby enemy morale by 2.</p></div><div><b>Terrain & supply</b><p>Nebulae cost 2 movement and cause 2.5% attrition each turn. Asteroids cost 2 movement and reduce damage by 15%. Yang ignores terrain movement costs. Gravity rifts are impassable. Capture the three crossings to invade the other side.</p></div><div><b>Shipyards</b><p>Each station builds one fleet per turn. New units act next turn. Upgrade yards through tier 3 to unlock heavy hulls. Artillery unlocks in order: Artillery Frigates at tier 1, Artillery Cruisers at tier 2, Siege Cannons at tier 3.</p></div><div><b>HQ research & command tokens</b><p>As in World Conqueror 4, technology is researched at Command HQ with command tokens and is kept across every operation and side. The first victory in each operation at each difficulty earns tokens: 250, plus 50 per star (150 for a Conquest) and 1 per 5 research banked, ×1.5 on Hard and ×2 on Challenge, with 150 extra for your first win ever. Replays pay nothing. Five trees (Escort, Battle Line, Artillery, Aerospace, Stations) hold weapons, armor, hull, engine and class-ability upgrades. Higher tiers open after 2, 4 and 7 operations won.</p></div><div><b>Difficulty</b><p>Every operation has three difficulties. Normal is the operation as designed. Hard gives the enemy all tier I–II research, upgrades half of their fleets one class (an escort becomes a light cruiser, a cruiser a heavier hull) and adds a fleet for every four. Challenge gives them every technology, upgrades every fleet and adds a stack, adds a fleet for every two, and raises their income 25%. Enemy admirals also start one or two ranks higher.</p></div><div><b>Fortresses & Thor's Hammer</b><p>Iserlohn and Geiersburg carry main guns. Select your fortress and click a red hex to fire at an enemy fleet within 3 hexes for 40% of its hull and a morale hit. The gun then recharges for 2 turns and is silenced while the fortress shields are down. The enemy fires its fortresses the same way.</p></div><div><b>Station buildings</b><p>Every station has a Shipyard (unlocks larger hulls, +10 industry per level), a Research station (+8 research per level; research banked when you win becomes command tokens) and an Air base (air wings). Each upgrades to level 3 from the station panel.</p></div><div><b>Air wings</b><p>Air bases build Fighter wings (level 1), Bomber wings (level 2) and Strategic Bomber wings (level 3). Air wings ignore terrain and cannot capture. Fighters deal +60% to air, bombers +40% to Battle Line and Artillery hulls, strategic bombers +120% to station defenses. Only escorts and fighters return fire against air wings, escorts deal +50% to them, and artillery cannot target them. Wings lose 10% hull each turn they start more than 3 hexes from a friendly air base.</p></div><div><b>Start dates & scenarios</b><p>Conquest offers the standard frontier plus four start dates: Astarte, the Amritsar offensive, the Lippstadt War (rebel stations and garrisons on both sides) and Operation Ragnarök. Scenarios have one objective, a turn limit and a 1–3 star rating; your best rating is shown in the operation list.</p></div><div><b>Economy</b><p>A turn's income buys roughly one cruiser. Escorts give the most firepower per credit; flagships are the strongest ships per hex but cost about two turns of income. Extra stacks cost 85% of a hull, reinforcing in the field costs a full hull, and repairs cost a fifth of the fleet's price.</p></div><div><b>Your objectives</b><p>Conquest: hold both capitals, or hold more stations at the 50-turn armistice. Scenarios: complete the objective before the turn limit; finish faster, or with more fleets intact when holding, for more stars.</p></div></div><div class="info-strip">Controls: N cycles ready fleets · Click or Enter on a red hex attacks · Z undoes the last move · Escape clears the selection or closes a menu · Arrow keys move the hex cursor and Enter selects · Drag or WASD pans · Scroll / + / − zooms · 0 fits the map.</div><p style="font-size:12px">Unofficial fan game. Original code and alternate-history scenarios, using the requested ship-class mappings. Gameplay draws on <a href="https://apps.apple.com/sg/app/world-conqueror-4/id1258468290" target="_blank" rel="noopener noreferrer">EasyTech’s World Conqueror 4</a>; <a href="https://world-conqueror-4.fandom.com/wiki/Units" target="_blank" rel="noopener noreferrer">unit reference</a>. Numbers and some abilities are adapted for this game.</p></section></div>`;
+  modal.innerHTML = `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-label="Field manual"><div class="dialog-head"><div><div class="eyebrow">Field manual</div><h2>War on a hex grid</h2></div><button class="small close" data-action="help-close">Close</button></div><div class="help-grid"><div><b>Movement & firing</b><p>Every fleet can move once, then attack once per turn. Attacking spends its movement too. Select a fleet, click a green hex to move, and click a red hex to attack at once; hover a red hex to see the expected damage. Undo (Z) returns a fleet that moved but has not fired.</p></div><div><b>Capture stations</b><p>Destroy station defenses and remove its garrison, then move an Escort or Battle Line fleet onto the hex. Artillery cannot capture. Friendly stations produce resources and repair garrisons by 8% HP each turn.</p></div><div><b>Artillery & counter-fire</b><p>Artillery Frigates fire at range 1. Artillery Cruisers and Siege Cannons fire at exactly 2 hexes and cannot hit adjacent targets, so screen them with escorts. Artillery Cruisers splash enemies next to the target for 45% damage; Siege Cannons deal +100% station damage. All artillery attacks suppress enemy counter-fire. Escorts and Battle Line hulls exchange counter-fire when in range. Only Battleships and Dreadnoughts have range 2 in the Battle Line; all escorts and other cruisers have range 1.</p></div><div><b>Stacking & breakthroughs</b><p>Build 1–3-stack fleets. Each extra stack adds 70% HP and 45% attack. Add stacks near friendly stations. Battle Line kills refresh movement and fire once per turn; Mittermeyer and Attenborough allow two refreshes.</p></div><div><b>Admirals & morale</b><p>Attach officers to any fleet. Each admiral has one signature ability and branch ratings (up to 6 stars) that raise damage and cut damage taken for that branch. Click any portrait for General Info: command tokens buy stars and promote admirals through eleven naval ranks, Ensign to Fleet Admiral, raising their fleet's hull from 112% to 160%. Records carry into every mode. Twenty-two more admirals (Bittenfeld, Müller, Bucock, Poplin and others) can be recruited once with command tokens (300 for four-star, 200 for three-star) from the Admirals menu, then assigned in any operation. High morale grants +25% damage; low −25%, diminished −50%. Confused fleets cannot act or retaliate. Two adjacent enemies lower morale; three diminish it. Yang’s Confusion reduces nearby enemy morale by 2.</p></div><div><b>Terrain & supply</b><p>Nebulae cost 2 movement and cause 2.5% attrition each turn. Asteroids cost 2 movement and reduce damage by 15%. Yang ignores terrain movement costs. Gravity rifts are impassable. Capture the three crossings to invade the other side.</p></div><div><b>Shipyards</b><p>Each station builds one fleet per turn. New units act next turn. Upgrade yards through tier 3 to unlock heavy hulls. Artillery unlocks in order: Artillery Frigates at tier 1, Artillery Cruisers at tier 2, Siege Cannons at tier 3.</p></div><div><b>HQ research & command tokens</b><p>As in World Conqueror 4, technology is researched at Command HQ with command tokens and is kept across every operation and side. The first victory in each operation at each difficulty earns tokens: 250, plus 50 per star (150 for a Conquest) and 1 per 5 research banked, ×1.5 on Hard and ×2 on Challenge, with 150 extra for your first win ever. Replays pay nothing. Five trees (Escort, Battle Line, Artillery, Aerospace, Stations) hold weapons, armor, hull, engine and class-ability upgrades. Higher tiers open after 2, 4 and 7 operations won.</p></div><div><b>Difficulty</b><p>Every operation has three difficulties. Normal is the operation as designed. Hard gives the enemy all tier I–II research, upgrades half of their fleets one class (an escort becomes a light cruiser, a cruiser a heavier hull) and adds a fleet for every four. Challenge gives them every technology, upgrades every fleet and adds a stack, adds a fleet for every two, and raises their income 25%. Enemy admirals also start one or two ranks higher.</p></div><div><b>Fortresses & Thor's Hammer</b><p>Iserlohn and Geiersburg carry main guns. Select your fortress and click a red hex to fire at an enemy fleet within 3 hexes for 40% of its hull and a morale hit. The gun then recharges for 2 turns and is silenced while the fortress shields are down. The enemy fires its fortresses the same way.</p></div><div><b>Station buildings</b><p>Every station has a Shipyard (unlocks larger hulls, +10 industry per level), a Research station (+8 research per level; research banked when you win becomes command tokens) and an Air base (air wings). Each upgrades to level 3 from the station panel.</p></div><div><b>Air wings</b><p>Air bases build Fighter wings (level 1), Bomber wings (level 2) and Strategic Bomber wings (level 3). Air wings ignore terrain and cannot capture. Fighters deal +60% to air, bombers +40% to Battle Line and Artillery hulls, strategic bombers +120% to station defenses. Only escorts and fighters return fire against air wings, escorts deal +50% to them, and artillery cannot target them. Wings lose 10% hull each turn they start more than 3 hexes from a friendly air base.</p></div><div><b>Campaigns & Conquest</b><p>Each side has its own campaign, played chapter by chapter as in World Conqueror 4: a chapter unlocks when you win the one before it. Empire: Tiamat, Astarte, Amritsar, the Eighth Battle of Iserlohn, Operation Ragnarök, Vermilion, Rantemario and the Corridor. Alliance: Astarte, the Seventh Battle of Iserlohn, Amritsar, the Defense of Iserlohn, Vermilion, Mar-Adetta and the Corridor. Each chapter has one objective, a turn limit and a 1–3 star rating. Conquest start dates (the frontier, Astarte, Amritsar, Lippstadt, Ragnarök) are picked from the dropdown and are always open.</p></div><div><b>Economy</b><p>A turn's income buys roughly one cruiser. Escorts give the most firepower per credit; flagships are the strongest ships per hex but cost about two turns of income. Extra stacks cost 85% of a hull, reinforcing in the field costs a full hull, and repairs cost a fifth of the fleet's price.</p></div><div><b>Your objectives</b><p>Conquest: hold both capitals, or hold more stations at the 50-turn armistice. Scenarios: complete the objective before the turn limit; finish faster, or with more fleets intact when holding, for more stars.</p></div></div><div class="info-strip">Controls: N cycles ready fleets · Click or Enter on a red hex attacks · Z undoes the last move · Escape clears the selection or closes a menu · Arrow keys move the hex cursor and Enter selects · Drag or WASD pans · Scroll / + / − zooms · 0 fits the map.</div><p style="font-size:12px">Unofficial fan game. Original code and alternate-history scenarios, using the requested ship-class mappings. Gameplay draws on <a href="https://apps.apple.com/sg/app/world-conqueror-4/id1258468290" target="_blank" rel="noopener noreferrer">EasyTech’s World Conqueror 4</a>; <a href="https://world-conqueror-4.fandom.com/wiki/Units" target="_blank" rel="noopener noreferrer">unit reference</a>. Numbers and some abilities are adapted for this game.</p></section></div>`;
   focusDialog();
 }
 function menuDialog() {
@@ -1061,6 +1070,11 @@ document.addEventListener('change', e => {
     startMenu();
     $('mode-select')?.focus();
   }
+  if (id === 'conquest-select') {
+    setup.conquest = e.target.value;
+    startMenu();
+    $('conquest-select')?.focus();
+  }
   if (id === 'difficulty-select') {
     setup.difficulty = e.target.value;
     setup.mode = $('mode-select').value;
@@ -1084,9 +1098,7 @@ document.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (d.campaign) {
-    setup.mode = d.campaign;
-    const sc = E.SCENARIOS[d.campaign];
-    if (sc?.side) setup.side = sc.side;
+    (setup.chapter ||= {})[setup.side] = d.campaign;
     startMenu();
     return;
   }
@@ -1211,6 +1223,23 @@ document.addEventListener('click', e => {
       break;
     case 'start':
       setup.mode = $('mode-select').value;
+      newGame();
+      break;
+    case 'start-chapter': {
+      const side = E.SCENARIOS[d.chapter]?.side,
+        i = E.CAMPAIGNS[side]?.indexOf(d.chapter);
+      if (i == null || i < 0 || !chapterUnlocked(side, i)) {
+        toast('Win the previous chapter first.');
+        break;
+      }
+      setup.side = side;
+      setup.mode = d.chapter;
+      newGame();
+      break;
+    }
+    case 'start-conquest':
+      setup.conquest = $('conquest-select').value;
+      setup.mode = setup.conquest;
       newGame();
       break;
     case 'continue': {

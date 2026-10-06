@@ -736,3 +736,23 @@ test('Air supply covers hexes within range of a friendly air base, and Carrier O
   g.tech.alliance['air.carrier'] = 1;
   assert(E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
 });
+test('Each side has a campaign of its own scenarios, every chapter legal for that side', () => {
+  assert.equal(E.CAMPAIGNS.empire.length, 8);
+  assert.equal(E.CAMPAIGNS.alliance.length, 7);
+  for (const [side, ids] of Object.entries(E.CAMPAIGNS))
+    for (const id of ids) {
+      assert.equal(E.SCENARIOS[id].side, side, id);
+      for (const level of ['normal', 'challenge']) {
+        const g = E.createGame(side === 'empire' ? 'alliance' : 'empire', level, id, 9);
+        assert.equal(g.player, side);
+        assert.equal(E.checkVictory(g), null, id);
+      }
+    }
+  const s = E.createGame('alliance', 'normal', 'astarte_a', 4);
+  s.turn = 11;
+  assert.equal(E.checkVictory(s).winner, 'alliance');
+  const dead = E.createGame('alliance', 'normal', 'astarte_a', 4);
+  dead.units.find(u => u.admiral === 'yang').hp = 0;
+  assert.equal(E.checkVictory(dead).winner, 'empire');
+  assert(E.createGame('empire', 'normal', 'rantemario', 4).retired.includes('kircheis'));
+});
