@@ -3331,23 +3331,11 @@
         if (owner === 'neutral' && g.rules?.rebelShield)
           s.maxShield = s.shield = Math.round(s.maxShield * g.rules.rebelShield);
       }
-      if (spec.units) spec.units.forEach(place);
-      if (g.rules?.morale)
-        for (const u of g.units)
-          if (u.side === g.rules.morale.side) u.morale = g.rules.morale.value;
-          else
-            for (const side of ['empire', 'alliance']) {
-              const mirror = c => (side === 'empire' ? c : 16 - c);
-              newUnit(g, 'flagship', side, mirror(4), 5, 1, side === 'empire' ? 'reinhard' : 'yang');
-              newUnit(g, 'heavy', side, mirror(5), 3, 2, side === 'empire' ? 'mittermeyer' : 'attenborough');
-              newUnit(g, 'light', side, mirror(5), 7, 2);
-              newUnit(g, 'beam', side, mirror(4), 4, 2);
-              newUnit(g, 'siege', side, mirror(5), 1, 1);
-              newUnit(g, 'missile', side, mirror(3), 6, 1);
-              newUnit(g, 'frigate', side, mirror(6), 2, 1);
-              newUnit(g, 'corvette', side, mirror(6), 8, 2);
-              newUnit(g, 'destroyer', side, mirror(3), 9, 1);
-            }
+      spec.units.forEach(place);
+      // Astarte: the Imperial fleets open the battle with high morale.
+      if (g.rules?.morale) {
+        for (const u of g.units) if (u.side === g.rules.morale.side) u.morale = g.rules.morale.value;
+      }
       setEconomy(spec.economy);
     } else if (def?.layout) {
       const L = def.layout;

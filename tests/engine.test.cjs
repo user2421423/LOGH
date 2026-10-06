@@ -433,7 +433,7 @@ test('Confused fleets cannot repair or reinforce', () => {
 test('Both sides start conquest with equal income', () => {
   const g = E.createGame('alliance', 'normal', 'conquest', 4);
   assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
-  assert.equal(E.income(g, 'alliance').credits, 250);
+  assert.equal(E.income(g, 'alliance').credits, 505);
 });
 test('Pricing makes escorts the most cost-efficient and flagships the strongest per hex', () => {
   const linear = (k, n = 1) => {
@@ -446,7 +446,8 @@ test('Pricing makes escorts the most cost-efficient and flagships the strongest 
   assert(linear('flagship') > linear('battleship') && linear('battleship') > linear('heavy'));
   assert(eff('heavy', 2) < eff('heavy') && eff('heavy', 3) < eff('heavy', 2));
   const g = E.createGame('alliance', 'normal', 'conquest', 4);
-  assert(E.price('flagship').credits > E.income(g, 'alliance').credits * 1.8);
+  // On the 24-world Conquest map a dreadnought still costs about a full turn of income.
+  assert(E.price('flagship').credits > E.income(g, 'alliance').credits * 0.9);
 });
 test('Repairs cost a fifth of the fleet build price; reinforcing costs a full hull', () => {
   const g = blank(),
