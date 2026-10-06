@@ -41,6 +41,8 @@ function toast(text) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3500);
 }
+// The admiral whose General Info card is open, so officer orders can refresh it.
+let generalOpen = null;
 const PROFILE_KEY = 'galactic-command-officers';
 function loadProfile() {
   try {
@@ -79,6 +81,7 @@ function focusDialog() {
   setTimeout(() => modal.querySelector('button:not(:disabled),select')?.focus(), 15);
 }
 function closeModal() {
+  generalOpen = null;
   modal.innerHTML = '';
   canvas?.focus({ preventScroll: true });
 }
@@ -541,11 +544,66 @@ function researchDialog(branch = researchBranch) {
 function ratingStars(n) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
+// A clickable portrait: opens the WC4-style General Info card for that admiral.
+function generalPortrait(k, cls = '') {
+  return ART.portrait(k, cls).replace(
+    '<span ',
+    `<span data-general="${k}" role="button" tabindex="0" title="${esc(E.ADMIRALS[k].name)}: general info" `,
+  );
+}
+const SKILL_GLYPHS = { gunnery: '⌖', bulwark: '⛨', maneuver: '➤', command: '✦', logistics: '✚', tactics: '♞' };
+const BRANCH_ICONS = { escort: 'destroyer', line: 'battleship', artillery: 'siege', air: 'fighter' };
+// General Info: portrait, rank, hull bonus and medals on the left; branch star ratings and skill badges on the right.
+function generalDialog(k) {
+  const a = E.ADMIRALS[k],
+    o = E.officer(game, k),
+    own = a.side === game.player,
+    next = E.RANK_XP[o.rank + 1],
+    pct = next != null ? Math.min(100, ((o.xp - E.RANK_XP[o.rank]) / (next - E.RANK_XP[o.rank])) * 100) : 100,
+    slots = E.medalSlots(o),
+    inventory = own ? game.medalInventory || [] : [],
+    fleet = game.units.find(u => u.hp > 0 && u.admiral === k),
+    canPromote = own && !E.promoteReason(game, k),
+    stars = n => Array.from({ length: 5 }, (_, i) => `<i class="${i < n ? 'on' : ''}">★</i>`).join('');
+  generalOpen = k;
+  const ratings = Object.entries(E.BRANCH_NAMES)
+    .map(
+      ([b, name]) =>
+        `<div class="gi-rating" title="${name}: ${o.ratings[b]} of 5 stars. Each star above 3 adds 4% damage and cuts damage taken 3% in this branch."><span class="gi-badge">${ART.ship(BRANCH_ICONS[b], '', a.side)}</span><span class="gi-name">${name}</span><span class="gi-stars">${stars(o.ratings[b])}</span>${own && o.points && o.ratings[b] < 5 ? act(`data-rate="${b}" data-officer="${k}"`, '+', E.rateReason(game, k, b), '', 'small mini') : ''}</div>`,
+    )
+    .join('');
+  const skills = Object.entries(E.SKILLS)
+    .map(([id, sk]) => {
+      const l = o.skills[id] || 0;
+      return `<div class="gi-skill ${l ? 'learned' : ''}" title="${esc(sk.name)}: ${esc(sk.desc)}"><span class="gi-emblem">${SKILL_GLYPHS[id]}</span><b>Lv ${l}</b><small>${sk.name}</small>${own && o.points && l < 3 ? act(`data-learn="${id}" data-officer="${k}"`, '+', E.learnReason(game, k, id), '', 'small mini') : ''}</div>`;
+    })
+    .join('');
+  const ribbons = Array.from({ length: 3 }, (_, i) => {
+    const m = o.medals[i];
+    if (m)
+      return `<span class="gi-ribbon ${m}" title="${E.MEDALS[m].name}: ${E.MEDALS[m].desc}${own ? ' (click to remove)' : ''}">${own ? `<button class="gi-ribbon-hit" data-unequip="${m}" data-officer="${k}" aria-label="Remove ${E.MEDALS[m].name}"></button>` : ''}</span>`;
+    if (i >= slots) return `<span class="gi-slot locked" title="Unlocks at ${E.RANKS[i * 2]}">🔒</span>`;
+    return `<span class="gi-slot" title="Empty medal slot">+</span>`;
+  }).join('');
+  const wearable = [...new Set(inventory)]
+    .map(id =>
+      act(
+        `data-equip="${id}" data-officer="${k}"`,
+        `Wear ${E.MEDALS[id].name}`,
+        E.equipReason(game, k, id),
+        E.MEDALS[id].desc,
+        'small',
+      ),
+    )
+    .join('');
+  modal.innerHTML = `<div class="overlay"><section class="dialog wide general-info ${a.side}" role="dialog" aria-modal="true" aria-label="General info"><div class="gi-head"><button class="small close" data-action="general-close" aria-label="Close">✕</button><h2>General Info</h2></div><div class="gi-body"><div class="gi-left"><div class="gi-nameplate"><span class="gi-stars-top">${'★'.repeat(a.stars)}</span><b>${a.name}</b></div><div class="gi-portrait">${ART.portrait(k, 'gi-portrait-art')}<div class="gi-ribbons">${ribbons}</div></div><div class="gi-rank">${own && canPromote ? `<button class="gi-promote" data-promote="${k}" title="Promote to ${E.RANKS[o.rank + 1]}">` : '<div class="gi-rank-line">'}<span class="gi-insignia">${'✦'.repeat(o.rank + 1)}</span><span>${E.RANKS[o.rank]}</span>${canPromote ? '<span class="gi-up">▲</span>' : ''}${own && canPromote ? '</button>' : '</div>'}<div class="gi-rank-line"><span class="gi-heart">❤</span><span>${Math.round(100 + 6 * o.rank)}% fleet hull</span></div></div></div><div class="gi-right"><div class="gi-ratings">${ratings}</div><div class="gi-ability"><span class="label">${a.skill}</span><p>${a.desc}</p><small>Command aura ${1 + (o.skills.command || 0)} hex${o.skills.command ? 'es' : ''} · ${a.role} specialist${fleet ? ` · Commanding ${E.TYPES[fleet.type].short} ×${fleet.stack}` : ''}${game.missionKills?.[k] ? ` · ${game.missionKills[k]} kills this operation` : ''}</small></div><div class="gi-skills">${skills}</div><div class="gi-xp"><div class="bar"><i style="width:${pct}%"></i></div><small>XP ${o.xp}${next != null ? ` / ${next} for ${E.RANKS[o.rank + 1]}` : ' · highest rank'}${own ? ` · ${o.points} skill point${o.points === 1 ? '' : 's'}` : ''}</small></div></div></div>${own ? `<div class="gi-foot">${wearable ? `<div class="gi-wear"><span class="label">Medal case</span>${wearable}</div>` : ''}<div class="gi-actions">${o.rank < E.RANKS.length - 1 ? act(`data-promote="${k}"`, `Promote to ${E.RANKS[o.rank + 1]}`, E.promoteReason(game, k), `${costHTML(E.promoteCost(o))} · +6% hull · +1 skill point`, 'small') : ''}<button class="small" data-action="admirals">All admirals</button></div></div>` : `<p class="description gi-enemy">Enemy officer · ${E.FACTIONS[a.side].name}. Ratings, skills and medals shown as of this operation.</p>`}</section></div>`;
+  focusDialog();
+}
 function admiralCard(k) {
   const a = E.ADMIRALS[k],
     o = E.officer(game, k),
     next = E.RANK_XP[o.rank + 1];
-  return `<div class="admiral-card">${ART.portrait(k)}<b>${E.RANKS[o.rank]} ${a.name}</b><p>${a.skill} · ${a.desc}</p><p class="officer-line">XP ${o.xp}${next != null ? ' / ' + next : ''} · ${Object.entries(
+  return `<div class="admiral-card">${generalPortrait(k)}<b>${E.RANKS[o.rank]} ${a.name}</b><p>${a.skill} · ${a.desc}</p><p class="officer-line">XP ${o.xp}${next != null ? ' / ' + next : ''} · ${Object.entries(
     E.BRANCH_NAMES,
   )
     .map(([b, name]) => `${name} ${o.ratings[b]}★`)
@@ -553,6 +611,7 @@ function admiralCard(k) {
 }
 function admiralDialog() {
   if (!interactive()) return;
+  generalOpen = null;
   const u = selectedUnit(),
     own = u?.side === game.player ? u : null,
     inventory = game.medalInventory || [],
@@ -610,7 +669,7 @@ function officerCard(k, a, own, counts) {
       ),
     )
     .join('');
-  return `<section class="officer">${ART.portrait(k, 'officer-portrait')}<span class="stars">${'★'.repeat(a.stars)}</span><h3>${a.name}</h3><span class="label">${E.RANKS[o.rank]} · ${a.skill}</span><p>${a.desc}</p><div class="xp"><div class="bar"><i style="width:${pct}%"></i></div><small>XP ${o.xp}${next != null ? ' / ' + next + ' for ' + E.RANKS[o.rank + 1] : ' · highest rank'} · ${o.points} skill point${o.points === 1 ? '' : 's'}</small></div><div class="ratings">${ratings}</div><div class="skills">${skills}</div><div class="medals"><span class="label">Medals ${o.medals.length}/${slots}</span>${worn}${equip}</div><div class="officer-actions">${act(`data-promote="${k}"`, o.rank >= E.RANKS.length - 1 ? 'Highest rank' : `Promote to ${E.RANKS[o.rank + 1]}`, o.rank >= E.RANKS.length - 1 ? 'Highest rank reached' : E.promoteReason(game, k), costHTML(E.promoteCost(o)))}${act(`data-admiral="${k}"`, 'Assign to selected fleet', E.assignReason(game, own, k), costHTML({ credits: a.cost }))}</div></section>`;
+  return `<section class="officer">${generalPortrait(k, 'officer-portrait')}<span class="stars">${'★'.repeat(a.stars)}</span><h3>${a.name}</h3><span class="label">${E.RANKS[o.rank]} · ${a.skill}</span><p>${a.desc}</p><div class="xp"><div class="bar"><i style="width:${pct}%"></i></div><small>XP ${o.xp}${next != null ? ' / ' + next + ' for ' + E.RANKS[o.rank + 1] : ' · highest rank'} · ${o.points} skill point${o.points === 1 ? '' : 's'}</small></div><div class="ratings">${ratings}</div><div class="skills">${skills}</div><div class="medals"><span class="label">Medals ${o.medals.length}/${slots}</span>${worn}${equip}</div><div class="officer-actions">${act(`data-promote="${k}"`, o.rank >= E.RANKS.length - 1 ? 'Highest rank' : `Promote to ${E.RANKS[o.rank + 1]}`, o.rank >= E.RANKS.length - 1 ? 'Highest rank reached' : E.promoteReason(game, k), costHTML(E.promoteCost(o)))}${act(`data-admiral="${k}"`, 'Assign to selected fleet', E.assignReason(game, own, k), costHTML({ credits: a.cost }))}</div></section>`;
 }
 function archiveDialog(branch = 'Escort') {
   modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Unit archive"><div class="dialog-head"><div><div class="eyebrow">Order of battle</div><h2>The fleet arsenal</h2><p>${E.FACTIONS[game.player].name} hulls. Values shown for one stack.</p></div><button class="small close" data-action="close">Close</button></div><div class="tabs">${['Escort', 'Battle Line', 'Artillery', 'Air'].map(b => `<button data-archive-branch="${b}" class="${b === branch ? 'active' : ''}">${b}</button>`).join('')}</div><div class="cards">${Object.entries(
@@ -657,6 +716,21 @@ function centerOn(p) {
     c = hexCenter(p);
   pan.x += mapSize.w / 2 - (c.x * scale + offset.x);
   pan.y += mapSize.h / 2 - (c.y * scale + offset.y);
+}
+// Admiral portraits float up and to the left of their fleet (see drawAdmiralPin).
+function hitPin(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect(),
+    scale = computeView(),
+    x = (clientX - rect.left - offset.x) / scale,
+    y = (clientY - rect.top - offset.y) / scale,
+    k = Math.min(1.6, Math.max(1, 0.85 / scale));
+  return game.units.find(u => {
+    if (u.hp <= 0 || !u.admiral) return false;
+    const p = animatedPosition(u),
+      dx = x - (p.x - 22),
+      dy = y - (p.y - 40);
+    return Math.abs(dx) <= 15 * k && dy >= -18 * k && dy <= 25 * k;
+  });
 }
 function hitHex(clientX, clientY) {
   const rect = canvas.getBoundingClientRect(),
@@ -775,7 +849,13 @@ function attachMap() {
     }
   };
   canvas.onpointerup = e => {
-    if (pointer && !pointer.dragged) activateHex(hitHex(e.clientX, e.clientY));
+    if (pointer && !pointer.dragged) {
+      // A click on an admiral's map portrait opens their General Info, unless it lands on a move or attack hex.
+      const p = hitHex(e.clientX, e.clientY),
+        pin = hitPin(e.clientX, e.clientY);
+      if (pin && !(p && (targetCache.has(E.key(p)) || readyCache.has(E.key(p))))) generalDialog(pin.admiral);
+      else activateHex(p);
+    }
     pointer = null;
     canvas.style.cursor = 'default';
   };
@@ -940,6 +1020,11 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('click', e => {
+  const portrait = e.target.closest('[data-general]');
+  if (portrait && !e.target.closest('button')) {
+    generalDialog(portrait.dataset.general);
+    return;
+  }
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
@@ -1012,7 +1097,8 @@ document.addEventListener('click', e => {
       undoStack = [];
       render();
       save();
-      admiralDialog();
+      if (generalOpen) generalDialog(generalOpen);
+      else admiralDialog();
       if (d.promote) toast(`${E.ADMIRALS[d.promote].short} promoted to ${E.RANKS[E.officer(game, d.promote).rank]}.`);
     } else toast(r.reason);
     return;
@@ -1091,6 +1177,9 @@ document.addEventListener('click', e => {
       else if (researchBack === 'result') resultDialog();
       else closeModal();
       break;
+    case 'general-close':
+      closeModal();
+      break;
     case 'admirals':
     case 'assign':
       admiralDialog();
@@ -1146,6 +1235,11 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset?.general) {
+    e.preventDefault();
+    generalDialog(e.target.dataset.general);
+    return;
+  }
   if (modal.children.length) {
     if (e.key === 'Tab') {
       const list = [...modal.querySelectorAll('button:not(:disabled),select,a[href]')],
@@ -1259,7 +1353,7 @@ function dockHTML() {
       a = E.ADMIRALS[u.admiral],
       ours = u.side === game.player,
       canUndo = ours && interactive() && undoStack.at(-1)?.unitId === u.id;
-    return `<div class="dock-visual">${ART.ship(u.type, '', artSide(u))}${a ? ART.portrait(u.admiral, 'dock-portrait') : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : u.side === 'alliance' ? 'A' : 'R'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${moraleName(u.morale)}${ours ? ' · ' + fireStatus(u) : ''}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '', 'small', false) : ''}${ours ? act('data-action="wait"', 'Hold position', phaseReason() || (u.attacked ? 'Already fired' : null), '', 'small ghost') : ''}</div>`;
+    return `<div class="dock-visual">${ART.ship(u.type, '', artSide(u))}${a ? generalPortrait(u.admiral, 'dock-portrait') : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : u.side === 'alliance' ? 'A' : 'R'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${moraleName(u.morale)}${ours ? ' · ' + fireStatus(u) : ''}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '', 'small', false) : ''}${ours ? act('data-action="wait"', 'Hold position', phaseReason() || (u.attacked ? 'Already fired' : null), '', 'small ghost') : ''}</div>`;
   }
   if (s) {
     const ours = s.owner === game.player;
