@@ -188,7 +188,8 @@ trimmed to their content and scaled to 900 px wide for the web.
 
 ## Recruitable admiral portraits
 
-The 22 recruitable admirals have no atlas art yet. `ART.portraitSVG` draws a placeholder bust for each
-(faction uniform and cap, hair colour and initials). Official Die Neue These artwork is copyrighted and is
-not bundled; drop licensed or original portraits into a new atlas and map them in `ART.officers` to replace
-the placeholders.
+`dist/assets/portraits/<id>.jpg` (300 × 400) are cropped from the official *Die Neue These* character pages
+(gineiden-anime.com/character.html and character-fpdf.html), used with the copyright permission the project owner
+obtained, for Bittenfeld, Müller, Fahrenheit, Kempff, Eisenach, Oberstein, Wahlen, Lutz, Mecklinger, Kessler,
+Steinmetz, Lennenkampf, Bucock, Merkatz, Cazerne, Poplin, Konev, Murai, Patrichev and Nguyen. Ulanhu and Borodin
+have no official portrait there and keep the drawn placeholder bust from `ART.portraitSVG`.

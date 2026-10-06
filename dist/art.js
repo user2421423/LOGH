@@ -912,7 +912,35 @@ const ART = {
     const name = ['station', 'fortress', 'capital'].includes(type) ? 'fleet' : side;
     return this.svg(name, this.frames[type] ?? 13, extra);
   },
+  // Recruitable admirals with Die Neue These portraits (assets/portraits/<id>.jpg, 300 × 400).
+  photos: [
+    'bittenfeld',
+    'muller',
+    'fahrenheit',
+    'kempff',
+    'eisenach',
+    'oberstein',
+    'wahlen',
+    'lutz',
+    'mecklinger',
+    'kessler',
+    'steinmetz',
+    'lennenkampf',
+    'bucock',
+    'merkatz',
+    'cazerne',
+    'poplin',
+    'konev',
+    'murai',
+    'patrichev',
+    'nguyen',
+  ],
+  photoUrl(admiral) {
+    return `assets/portraits/${admiral}.jpg`;
+  },
   portrait(admiral, extra = '') {
+    if (this.officers[admiral] == null && this.photos.includes(admiral))
+      return `<span class="portrait-art photo ${extra}" aria-hidden="true"><img src="${this.photoUrl(admiral)}" alt="" draggable="false"></span>`;
     if (this.officers[admiral] == null && this.looks[admiral])
       return `<span class="portrait-art generated ${extra}" aria-hidden="true">${this.portraitSVG(admiral)}</span>`;
     return this.svg('portraits', this.officers[admiral] ?? 0, extra);
@@ -957,7 +985,9 @@ const ART = {
     if (typeof Image === 'undefined' || !this.looks[admiral]) return null;
     if (!this.portraitImages[admiral]) {
       const img = new Image();
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(this.portraitSVG(admiral));
+      img.src = this.photos.includes(admiral)
+        ? this.photoUrl(admiral)
+        : 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(this.portraitSVG(admiral));
       this.portraitImages[admiral] = img;
     }
     return this.portraitImages[admiral];

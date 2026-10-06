@@ -1553,8 +1553,11 @@ function drawAdmiralPin(u, p, scale, sel) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   const drawn = ART.officers[u.admiral] == null ? ART.portraitImage(u.admiral) : null;
-  if (drawn?.complete && drawn.naturalWidth) ctx.drawImage(drawn, -w / 2, -h / 2, w, h);
-  else if (ART.officers[u.admiral] != null && ART.ready.portraits && img) {
+  if (drawn?.complete && drawn.naturalWidth) {
+    const sw = drawn.naturalWidth,
+      sh = Math.min(drawn.naturalHeight, sw * (h / w));
+    ctx.drawImage(drawn, 0, 0, sw, sh, -w / 2, -h / 2, w, h);
+  } else if (ART.officers[u.admiral] != null && ART.ready.portraits && img) {
     const [sx, sy, sw, sh] = ART.rect('portraits', ART.officers[u.admiral]),
       crop = sw * (h / w) < sh ? sw * (h / w) : sh;
     ctx.drawImage(img, sx, sy, sw, crop, -w / 2, -h / 2, w, h);
