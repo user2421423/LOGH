@@ -24,6 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Stamp each script and stylesheet with the commit so browsers load the new build at once
+      # instead of serving cached files for up to 10 minutes.
+      - name: Cache-bust assets
+        run: sed -i -E 's/(src|href)="([a-z]+\.(js|css))"/\1="\2?v=${{ github.sha }}"/g' dist/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
