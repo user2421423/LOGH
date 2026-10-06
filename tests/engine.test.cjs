@@ -673,8 +673,8 @@ test('Air supply covers hexes within range of a friendly air base, and Carrier O
   assert(E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
 });
 test('Each side has a campaign of its own scenarios, every chapter legal for that side', () => {
-  assert.equal(E.CAMPAIGNS.empire.length, 8);
-  assert.equal(E.CAMPAIGNS.alliance.length, 7);
+  assert.equal(E.CAMPAIGNS.empire.length, 9);
+  assert.equal(E.CAMPAIGNS.alliance.length, 9);
   for (const [side, ids] of Object.entries(E.CAMPAIGNS))
     for (const id of ids) {
       assert.equal(E.SCENARIOS[id].side, side, id);
@@ -782,4 +782,19 @@ test('A fleet whose only order is holding position has no orders left', () => {
   assert(E.hasOrders(g, u));
   u.attacked = true;
   assert(!E.hasOrders(g, u));
+});
+test('Conquest is a WC4-scale mirrored galaxy; Lippstadt and Ragnarok are campaign chapters', () => {
+  const g = E.createGame('empire', 'normal', 'conquest', 3);
+  assert.equal(g.cols, 31);
+  assert.equal(g.rows, 19);
+  assert.equal(g.stations.length, 24);
+  assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
+  assert.equal(E.tile(g, 15, 9).terrain, 'rift');
+  const lip = E.createGame('empire', 'normal', 'lippstadt_e', 3);
+  assert.equal(lip.mode, 'lippstadt_e');
+  assert(lip.units.some(u => u.side === 'neutral'));
+  assert.equal(lip.rules.rebelBounty, 150);
+  const rag = E.createGame('empire', 'normal', 'ragnarok_a', 3);
+  assert.equal(rag.player, 'alliance');
+  assert(!rag.stations.some(s => s.name === 'Vermilion'));
 });

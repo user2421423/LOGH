@@ -2210,12 +2210,13 @@
       else if (!g.stations.some(s => s.owner === side) && !g.units.some(u => u.hp > 0 && u.side === side))
         g.over = { winner: opponent(side), reason: 'The last enemy fleets and stations have fallen.' };
     }
-    if (g.turn > 50 && !g.over) {
+    const armistice = g.cols > 20 ? 80 : 50;
+    if (g.turn > armistice && !g.over) {
       const a = g.stations.filter(s => s.owner === g.player).length,
         b = g.stations.filter(s => s.owner === opponent(g.player)).length;
       g.over = {
         winner: a === b ? 'draw' : a > b ? g.player : opponent(g.player),
-        reason: `The 50-turn armistice: ${a} stations held against ${b}.`,
+        reason: `The ${armistice}-turn armistice: ${a} stations held against ${b}.`,
       };
     }
     return g.over;
@@ -2277,8 +2278,11 @@
     frontier: {
       name: 'The galactic frontier',
       year: 'Standard',
-      desc: 'A balanced start: both powers mass at the three corridor crossings.',
-      rulesText: 'Standard rules. The rift is crossed at Iserlohn, Vermilion and Fezzan.',
+      desc: 'A WC4-scale galaxy of 24 worlds. The Empire and the Alliance face each other across a vast rift crossed only by the Iserlohn and Fezzan corridors.',
+      rulesText: 'Take both capitals, or hold more stations at the 80-turn armistice.',
+      cols: 31,
+      rows: 19,
+      rift: { col: 15, open: [3, 15] },
     },
     astarte: {
       name: 'Battle of Astarte',
@@ -2486,6 +2490,43 @@
       objective: { type: 'kill', admiral: 'reinhard', turns: 15, stars: [9, 12] },
       win: 'Brünhild is lost. The Imperial offensive collapses.',
       timeout: 'Imperial reinforcements arrived. Brünhild escaped.',
+    },
+    // Former Conquest start dates, now fought as campaign chapters on their full galaxy map.
+    lippstadt_e: {
+      name: 'Lippstadt War',
+      side: 'empire',
+      year: 'UC 488 · RC 797',
+      cols: 17,
+      rows: 11,
+      conquestMap: 'lippstadt',
+      desc: 'The high nobility has risen under Braunschweig. Storm the rebel strongholds of Geiersburg and Valhalla while the Alliance tears itself apart.',
+      objective: { type: 'capture', stations: ['Geiersburg', 'Valhalla'], turns: 20, stars: [12, 16] },
+      win: 'Geiersburg and Valhalla have fallen. The Lippstadt League is broken.',
+      timeout: 'The rebel nobles held out. The civil war drags on.',
+    },
+    lippstadt_a: {
+      name: 'Alliance Civil War',
+      side: 'alliance',
+      year: 'RC 797',
+      cols: 17,
+      rows: 11,
+      conquestMap: 'lippstadt',
+      desc: 'The Military Congress for the Salvation of the Republic has seized Rantemario and Doria. Retake them before the Empire finishes its own civil war.',
+      objective: { type: 'capture', stations: ['Rantemario', 'Doria'], turns: 20, stars: [12, 16] },
+      win: 'Rantemario and Doria are retaken. The coup has failed.',
+      timeout: 'The Military Congress still holds its strongholds.',
+    },
+    ragnarok_a: {
+      name: 'Ragnarök: Defend Heinessen',
+      side: 'alliance',
+      year: 'RC 798',
+      cols: 17,
+      rows: 11,
+      conquestMap: 'ragnarok',
+      desc: 'The Empire has broken through Fezzan and its fleets pour toward the capital. Hold Heinessen until the Imperial offensive is spent.',
+      objective: { type: 'hold', stations: ['Heinessen'], turns: 16 },
+      win: 'Heinessen stands. The Imperial blitz has run out of momentum.',
+      timeout: 'Heinessen has fallen.',
     },
     // Data-built scenarios: territory splits at a column, then stations and fleets are placed from the layout.
     tiamat: {
@@ -2992,8 +3033,28 @@
   };
   // WC4-style campaigns: each side plays its chapters in order; a chapter unlocks when the previous one is won.
   const CAMPAIGNS = {
-    empire: ['tiamat', 'astarte', 'amritsar_e', 'geiersburg', 'ragnarok_e', 'vermilion_e', 'rantemario', 'corridor_e'],
-    alliance: ['astarte_a', 'iserlohn', 'amritsar', 'iserlohn_def', 'vermilion', 'maradetta', 'corridor_a'],
+    empire: [
+      'tiamat',
+      'astarte',
+      'amritsar_e',
+      'lippstadt_e',
+      'geiersburg',
+      'ragnarok_e',
+      'vermilion_e',
+      'rantemario',
+      'corridor_e',
+    ],
+    alliance: [
+      'astarte_a',
+      'iserlohn',
+      'amritsar',
+      'lippstadt_a',
+      'iserlohn_def',
+      'ragnarok_a',
+      'vermilion',
+      'maradetta',
+      'corridor_a',
+    ],
   };
   // Operation difficulty, as in WC4. Normal is the operation as designed. Hard gives every enemy side all tier I–II
   // HQ research, upgrades every other enemy fleet one class and adds one fleet per four. Challenge gives them all
@@ -3085,7 +3146,9 @@
     else scen = String(mode).replace('scenario:', '');
     if (era && !ERAS[era]) era = 'frontier';
     if (scen && !SCENARIOS[scen]) scen = 'iserlohn';
-    const def = scen ? SCENARIOS[scen] : null;
+    const def = scen ? SCENARIOS[scen] : null,
+      // Some scenarios are fought on a former Conquest start date's map (conquestMap), with their own objective.
+      mapEra = era || def?.conquestMap || null;
     if (def?.side) player = def.side;
     const g = {
       version: 2,
@@ -3095,10 +3158,10 @@
       mode: era ? 'conquest' : scen,
       era,
       objective: def ? { ...def.objective } : null,
-      retired: (era && ERAS[era].retired) || def?.retired || [],
+      retired: (mapEra && ERAS[mapEra].retired) || def?.retired || [],
       seed,
-      cols: def ? def.cols : 17,
-      rows: def ? def.rows : 11,
+      cols: def ? def.cols : ERAS[era].cols || 17,
+      rows: def ? def.rows : ERAS[era].rows || 11,
       turn: 1,
       phase: player,
       nextId: 1,
@@ -3121,7 +3184,7 @@
     };
     const enemy = opponent(player);
     // Each Conquest start date has its own geography: terrain mix, rift crossings and asteroid belts.
-    const eraSpec = era ? ERAS[era] : null,
+    const eraSpec = mapEra ? ERAS[mapEra] : null,
       mix = eraSpec?.terrain || { nebula: 0.085, asteroid: 0.075 },
       rift = eraSpec ? (eraSpec.rift === undefined ? { col: 8, open: [2, 5, 8] } : eraSpec.rift) : null;
     for (let r = 0; r < g.rows; r++)
@@ -3134,7 +3197,7 @@
           c,
           r,
           terrain,
-          owner: era
+          owner: mapEra
             ? c < (g.cols - 1) / 2 - 1
               ? 'empire'
               : c > (g.cols - 1) / 2 + 1
@@ -3170,6 +3233,57 @@
       tile(g, c, r).owner = owner;
       return s;
     }
+    // The galactic frontier: a WC4-scale 31 × 19 galaxy. The Empire's worlds mirror the Alliance's across a rift
+    // crossed only by the Iserlohn and Fezzan corridors.
+    function buildFrontier() {
+      const W = g.cols - 1,
+        worlds = [
+          // [Empire name, Alliance name, c, r, tier, capital, fort]
+          ['Odin', 'Heinessen', 2, 9, 3, true, false],
+          ['Valhalla', 'Rantemario', 4, 13, 2, false, false],
+          ['Freya', 'Palmeren', 4, 5, 2, false, false],
+          ['Rentenberg', 'Shiva', 2, 2, 1, false, false],
+          ['Westerland', 'Jamshid', 2, 16, 1, false, false],
+          ['Brauschweig', 'Dagon', 7, 3, 1, false, false],
+          ['Lippstadt', 'Doria', 7, 15, 1, false, false],
+          ['Garmisch', 'Amritsar', 9, 9, 2, false, false],
+          ['Kastrop', 'El Facil', 11, 5, 1, false, false],
+          ['Geiersburg', 'Vermilion', 11, 13, 2, false, true],
+          ['Kifeuser', 'Astarte', 13, 9, 1, false, false],
+        ];
+      for (const [imp, ally, c, r, tier, capital, fort] of worlds) {
+        claim(station(imp, c, r, 'empire', tier, capital, fort), 'empire');
+        claim(station(ally, W - c, r, 'alliance', tier, capital, fort), 'alliance');
+      }
+      station('Iserlohn', 15, 3, 'neutral', 3, false, true);
+      station('Fezzan', 15, 15, 'neutral', 2);
+      const leads = {
+        empire: ['reinhard', 'mittermeyer', 'reuenthal', 'kircheis'],
+        alliance: ['yang', 'attenborough', 'fischer', 'schonkopf'],
+      };
+      for (const side of ['empire', 'alliance']) {
+        const at = c => (side === 'empire' ? c : W - c),
+          [a0, a1, a2, a3] = leads[side];
+        [
+          ['flagship', 3, 9, 1, a0],
+          ['heavy', 5, 8, 2, a1],
+          ['battleship', 5, 10, 2, a2],
+          ['frigate', 8, 4, 2, a3],
+          ['heavy', 8, 14, 2],
+          ['light', 10, 6, 2],
+          ['light', 10, 12, 2],
+          ['beam', 6, 9, 2],
+          ['missile', 4, 8, 1],
+          ['siege', 4, 10, 1],
+          ['corvette', 12, 4, 2],
+          ['destroyer', 12, 14, 1],
+          ['corvette', 9, 10, 1],
+          ['fighter', 3, 8, 1],
+        ].forEach(([type, c, r, stack, admiral]) => newUnit(g, type, side, at(c), r, stack, admiral || null));
+      }
+      g.economy.empire = { credits: 400, industry: 150, science: 40 };
+      g.economy.alliance = { credits: 400, industry: 150, science: 40 };
+    }
     const place = ([side, type, c, r, stack = 1, admiral = null, art = null]) => {
       const u = newUnit(g, type, side, c, r, stack, admiral);
       if (art) u.art = art;
@@ -3179,7 +3293,8 @@
       for (const [side, [credits, industry]] of Object.entries(eco || {}))
         Object.assign(g.economy[side], { credits, industry });
     };
-    if (era) {
+    if (mapEra === 'frontier') buildFrontier();
+    else if (mapEra) {
       station('Odin', 1, 5, 'empire', 3, true);
       station('Valhalla', 3, 8, 'empire', 2);
       station('Geiersburg', 4, 2, 'empire', 2, false, true);
@@ -3201,7 +3316,7 @@
       kempff.income += Math.floor((ally.credits - imp.credits) / 2);
       kempff.industry += ally.industry - imp.industry;
       valhalla.science += ally.science - imp.science;
-      const spec = ERAS[era];
+      const spec = ERAS[mapEra];
       g.rules = spec.rules || null;
       for (const name of spec.removeStations || []) {
         const gone = g.stations.find(s => s.name === name);
@@ -3358,7 +3473,7 @@
       alliance: g.units.filter(u => u.side === 'alliance').length,
     };
     log(g, era ? ERAS[era].desc : def.desc, player);
-    if (era && ERAS[era].rulesText) log(g, ERAS[era].rulesText, player);
+    if (mapEra && ERAS[mapEra].rulesText) log(g, ERAS[mapEra].rulesText, player);
     return g;
   }
   // Enemy high command, run once at the start of each AI turn before its fleets act:
