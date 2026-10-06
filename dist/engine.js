@@ -1087,7 +1087,7 @@
     nguyen: { escort: 4, line: 4, artillery: 3, air: 3 },
   };
   // Two kinds of admiral. Scenario commanders come with an operation, sit on their fleets with fixed stats
-  // (g.officers) and are never upgraded. Your generals (profile.roster) are bought once, upgraded in HQ, kept
+  // (g.officers) and are never upgraded. Your admirals (profile.roster) are bought once, upgraded in HQ, kept
   // between operations and assignable in any operation, even beside the scenario's own version (u.personal).
   const STARTERS = { empire: ['reinhard', 'mittermeyer'], alliance: ['yang', 'attenborough'] };
   function recruitPrice(k) {
@@ -1125,7 +1125,7 @@
     g.officers ||= {};
     return (g.officers[k] ||= defaultOfficer(k));
   }
-  // The record behind a fleet's admiral: your general for personal fleets, the scenario commander otherwise.
+  // The record behind a fleet's admiral: your admiral for personal fleets, the scenario commander otherwise.
   function officerOf(g, u) {
     if (!u?.admiral) return null;
     return (u.personal && g.roster?.[u.admiral]) || officer(g, u.admiral);
@@ -1164,14 +1164,14 @@
     if (['reinhard', 'wahlen', 'bucock'].includes(v.admiral)) return 0;
     return g.units.some(m => m.hp > 0 && m.side === v.side && m.admiral === 'murai' && distance(m, v) <= 1) ? -1 : -3;
   }
-  // ---- HQ generals: every action below works on the profile, outside or inside an operation ----
+  // ---- HQ admirals: every action below works on the profile, outside or inside an operation ----
   function tokenShort(profile, cost) {
     const have = profile?.tokens || 0;
     return cost > have ? `Need ${cost - have} more command tokens` : null;
   }
   function recruitReason(profile, k) {
     if (!ADMIRALS[k]) return 'Unknown admiral';
-    if (owns(profile, k)) return 'Already one of your generals';
+    if (owns(profile, k)) return 'Already one of your admirals';
     return tokenShort(profile, recruitPrice(k));
   }
   function recruitAdmiral(profile, k) {
@@ -1353,11 +1353,11 @@
       have = profile?.tokens || 0;
     return cost > have ? `Need ${cost - have} more command tokens` : null;
   }
-  // Only your own generals can be assigned; a scenario's commanders stay on the fleets they came with.
+  // Only your own admirals can be assigned; a scenario's commanders stay on the fleets they came with.
   function assignReason(g, u, k) {
     const a = ADMIRALS[k];
     if (!a) return 'Unknown admiral';
-    if (!g.roster?.[k]) return `Not one of your generals: recruit in HQ for ${recruitPrice(k)} command tokens`;
+    if (!g.roster?.[k]) return `Not one of your admirals: recruit in HQ for ${recruitPrice(k)} command tokens`;
     const busy = g.units.find(v => v.hp > 0 && v.personal && v.admiral === k);
     if (busy) return `Commanding ${TYPES[busy.type].short}`;
     if (!u) return 'Select one of your fleets first';
@@ -1377,12 +1377,12 @@
       (!g.units.some(v => v.hp > 0 && v.side !== u.side && distance(u, v) <= 2) ? 'No enemy within 2 hexes' : null)
     );
   }
-  // Bring the profile into an operation: a copy of your generals (for assignment and personal fleets) and research.
+  // Bring the profile into an operation: a copy of your admirals (for assignment and personal fleets) and research.
   function applyProfile(g, profile = {}) {
     applyRoster(g, profile);
     return applyTech(g, profile?.research);
   }
-  // Refresh your generals inside an operation, e.g. after an HQ promotion; personal fleets keep their damage.
+  // Refresh your admirals inside an operation, e.g. after an HQ promotion; personal fleets keep their damage.
   function applyRoster(g, profile = {}) {
     g.roster = Object.fromEntries(Object.entries(roster(profile)).map(([k, rec]) => [k, cleanOfficer(k, rec)]));
     for (const u of g.units) {

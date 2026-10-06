@@ -692,7 +692,7 @@ test('Each side has a campaign of its own scenarios, every chapter legal for tha
   assert.equal(E.checkVictory(dead).winner, 'empire');
   assert(E.createGame('empire', 'normal', 'rantemario', 4).retired.includes('kircheis'));
 });
-test('Your generals start with two per side, promote and buy stars with tokens, and keep their records', () => {
+test('Your admirals start with two per side, promote and buy stars with tokens, and keep their records', () => {
   const p = { tokens: 10 };
   assert.deepEqual(Object.keys(E.roster(p)).sort(), ['attenborough', 'mittermeyer', 'reinhard', 'yang']);
   assert.equal(E.RANKS.length, 11);
@@ -744,9 +744,9 @@ test('Scenario commanders are fixed; your own version can serve beside them', ()
     ),
     /^Commanding /,
   );
-  assert.match(E.assignReason(g, fleet, 'fischer'), /^Not one of your generals/);
+  assert.match(E.assignReason(g, fleet, 'fischer'), /^Not one of your admirals/);
 });
-test('Recruiting adds a general to the roster once; recruitable admirals start in no operation', () => {
+test('Recruiting adds an admiral to the roster once; recruitable admirals start in no operation', () => {
   assert.equal(Object.values(E.ADMIRALS).filter(a => a.recruit).length, 22);
   for (const mode of [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)])
     for (const side of ['empire', 'alliance'])
@@ -758,7 +758,7 @@ test('Recruiting adds a general to the roster once; recruitable admirals start i
   p.tokens = 500;
   assert(E.recruitAdmiral(p, 'bucock').ok);
   assert.equal(p.tokens, 200);
-  assert.equal(E.recruitReason(p, 'bucock'), 'Already one of your generals');
+  assert.equal(E.recruitReason(p, 'bucock'), 'Already one of your admirals');
   const g = E.applyProfile(blank(), p),
     u = E.newUnit(g, 'heavy', 'alliance', 2, 2);
   g.economy.alliance.credits = 5000;
