@@ -721,6 +721,27 @@ test('Your admirals start with two per side, promote and buy stars with tokens, 
     assert.equal(g.roster.attenborough.ratings.line, 6);
   }
 });
+test('Every admiral has a Movement rating out of 6 stars that adds hexes', () => {
+  const fresh = blank();
+  for (const k of Object.keys(E.ADMIRALS)) assert(E.officer(fresh, k).ratings.move > 0, k);
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6].map(n => E.moveBonus({ ratings: { move: n } })),
+    [-1, 0, 0, 1, 1, 2],
+  );
+  // Older profiles without a Movement rating get the admiral's default.
+  const p = {
+    tokens: 1000,
+    roster: { yang: { rank: 0, ratings: { escort: 4, line: 5, artillery: 4, air: 4 }, medals: [] } },
+  };
+  assert.equal(E.roster(p).yang.ratings.move, 3);
+  assert.equal(E.starCost(p, 'yang', 'move'), 120);
+  assert(E.buyStar(p, 'yang', 'move').ok);
+  assert.equal(E.roster(p).yang.ratings.move, 4);
+  const g = E.applyProfile(blank(), p),
+    u = E.newUnit(g, 'heavy', 'alliance', 4, 4, 1, 'yang');
+  u.personal = true;
+  assert.equal(E.movement(g, u), E.TYPES.heavy.move + 1);
+});
 test('Scenario commanders are fixed; your own version can serve beside them', () => {
   const p = { tokens: 1000 };
   E.promote(p, 'yang');

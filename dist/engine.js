@@ -669,6 +669,8 @@
   // player's profile across every operation and side. Each level unlocks at a tier gated by total victories.
   const BRANCHES = { Escort: 'escort', 'Battle Line': 'line', Artillery: 'artillery', Air: 'air' };
   const BRANCH_NAMES = { escort: 'Escort', line: 'Battle Line', artillery: 'Artillery', air: 'Aerospace' };
+  // Every rating an admiral holds: the four branches and Movement.
+  const RATING_NAMES = { ...BRANCH_NAMES, move: 'Movement' };
   const TECH_TIERS = [0, 0, 2, 4, 7];
   const pct = v => `${Math.round(v * 100)}%`;
   const TECH_TREE = {
@@ -1053,38 +1055,38 @@
     },
     campaign: { name: 'Campaign Ribbon', desc: '+4% damage and 4% less damage taken.', earn: 'Win any operation.' },
   };
-  // Starting branch ratings (stars, up to 6 with command tokens): Escort, Battle Line, Artillery, Aerospace.
+  // Starting ratings (stars, up to 6 with command tokens): Escort, Battle Line, Artillery, Aerospace, plus Movement.
   const RATINGS = {
-    reinhard: { escort: 3, line: 5, artillery: 4, air: 3 },
-    yang: { escort: 4, line: 5, artillery: 4, air: 4 },
-    mittermeyer: { escort: 4, line: 5, artillery: 3, air: 3 },
-    reuenthal: { escort: 3, line: 5, artillery: 4, air: 3 },
-    kircheis: { escort: 5, line: 4, artillery: 3, air: 3 },
-    attenborough: { escort: 4, line: 4, artillery: 3, air: 3 },
-    fischer: { escort: 4, line: 4, artillery: 3, air: 3 },
-    schonkopf: { escort: 5, line: 2, artillery: 2, air: 3 },
-    bittenfeld: { escort: 3, line: 5, artillery: 3, air: 3 },
-    muller: { escort: 4, line: 5, artillery: 3, air: 3 },
-    fahrenheit: { escort: 4, line: 4, artillery: 3, air: 3 },
-    kempff: { escort: 3, line: 3, artillery: 4, air: 5 },
-    eisenach: { escort: 4, line: 4, artillery: 4, air: 3 },
-    oberstein: { escort: 4, line: 3, artillery: 4, air: 3 },
-    wahlen: { escort: 3, line: 5, artillery: 3, air: 3 },
-    lutz: { escort: 3, line: 4, artillery: 5, air: 3 },
-    mecklinger: { escort: 3, line: 4, artillery: 5, air: 3 },
-    kessler: { escort: 4, line: 3, artillery: 3, air: 3 },
-    steinmetz: { escort: 3, line: 4, artillery: 3, air: 3 },
-    lennenkampf: { escort: 3, line: 4, artillery: 3, air: 2 },
-    bucock: { escort: 3, line: 5, artillery: 4, air: 3 },
-    merkatz: { escort: 5, line: 4, artillery: 3, air: 4 },
-    ulanhu: { escort: 3, line: 4, artillery: 3, air: 3 },
-    borodin: { escort: 3, line: 4, artillery: 3, air: 3 },
-    cazerne: { escort: 4, line: 3, artillery: 3, air: 3 },
-    poplin: { escort: 3, line: 2, artillery: 2, air: 5 },
-    konev: { escort: 3, line: 2, artillery: 2, air: 5 },
-    murai: { escort: 4, line: 3, artillery: 3, air: 3 },
-    patrichev: { escort: 3, line: 4, artillery: 3, air: 3 },
-    nguyen: { escort: 4, line: 4, artillery: 3, air: 3 },
+    reinhard: { escort: 3, line: 5, artillery: 4, air: 3, move: 4 },
+    yang: { escort: 4, line: 5, artillery: 4, air: 4, move: 3 },
+    mittermeyer: { escort: 4, line: 5, artillery: 3, air: 3, move: 5 },
+    reuenthal: { escort: 3, line: 5, artillery: 4, air: 3, move: 4 },
+    kircheis: { escort: 5, line: 4, artillery: 3, air: 3, move: 4 },
+    attenborough: { escort: 4, line: 4, artillery: 3, air: 3, move: 4 },
+    fischer: { escort: 4, line: 4, artillery: 3, air: 3, move: 5 },
+    schonkopf: { escort: 5, line: 2, artillery: 2, air: 3, move: 3 },
+    bittenfeld: { escort: 3, line: 5, artillery: 3, air: 3, move: 4 },
+    muller: { escort: 4, line: 5, artillery: 3, air: 3, move: 3 },
+    fahrenheit: { escort: 4, line: 4, artillery: 3, air: 3, move: 4 },
+    kempff: { escort: 3, line: 3, artillery: 4, air: 5, move: 3 },
+    eisenach: { escort: 4, line: 4, artillery: 4, air: 3, move: 3 },
+    oberstein: { escort: 4, line: 3, artillery: 4, air: 3, move: 2 },
+    wahlen: { escort: 3, line: 5, artillery: 3, air: 3, move: 3 },
+    lutz: { escort: 3, line: 4, artillery: 5, air: 3, move: 3 },
+    mecklinger: { escort: 3, line: 4, artillery: 5, air: 3, move: 3 },
+    kessler: { escort: 4, line: 3, artillery: 3, air: 3, move: 3 },
+    steinmetz: { escort: 3, line: 4, artillery: 3, air: 3, move: 3 },
+    lennenkampf: { escort: 3, line: 4, artillery: 3, air: 2, move: 3 },
+    bucock: { escort: 3, line: 5, artillery: 4, air: 3, move: 3 },
+    merkatz: { escort: 5, line: 4, artillery: 3, air: 4, move: 3 },
+    ulanhu: { escort: 3, line: 4, artillery: 3, air: 3, move: 3 },
+    borodin: { escort: 3, line: 4, artillery: 3, air: 3, move: 3 },
+    cazerne: { escort: 4, line: 3, artillery: 3, air: 3, move: 2 },
+    poplin: { escort: 3, line: 2, artillery: 2, air: 5, move: 4 },
+    konev: { escort: 3, line: 2, artillery: 2, air: 5, move: 4 },
+    murai: { escort: 4, line: 3, artillery: 3, air: 3, move: 2 },
+    patrichev: { escort: 3, line: 4, artillery: 3, air: 3, move: 3 },
+    nguyen: { escort: 4, line: 4, artillery: 3, air: 3, move: 4 },
   };
   // Two kinds of admiral. Scenario commanders come with an operation, sit on their fleets with fixed stats
   // (g.officers) and are never upgraded. Your admirals (profile.roster) are bought once, upgraded in HQ, kept
@@ -1115,6 +1117,9 @@
       const keep = [...STARTERS.empire, ...STARTERS.alliance, ...(profile.recruited || [])];
       for (const k of keep) if (ADMIRALS[k]) profile.roster[k] = cleanOfficer(k, profile.officers?.[k]);
     }
+    // Ratings added after a profile was made (such as Movement) start at the admiral's default.
+    for (const [k, o] of Object.entries(profile.roster))
+      if (RATINGS[k]) o.ratings = { ...RATINGS[k], ...(o.ratings || {}) };
     return profile.roster;
   }
   function owns(profile, k) {
@@ -1123,12 +1128,18 @@
   function officer(g, k) {
     if (!k || !ADMIRALS[k]) return null;
     g.officers ||= {};
-    return (g.officers[k] ||= defaultOfficer(k));
+    return withRatings(k, (g.officers[k] ||= defaultOfficer(k)));
+  }
+  // Saves made before a rating existed (such as Movement) pick up the admiral's default for it.
+  function withRatings(k, o) {
+    if (o && Object.keys(RATINGS[k] || {}).some(b => o.ratings?.[b] == null))
+      o.ratings = { ...RATINGS[k], ...o.ratings };
+    return o;
   }
   // The record behind a fleet's admiral: your admiral for personal fleets, the scenario commander otherwise.
   function officerOf(g, u) {
     if (!u?.admiral) return null;
-    return (u.personal && g.roster?.[u.admiral]) || officer(g, u.admiral);
+    return (u.personal && withRatings(u.admiral, g.roster?.[u.admiral])) || officer(g, u.admiral);
   }
   function wears(g, u, medal) {
     return !!officerOf(g, u)?.medals?.includes(medal);
@@ -1155,6 +1166,11 @@
         (wears(g, u, 'laurel') ? 0.92 : 1) *
         (wears(g, u, 'campaign') ? 0.96 : 1),
     );
+  }
+  // Movement rating: 1 star −1 hex, 2–3 stars ±0, 4–5 stars +1, 6 stars +2.
+  function moveBonus(o, k) {
+    const n = o?.ratings?.move ?? RATINGS[k]?.move ?? 3;
+    return n >= 6 ? 2 : n >= 4 ? 1 : n <= 1 ? -1 : 0;
   }
   function auraRange(g, a) {
     return a && ['eisenach', 'merkatz'].includes(a.admiral) ? 2 : 1;
@@ -1202,7 +1218,7 @@
     o.rank++;
     return { ok: true, rank: o.rank };
   }
-  // As in WC4, command tokens (the medals of this game) buy extra branch stars, up to six.
+  // As in WC4, command tokens (the medals of this game) buy extra branch and Movement stars, up to six.
   const MAX_RATING = 6;
   const STAR_COST = [0, 0, 0, 60, 120, 220, 360];
   function starCost(profile, k, branch) {
@@ -1210,7 +1226,7 @@
     return STAR_COST[(o.ratings[branch] || 0) + 1] ?? Infinity;
   }
   function starReason(profile, k, branch) {
-    if (!BRANCH_NAMES[branch]) return 'Unknown branch';
+    if (!RATING_NAMES[branch]) return 'Unknown rating';
     const why = ownedReason(profile, k);
     if (why) return why;
     return (roster(profile)[k].ratings[branch] || 0) >= MAX_RATING
@@ -1549,7 +1565,8 @@
     if (u.admiral === 'mittermeyer') n += 2;
     if (g?.rules?.blitz && u.side === g.rules.blitz.side && g.turn <= g.rules.blitz.turns) n++;
     if (['attenborough', 'fischer'].includes(u.admiral)) n++;
-    return n;
+    if (u.admiral && g) n += moveBonus(officerOf(g, u), u.admiral);
+    return Math.max(1, n);
   }
   function terrainCost(g, u, t) {
     if (u.admiral === 'yang' || TYPES[u.type].air) return 1;
@@ -3674,6 +3691,8 @@
     ROMAN,
     BRANCHES,
     BRANCH_NAMES,
+    RATING_NAMES,
+    moveBonus,
     branchOf,
     techLevel,
     techValue,

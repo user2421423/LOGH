@@ -2005,6 +2005,10 @@ button.mini small {
 .gi-ratings {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* Movement, the fifth rating, spans the full row. */
+.gi-rating:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .gi-rating {
   min-height: 72px;
   gap: 10px;

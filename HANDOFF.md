@@ -117,7 +117,9 @@ Everything ships from `dist/`; there is no bundler. Scripts load in this order f
   Lieutenant 120%, Lt Commander 124%, Commander 128%, Captain 133%, Commodore 138%, Rear Admiral 143%,
   Vice Admiral 148%, Admiral 154%, Fleet Admiral 160%.
 - Branch star ratings (Escort, Battle Line, Artillery, Aerospace), up to 6 stars, bought with tokens; each star above
-  3 adds 4% damage and cuts damage taken 3% for that branch. Medals (Valor, Laurel, Conqueror's Star, Marksman,
+  3 adds 4% damage and cuts damage taken 3% for that branch. A fifth rating, **Movement** (up to 6 stars, same
+  token prices), changes the commanded fleet's movement: 1★ −1 hex, 2–3★ ±0, 4–5★ +1, 6★ +2, on top of signature
+  abilities such as Mittermeyer's +2. Defaults sit in `RATINGS[k].move`; older saves and profiles are backfilled. Medals (Valor, Laurel, Conqueror's Star, Marksman,
   Campaign) are earned in operations and worn in limited slots. There is no XP or skill-point system.
 - Clicking any portrait (map pin, panel, dock, admirals lists) opens the WC4-style **Admiral Info** card.
 
