@@ -132,11 +132,13 @@ const SFX = (() => {
       burst(t + 0.55, 'lowpass', 2800, 45, 1.3, 0.9);
       burst(t + 0.55, 'highpass', 3200, 700, 0.45, 0.22);
     },
-    // Fleet movement: an engine surge rising under a sweeping thruster wash.
+    // Fleet movement: a soft warp-drive glide — a rising hum, a gentle air wash and a quiet arrival chime.
     move(t, v) {
-      tone(t, v.wave, 55 * v.pitch, 95 * v.pitch, 0.7, 0.14);
-      tone(t + 0.05, 'sine', 110 * v.pitch, 170 * v.pitch, 0.55, 0.07);
-      burst(t, 'bandpass', 250 * v.pitch, 1100 * v.pitch, 0.75, 0.16, 1.6);
+      tone(t, 'sine', 180 * v.pitch, 520 * v.pitch, 0.42, 0.09);
+      tone(t, 'triangle', 90 * v.pitch, 140 * v.pitch, 0.5, 0.06);
+      burst(t + 0.05, 'highpass', 900 * v.pitch, 2600 * v.pitch, 0.38, 0.05, 0.7);
+      tone(t + 0.36, 'sine', 990 * v.pitch, 990 * v.pitch, 0.22, 0.035);
+      tone(t + 0.36, 'sine', 1485 * v.pitch, 1485 * v.pitch, 0.18, 0.02);
     },
     // Air wings: a fast high fly-by sweeping past.
     flyby(t, v) {
