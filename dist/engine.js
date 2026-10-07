@@ -1211,6 +1211,7 @@
       }
     }
     const destroyed = !!d && d.hp <= 0;
+    let pursuitTriggered = false;
     if (destroyed) {
       kill(g, d, a);
       if (a.admiral === 'reinhard' && a.inspireUsedTurn !== g.turn) {
@@ -1223,7 +1224,7 @@
       }
       if (a.admiral === 'bittenfeld' && a.pursuitUsedTurn !== g.turn) {
         a.pursuitUsedTurn = g.turn;
-        a.moved = false;
+        pursuitTriggered = true;
       }
     }
     let cap = ['mittermeyer', 'attenborough', 'nguyen'].includes(a.admiral) ? 2 : 1;
@@ -1251,6 +1252,11 @@
     }
     // Gale Wolf: once per turn, an attack that would otherwise leave movement spent opens a short reposition.
     // It never restores the attack itself; breakthrough handling above remains unchanged.
+    if (pursuitTriggered && a.hp > 0) {
+      a.repositionTurn = g.turn;
+      a.reposition = movement(g, a);
+      a.moved = false;
+    }
     if (a.admiral === 'mittermeyer' && a.hp > 0 && a.moved && a.repositionUsedTurn !== g.turn) {
       a.repositionUsedTurn = g.turn;
       a.repositionTurn = g.turn;
