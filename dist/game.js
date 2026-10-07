@@ -383,7 +383,7 @@ function panel() {
   if (u || s) return main;
   return (
     main +
-    `<section class="section-divider"><span class="label">${selectedTile ? 'Hex ' + selectedTile.c + ', ' + selectedTile.r : 'Theater intelligence'}</span><p class="description">${selectedTile ? terrainDescription(selectedTile) : 'Iserlohn, Vermilion, and Fezzan form three crossings through the gravity rifts.'}</p><label class="label" for="station-select">Station directory</label><select class="select unit-select" id="station-select"><option value="">Inspect station…</option>${game.stations.map(s => `<option value="${s.id}">${s.name} · ${E.FACTIONS[s.owner].short}</option>`).join('')}</select></section><section class="section-divider dispatches"><span class="label">Command dispatches</span>${game.log
+    `<section class="section-divider"><span class="label">${selectedTile ? 'Hex ' + selectedTile.c + ', ' + selectedTile.r : 'Theater intelligence'}</span><p class="description">${selectedTile ? terrainDescription(selectedTile) : 'Iserlohn and Fezzan are the only crossings through the central gravity rift.'}</p><label class="label" for="station-select">Station directory</label><select class="select unit-select" id="station-select"><option value="">Inspect station…</option>${game.stations.map(s => `<option value="${s.id}">${s.name} · ${E.FACTIONS[s.owner].short}</option>`).join('')}</select></section><section class="section-divider dispatches"><span class="label">Command dispatches</span>${game.log
       .slice(0, 4)
       .map(l => `<p class="dispatch"><b>T${l.turn}</b> ${esc(l.text)}</p>`)
       .join('')}</section>`
