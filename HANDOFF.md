@@ -156,10 +156,15 @@ chapter map with completion, best stars, remaining rewards and the next chapter.
   `CAMPAIGNS` lists the chapter order per side.
 
 ### Conquest
-- Only **The galactic frontier**: a mirrored 31 × 19 galaxy of 24 named worlds (Odin, Valhalla, Freya, Brauschweig,
-  Lippstadt, Geiersburg… against Heinessen, Rantemario, Palmeren, Dagon, Doria, Vermilion…), split by a rift crossed
-  at Iserlohn and Fezzan (both neutral at the start). 14 fleets per side. Win by taking both capitals, or by
-  holding more stations at the 80-turn armistice.
+- Only **The galactic frontier**: a 51 × 29 galaxy with 44 named systems: 21 Empire, 21 Alliance, plus neutral
+  Iserlohn and Fezzan. The central gravity barrier is three columns wide and can only be crossed on the Iserlohn
+  row (north) or Fezzan row (south), so controlling a corridor creates a real operational bridgehead.
+- Each side starts with 18 fleets divided between the home core and both corridor approaches. Minor-system income
+  is deliberately scaled down and Heinessen is automatically balanced against Odin so the larger station count does
+  not turn Conquest into runaway production. Win by taking both capitals or by holding more stations at turn 80.
+- Frontier station/fleet placement lives in `ERAS.frontier` in `dist/engine/galaxy.js`; the rules engine's
+  `buildFrontier()` consumes that data rather than hard-coding the map. Historical campaign/start-date maps remain
+  their original size and geography.
 
 ### AI
 - Conquest AI lives in `dist/engine/ai.js`. Each side identifies strategic objectives, clusters them into fronts,
