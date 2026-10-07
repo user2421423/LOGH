@@ -126,6 +126,8 @@ Everything ships from `dist/`; there is no bundler. Scripts load in this order f
   token prices), changes the commanded fleet's movement: 1★ −1 hex, 2★ ±0, 3★ +1, 4★ +2, 5★ +3, 6★ +4, on top of signature
   abilities such as Mittermeyer's +2. Defaults sit in `RATINGS[k].move`; older saves and profiles are backfilled. Medals (Valor, Laurel, Conqueror's Star, Marksman,
   Campaign) are earned in operations and worn in limited slots. There is no XP or skill-point system.
+- Signature skills are deliberately situational rather than just stat sticks. Important examples: Reinhard's first kill inspires adjacent allies (+15% damage for the turn and +1 morale); Mittermeyer can make one 2-hex post-attack reposition per turn if the attack consumed his movement; Fischer grants +1 movement to friendly fleets within 2 hexes; Bittenfeld deals extra damage to damaged fleets and his first kill opens a pursuit move; Müller protects adjacent admiral-led fleets; Lutz marks a surviving target for +15% subsequent friendly damage that turn; Lennenkampf gains attack/defense only in a Battle Line formation; Borodin becomes tougher and improves counter-fire below half hull.
+- Post-attack maneuvering uses `u.reposition` / `u.repositionTurn`. `reachable()` treats that as a movement-only allowance even after firing; `move()` consumes it. The AI checks the same fields after its attack chain so these skills are not player-only.
 - Clicking any portrait (map pin, panel, dock, admirals lists) opens the WC4-style **Admiral Info** card.
 
 ### HQ research and command tokens

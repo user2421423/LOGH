@@ -320,6 +320,102 @@ test('Admirals have distinct movement, terrain, penetration and morale abilities
   E.beginTurn(g, 'empire', false);
   assert.equal(r.morale, 0);
 });
+test('Reworked admirals use maneuver, pursuit, formation and target-designation mechanics', () => {
+  // Mittermeyer: attack after moving, then reposition up to 2 hexes without regaining the attack.
+  let g = blank();
+  g.phase = 'empire';
+  const mit = E.newUnit(g, 'heavy', 'empire', 2, 2, 1, 'mittermeyer'),
+    durable = E.newUnit(g, 'flagship', 'alliance', 4, 2, 3);
+  assert(E.move(g, mit.id, 3, 2).ok);
+  durable.hp = E.maxHP(durable);
+  const mitShot = E.attack(g, mit.id, durable.c, durable.r);
+  assert(mitShot.ok && durable.hp > 0);
+  assert(mit.attacked);
+  const reposition = E.reachable(g, mit);
+  assert(reposition.size > 0);
+  assert(Math.max(...reposition.values()) <= 2);
+  const [mitHex] = reposition.keys();
+  const [mc, mr] = mitHex.split(',').map(Number);
+  assert(E.move(g, mit.id, mc, mr).ok);
+  assert.equal(E.reachable(g, mit).size, 0);
+
+  // Fischer: nearby fleets get +1 movement; Fischer himself is not a generic damage aura.
+  g = blank();
+  const fleet = E.newUnit(g, 'heavy', 'alliance', 4, 4),
+    baseMove = E.movement(g, fleet);
+  E.newUnit(g, 'light', 'alliance', 5, 4, 1, 'fischer');
+  assert.equal(E.movement(g, fleet), baseMove + 1);
+
+  // Reinhard: first kill inspires adjacent allies for the rest of the turn.
+  g = blank();
+  g.phase = 'empire';
+  const rein = E.newUnit(g, 'heavy', 'empire', 4, 4, 1, 'reinhard'),
+    ally = E.newUnit(g, 'heavy', 'empire', 3, 4),
+    victim = E.newUnit(g, 'corvette', 'alliance', 5, 4);
+  victim.hp = 1;
+  ally.morale = -1;
+  assert(E.attack(g, rein.id, victim.c, victim.r).destroyed);
+  assert.equal(ally.inspiredTurn, g.turn);
+  assert.equal(ally.morale, 0);
+
+  // Bittenfeld: wounded targets take more damage; first kill opens a pursuit move even on non-line hulls.
+  g = blank();
+  g.phase = 'empire';
+  const bit = E.newUnit(g, 'beam', 'empire', 3, 3, 1, 'bittenfeld'),
+    prey = E.newUnit(g, 'heavy', 'alliance', 4, 3, 3);
+  const full = E.preview(g, bit.id, prey.c, prey.r).unit;
+  prey.hp = Math.floor(E.maxHP(prey) * 0.4);
+  const wounded = E.preview(g, bit.id, prey.c, prey.r).unit;
+  assert(wounded > full);
+  prey.hp = 1;
+  assert(E.attack(g, bit.id, prey.c, prey.r).destroyed);
+  assert(bit.attacked);
+  assert(E.reachable(g, bit).size > 0);
+
+  // Müller: adjacent admiral-led fleets are protected.
+  g = blank();
+  g.phase = 'alliance';
+  const guarded = E.newUnit(g, 'heavy', 'empire', 4, 4, 2, 'reuenthal'),
+    muller = E.newUnit(g, 'heavy', 'empire', 3, 4, 1, 'muller'),
+    attacker = E.newUnit(g, 'heavy', 'alliance', 5, 4, 2);
+  const protectedDamage = E.preview(g, attacker.id, guarded.c, guarded.r).unit;
+  muller.hp = 0;
+  const exposedDamage = E.preview(g, attacker.id, guarded.c, guarded.r).unit;
+  assert(protectedDamage < exposedDamage);
+
+  // Lutz: his hit marks a surviving target for subsequent friendly fire.
+  g = blank();
+  g.phase = 'empire';
+  const lutz = E.newUnit(g, 'heavy', 'empire', 4, 4, 1, 'lutz'),
+    follow = E.newUnit(g, 'heavy', 'empire', 4, 5),
+    marked = E.newUnit(g, 'flagship', 'alliance', 5, 4, 3);
+  const beforeMark = E.preview(g, follow.id, marked.c, marked.r).unit;
+  assert(E.attack(g, lutz.id, marked.c, marked.r).ok);
+  assert(marked.hp > 0 && marked.markSide === 'empire');
+  assert(E.preview(g, follow.id, marked.c, marked.r).unit > beforeMark);
+
+  // Lennenkampf: line formation raises attack and defense only while another Battle Line fleet is adjacent.
+  g = blank();
+  g.phase = 'empire';
+  const len = E.newUnit(g, 'heavy', 'empire', 4, 4, 1, 'lennenkampf'),
+    foe = E.newUnit(g, 'heavy', 'alliance', 5, 4, 1);
+  const soloAttack = E.preview(g, len.id, foe.c, foe.r).unit,
+    soloIncoming = E.preview(g, foe.id, len.c, len.r).unit;
+  E.newUnit(g, 'light', 'empire', 3, 4);
+  assert(E.preview(g, len.id, foe.c, foe.r).unit > soloAttack);
+  assert(E.preview(g, foe.id, len.c, len.r).unit < soloIncoming);
+
+  // Borodin: below half hull he becomes harder to kill and his counter-fire strengthens.
+  g = blank();
+  g.phase = 'empire';
+  const borodin = E.newUnit(g, 'heavy', 'alliance', 4, 4, 2, 'borodin'),
+    aggressor = E.newUnit(g, 'heavy', 'empire', 5, 4, 2);
+  const healthy = E.preview(g, aggressor.id, borodin.c, borodin.r);
+  borodin.hp = Math.floor(E.maxHP(borodin) * 0.4);
+  const lastStand = E.preview(g, aggressor.id, borodin.c, borodin.r);
+  assert(lastStand.unit < healthy.unit);
+  assert(lastStand.counter > healthy.counter);
+});
 test('HQ research spends command tokens, respects tiers and prerequisites, and applies to the player only', () => {
   const p = { tokens: 0, wins: 0, research: {} };
   assert.equal(E.researchReason(p, 'line.armor'), 'Need 50 more command tokens');

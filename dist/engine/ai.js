@@ -338,6 +338,16 @@
       if (!fired.ok) break;
       events.push({ kind: 'attack', ...fired, id });
     }
+
+    // Admirals such as Mittermeyer and Bittenfeld may earn movement after firing. Use it to continue toward
+    // the assigned front without granting another attack.
+    if (!g.over && u.repositionTurn === g.turn && u.reposition > 0 && !u.moved) {
+      const p = bestMove(g, u, destination, plan || {});
+      if (p) {
+        const moved = E.move(g, id, p.c, p.r);
+        if (moved.ok) events.push({ kind: 'move', ...moved, id, maneuver: true });
+      }
+    }
     return events;
   }
 
