@@ -186,7 +186,7 @@
       role: 'Battle Line',
       hull: 'Salamander',
       skill: 'Steadfast',
-      desc: 'Morale never falls below steady. If he did not move on his previous turn, he and adjacent friendly fleets take 20% less damage.',
+      desc: 'Morale never falls below steady. While he remains stationary in the current round, he and adjacent friendly fleets take 20% less damage.',
       trait: 'steadfast',
       recruit: 300,
     },
