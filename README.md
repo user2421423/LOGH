@@ -10,13 +10,14 @@ https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `
 
 - **One-click attacks:** click (or press Enter on) a red hex to fire immediately. Hover first to see the expected damage and counter-fire.
 - **Undo move:** a fleet that has moved but not fired can be sent back with the **Undo move** button or **Z**. Any attack, purchase or other order locks in earlier moves.
+- **Standing courses:** select one of your fleets and choose **Set course** (or press **G**), then click any navigable sector. The fleet advances toward that destination automatically at the start of each future turn and still retains its attack for that turn. Hold position or Clear course cancels the route.
 - **Resources:** Credits (gold $ coin), Industry (gear and ingot) and Research (microchip).
 - **Map tokens:** Imperial fleets stand on navy plates with gold trim, Alliance fleets on crimson plates with silver trim, ringed by a green → yellow → red hull gauge. Metallic bars show 1–3 stacks, and admirals appear as framed portraits with rank stars above their fleets.
 - **Combat juice:** synthesized weapon sounds per hull class and faction (🔊 button mutes), floating damage with red **CRIT!** numbers, blue station-defense tags, **MORALE ↓ / CONFUSED / LOW SUPPLY** alerts, and camera shake on heavy hits.
 - **Fortress main guns:** select your own Iserlohn (Thor's Hammer) or Geiersburg and click a red hex to strike an enemy fleet within 3 hexes for 40% of its hull. Two-turn recharge; silenced while shields are down. Nothing fires automatically.
 - **Station buildings:** every station has a Shipyard (larger hulls, +10 industry per level), a Research station (+8 research per level; research banked at victory becomes command tokens) and an Air base, each upgradable to level 3.
 - **Air wings:** Fighter, Bomber and Strategic Bomber wings from air bases. They ignore terrain, cannot capture, are immune to artillery, only take return fire from escorts and fighters, and need a friendly air base within 3 hexes.
-- **Conquest:** the galactic frontier, a WC4-scale 31 × 19 galaxy of 24 named worlds (Odin, Valhalla, Freya, Brauschweig, Lippstadt, Geiersburg… against Heinessen, Rantemario, Palmeren, Dagon, Doria, Vermilion…) mirrored across a rift crossed only at Iserlohn and Fezzan. Win by taking both capitals or holding more stations at the 80-turn armistice.
+- **Conquest:** the galactic frontier, a WC4-scale 31 × 19 galaxy of 24 named worlds (Odin, Valhalla, Freya, Brauschweig, Lippstadt, Geiersburg… against Heinessen, Rantemario, Palmeren, Dagon, Doria, Vermilion…) mirrored across a rift crossed only at Iserlohn and Fezzan. Win by taking both capitals or holding more stations at the 80-turn armistice. Enemy high command now organizes fleets into persistent fronts, keeps a strategic reserve, masses offensive fleets at rally stations, and then commits them together instead of sending every fleet toward its nearest target independently.
 - **Scenarios:** Assault on Iserlohn, Battle of Astarte, Hold Amritsar and Battle of Vermilion, each with one objective, a turn limit and a saved 1–3 star rating.
 - **HQ research with command tokens:** as in World Conqueror 4, technology is bought at Command HQ with command tokens and kept across every operation and side. Tokens come only from the first victory in each operation at each difficulty (250, plus 50 per star or 150 for a Conquest, plus 1 per 5 research banked; ×1.5 on Hard, ×2 on Challenge; 150 extra for the first win ever). Replays pay nothing. 37 technologies in five trees: Escort, Battle Line, Artillery, Aerospace and Stations. They cover weapons, armor, hull, engines, class counters, Assault Doctrine breakthroughs, Fire Control, Carrier Operations, Fortification and Thor Overcharge. Tiers II–IV open after 2, 4 and 7 victories.
 - **Difficulty (Normal / Hard / Challenge):** Normal is each operation as designed. Hard gives every enemy side all tier I–II HQ research, upgrades every other enemy fleet one class (escort → light cruiser, cruiser → heavier hull, artillery and air wings likewise), adds one fleet per four and makes enemy admirals one rank higher. Challenge gives them every technology, upgrades every fleet with an extra stack, adds one fleet per two, two admiral ranks and +25% enemy income. Best stars and rewards are tracked per difficulty.
@@ -50,8 +51,15 @@ You can also try opening `dist/index.html` directly in your browser. Serving the
 ## Files
 
 - `dist/index.html` — entry page
-- `dist/engine.js` — game rules, unit roster, combat, AI, economy, and save migration
-- `dist/game.js` — interface, controls, battlefield rendering, and browser saves
+- `dist/engine.js` — core deterministic rules, combat, economy, saves, and public API
+- `dist/engine/admirals.js` — admiral roster and starting ratings
+- `dist/engine/research.js` — HQ research trees and technology data
+- `dist/engine/galaxy.js` — Conquest eras and galaxy definitions
+- `dist/engine/campaign.js` — scenario and campaign definitions
+- `dist/engine/orders.js` — standing-course pathfinding and automatic movement
+- `dist/engine/ai.js` — theater/front planning, reserves, rallying, production and tactical AI
+- `dist/ui/orders.js` — standing-order targeting UI state
+- `dist/game.js` — main interface, battlefield rendering, dialogs and browser saves
 - `dist/art.js` — artwork loading and sprite definitions
 - `dist/style.css`, `dist/battlefield.css` — interface styling
 - `dist/assets/empire-fleet.png` — white/gold Imperial ships
