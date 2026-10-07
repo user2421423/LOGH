@@ -1399,9 +1399,31 @@ document.addEventListener('click', e => {
       if (s) doAction(() => E.build(game, s.id, 'shipyard'));
       break;
     }
+    case 'course': {
+      const u = selectedUnit();
+      if (u && u.side === game.player && interactive()) {
+        OrdersUI.begin(u.id);
+        updateSelection();
+        canvas?.focus({ preventScroll: true });
+        toast('Set course: click any navigable sector. The fleet will move toward it at the start of future turns.');
+      }
+      break;
+    }
+    case 'course-clear': {
+      const u = selectedUnit();
+      if (u) {
+        E.clearDestination(game, u.id);
+        OrdersUI.cancel();
+        refreshAndSave();
+        toast('Standing course cleared.');
+      }
+      break;
+    }
     case 'wait': {
       const u = selectedUnit();
       if (u && u.side === game.player && interactive()) {
+        E.clearDestination(game, u.id);
+        OrdersUI.cancel();
         u.moved = u.attacked = true;
         refreshAndSave();
         nextFleet();
@@ -1447,6 +1469,15 @@ document.addEventListener('keydown', e => {
   }
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   const k = e.key.toLowerCase();
+  if (k === 'g') {
+    const u = selectedUnit();
+    if (u && u.side === game.player && interactive()) {
+      e.preventDefault();
+      OrdersUI.begin(u.id);
+      updateSelection();
+      toast('Set course: click a navigable sector. Esc cancels.');
+    }
+  }
   if (k === 'n') {
     e.preventDefault();
     nextFleet();
@@ -1456,8 +1487,14 @@ document.addEventListener('keydown', e => {
     undoMove();
   }
   if (k === 'escape') {
-    selection = null;
-    updateSelection();
+    if (OrdersUI.active() != null) {
+      OrdersUI.cancel();
+      updateSelection();
+      toast('Standing order cancelled.');
+    } else {
+      selection = null;
+      updateSelection();
+    }
   }
   if (k === '+' || k === '=') changeZoom(1.2);
   if (k === '-') changeZoom(1 / 1.2);
