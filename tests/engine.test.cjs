@@ -294,7 +294,8 @@ test('Conquest AI forms theater fronts around corridors and keeps persistent ass
   E.aiProduction(g);
   const fronts = E.frontSummary(g, 'alliance');
   assert(fronts.length >= 2);
-  assert(fronts.some(f => f.name === 'Iserlohn' || f.name === 'Fezzan'));
+  assert(fronts.some(f => f.name === 'Iserlohn'));
+  assert(fronts.some(f => f.name === 'Fezzan'));
   const assignments = g.ai.alliance.assignments;
   assert(Object.keys(assignments).length > 0);
   const assigned = Object.entries(assignments).find(([, a]) => a.front !== 'reserve');
@@ -490,7 +491,7 @@ test('Confused fleets cannot repair or reinforce', () => {
 test('Both sides start conquest with equal income', () => {
   const g = E.createGame('alliance', 'normal', 'conquest', 4);
   assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
-  assert.equal(E.income(g, 'alliance').credits, 505);
+  assert.equal(E.income(g, 'alliance').credits, 474);
 });
 test('Pricing makes escorts the most cost-efficient and flagships the strongest per hex', () => {
   const linear = (k, n = 1) => {
@@ -503,7 +504,7 @@ test('Pricing makes escorts the most cost-efficient and flagships the strongest 
   assert(linear('flagship') > linear('battleship') && linear('battleship') > linear('heavy'));
   assert(eff('heavy', 2) < eff('heavy') && eff('heavy', 3) < eff('heavy', 2));
   const g = E.createGame('alliance', 'normal', 'conquest', 4);
-  // On the 24-world Conquest map a dreadnought still costs about a full turn of income.
+  // On the 44-system Conquest map a dreadnought still costs about a full turn of income.
   assert(E.price('flagship').credits > E.income(g, 'alliance').credits * 0.9);
 });
 test('Repairs cost a fifth of the fleet build price; reinforcing costs a full hull', () => {
@@ -867,13 +868,21 @@ test('A fleet whose only order is holding position has no orders left', () => {
   u.attacked = false;
   assert(E.hasOrders(g, u));
 });
-test('Conquest is a WC4-scale mirrored galaxy; Lippstadt and Ragnarok are campaign chapters', () => {
+test('Conquest is a 51 × 29, 44-system galaxy with only the Iserlohn and Fezzan corridors', () => {
   const g = E.createGame('empire', 'normal', 'conquest', 3);
-  assert.equal(g.cols, 31);
-  assert.equal(g.rows, 19);
-  assert.equal(g.stations.length, 24);
+  assert.equal(g.cols, 51);
+  assert.equal(g.rows, 29);
+  assert.equal(g.stations.length, 44);
+  assert.equal(g.stations.filter(s => s.owner === 'empire').length, 21);
+  assert.equal(g.stations.filter(s => s.owner === 'alliance').length, 21);
   assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
-  assert.equal(E.tile(g, 15, 9).terrain, 'rift');
+  for (const c of [24, 25, 26]) {
+    assert.equal(E.tile(g, c, 14).terrain, 'rift');
+    assert.notEqual(E.tile(g, c, 6).terrain, 'rift');
+    assert.notEqual(E.tile(g, c, 22).terrain, 'rift');
+  }
+  assert.equal(g.units.filter(u => u.side === 'empire').length, 18);
+  assert.equal(g.units.filter(u => u.side === 'alliance').length, 18);
   const lip = E.createGame('empire', 'normal', 'lippstadt_e', 3);
   assert.equal(lip.mode, 'lippstadt_e');
   assert(lip.units.some(u => u.side === 'neutral'));
