@@ -860,6 +860,26 @@ function fireFortressAt(s, p) {
 }
 function activateHex(p) {
   if (!p) return;
+  if (OrdersUI.active() != null) {
+    const id = OrdersUI.active(),
+      unit = game.units.find(u => u.id === id && u.hp > 0);
+    if (!unit || unit.side !== game.player) {
+      OrdersUI.cancel();
+      toast('Standing order cancelled.');
+      updateSelection();
+      return;
+    }
+    const order = E.setDestination(game, id, p.c, p.r);
+    if (!order.ok) {
+      toast(order.reason);
+      return;
+    }
+    OrdersUI.cancel();
+    selection = { kind: 'unit', id };
+    refreshAndSave();
+    toast(order.arrived ? 'Fleet is already at that sector.' : `Course set for [${p.c},${p.r}]. Automatic movement begins next turn.`);
+    return;
+  }
   const fort = selectedStation();
   if (fort && interactive() && targetCache.has(E.key(p))) {
     fireFortressAt(fort, p);
@@ -928,14 +948,16 @@ function attachMap() {
     }
     hover = hitHex(e.clientX, e.clientY);
     if (hover && !pointer?.dragged) {
-      canvas.style.cursor = readyCache.has(E.key(hover)) || targetCache.has(E.key(hover)) ? 'pointer' : 'default';
+      canvas.style.cursor = OrdersUI.active() != null ? 'crosshair' : readyCache.has(E.key(hover)) || targetCache.has(E.key(hover)) ? 'pointer' : 'default';
       const u = E.unitAt(game, hover),
         s = E.stationAt(game, hover),
         own = selectedUnit(),
         fort = selectedStation(),
         pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null;
       $('map-caption').textContent =
-        supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
+        OrdersUI.active() != null
+          ? 'Set course: click a navigable sector · Esc cancels'
+          : supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
           ? `⚠ Outside air supply · −10% hull at the start of each turn here · nearest coverage ${E.airSupply(game, own.side)} hexes from a friendly air base`
           : fort && u && targetCache.has(E.key(hover))
             ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
@@ -949,7 +971,7 @@ function attachMap() {
       // A click on an admiral's map portrait opens their Admiral Info, unless it lands on a move or attack hex.
       const p = hitHex(e.clientX, e.clientY),
         pin = hitPin(e.clientX, e.clientY);
-      if (pin && !(p && (targetCache.has(E.key(p)) || readyCache.has(E.key(p)))))
+      if (pin && OrdersUI.active() == null && !(p && (targetCache.has(E.key(p)) || readyCache.has(E.key(p)))))
         generalDialog(pin.admiral, !!pin.personal);
       else activateHex(p);
     }
