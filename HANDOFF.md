@@ -176,9 +176,28 @@ chapter map with completion, best stars, remaining rewards and the next chapter.
   offensives as **assembling** or **attacking**. Offensive fleets mass around a rally station before committing;
   defensive fronts take priority when capitals, fortresses or corridor stations are threatened.
 - Tactical movement scores progress toward the assigned front together with attack opportunities, artillery spacing,
-  Battle Line concentration and air supply. Production still handles fortress fire, repairs, dreadnought saving,
-  station upgrades, reinforcement and stacked fleet construction, but forward and rear shipyards now favor different
-  mixes. Scenario battles use the same tactical executor without the Conquest theater layer.
+  Battle Line concentration and air supply. Scenario battles use the same tactical executor without the Conquest
+  theater layer.
+- Production is now a strategic procurement planner rather than a fixed ship priority list. Each reachable front
+  starts from an approximately 40/20/20/10 Battle Line/Escort/Artillery/Air operational mix (with the theater reserve
+  handled separately), then shifts the mix against visible enemy branches and fortified objectives. Hard applies
+  stronger counter-building; Challenge also alternates combat and support branches through `productionHistory`.
+- Shipyards are attached to the nearest front using `routeField()`, so the gravity rift and the Iserlohn/Fezzan
+  crossings matter; raw hex distance is not used to decide which theater a yard supports. Forward yards favor immediate
+  line/screen needs, while deep yards can replenish an understrength strategic reserve with flexible Heavy Cruiser,
+  Destroyer and Fighter production.
+- Before reinforcement/upgrades the AI protects roughly 40% of current industry (and a smaller credit floor) for new
+  hulls. Reinforcement is scored toward admirals, dreadnoughts/battleships, artillery and vital fronts instead of
+  automatically stacking every eligible fleet. Emergency threats to a capital/corridor cancel long-term saving and
+  bias purchases toward fast, immediately useful ships.
+- Dreadnought saving is deterministic: a stable theater, adequate reserve, safe tier-3 yard and healthy economy can
+  reserve resources for a second dreadnought; threatened fronts cancel the plan. Every legal hull/stack combination is
+  scored for strategic deficit, counter value, combat efficiency, cost and yard role instead of always buying the
+  largest affordable stack.
+- `chooseDeployment()` selects a legal spawn hex toward the assigned reachable front, keeps artillery out of exposed
+  adjacent positions and keeps air supplied. New fleets receive a sticky front/reserve assignment immediately, then
+  the theater plan is rebuilt with the new force included. `E.productionSummary(g, side)` exposes the last procurement
+  decision (yards, builds, reinforcement, reserve target and emergency state) for deterministic tests/debugging.
 - The AI never appoints admirals. `E.frontSummary(g, side)` exposes the current front/state assignments for tests
   and debugging.
 
