@@ -406,9 +406,9 @@
       defensive = front?.type === 'defensive';
 
     // Counter-production: screens hunt artillery, fighters/screens answer air, frigates/artillery crack battle lines.
-    mix.Escort += mind.counter * (ratio.Artillery * 0.24 + ratio.Air * 0.1 + ratio['Battle Line'] * 0.07);
-    mix.Artillery += mind.counter * (ratio['Battle Line'] * 0.2 + (fortified ? 0.12 : 0));
-    mix.Air += mind.counter * (ratio.Air * 0.15 + (fortified ? 0.07 : 0));
+    mix.Escort += mind.counter * (ratio.Artillery * 0.55 + ratio.Air * 0.3 + ratio['Battle Line'] * 0.08);
+    mix.Artillery += mind.counter * (ratio['Battle Line'] * 0.24 + (fortified ? 0.12 : 0));
+    mix.Air += mind.counter * (ratio.Air * 0.36 + (fortified ? 0.07 : 0));
     mix['Battle Line'] += mind.counter * (ratio.Escort * 0.1 + (defensive ? 0.08 : 0));
     return { mix: normalizeMix(mix), enemy, enemyRatio: ratio, fortified, enemies };
   }
@@ -481,7 +481,17 @@
       minFront = frontDistances.length ? Math.min(...frontDistances) : 999,
       forward = minFront <= 7,
       rear = minFront >= 11;
-    if (reserve.deficit > 0 && rear) return { kind: 'reserve', distance: minFront, destination: plan?.capital, front: null, forward, rear };
+    if (reserve.deficit > 0 && rear)
+      return {
+        kind: 'reserve',
+        distance: minFront,
+        destination: plan?.capital,
+        front: null,
+        fallbackFront: best?.front || null,
+        fallbackDestination: best?.destination || plan?.capital,
+        forward,
+        rear,
+      };
     return { kind: 'front', ...(best || { front: null, distance: 999, destination: plan?.capital }), forward, rear };
   }
 
@@ -503,9 +513,11 @@
       front = context.yard.front;
     let score = 0;
 
-    if (type === 'destroyer') score += 42 * ((er.Artillery || 0) + (er.Air || 0) * 0.65);
-    if (type === 'frigate') score += 38 * (er['Battle Line'] || 0) + (fortified ? 14 : 0);
-    if (type === 'fighter') score += 50 * (er.Air || 0);
+    if (type === 'destroyer') score += 120 * (er.Artillery || 0) + 95 * (er.Air || 0);
+    if (type === 'frigate') score += 70 * (er['Battle Line'] || 0) + 60 * (er.Artillery || 0) + 45 * (er.Air || 0) + (fortified ? 14 : 0);
+    if (type === 'fighter') score += 170 * (er.Air || 0);
+    if (branch === 'Artillery' && ((er.Artillery || 0) > 0.45 || (er.Air || 0) > 0.35))
+      score -= 90 * Math.max(er.Artillery || 0, er.Air || 0);
     if (type === 'missile') score += 35 * (er['Battle Line'] || 0) + (fortified ? 12 : 0);
     if (type === 'siege') score += fortified ? 55 : 8;
     if (type === 'bomber') score += fortified ? 36 : 8;
@@ -672,7 +684,7 @@
 
     // Fortresses always fire before spending resources.
     for (const s of bases) {
-      const target = E.fortressTargets(g, s.id != null ? s : s)
+      const target = E.fortressTargets(g, s)
         .map(p => E.unitAt(g, p))
         .filter(Boolean)
         .sort((a, b) => b.hp - a.hp)[0];
@@ -790,12 +802,23 @@
 
     for (const s of buildOrder) {
       if (s.producedTurn === g.turn) continue;
-      const yp = yardPlans.get(s.id),
+      const originalYard = yardPlans.get(s.id) || { kind: 'reserve', destination: plan?.capital, front: null },
+        liveReserve = reserveStatus(g, side, plan),
+        yp =
+          originalYard.kind === 'reserve' && liveReserve.deficit <= 0 && originalYard.fallbackFront
+            ? {
+                ...originalYard,
+                kind: 'front',
+                front: originalYard.fallbackFront,
+                destination: originalYard.fallbackDestination,
+              }
+            : originalYard,
         targetFront = emergency.front && emergency.level >= 2 ? emergency.front : yp?.front,
+        liveGlobal = globalDeficits(g, side),
         need = targetFront
           ? frontProductionNeed(g, side, targetFront)
-          : { ...compositionTarget(g, side, null), deficit: global.deficit },
-        context = { yard: yp || { kind: 'reserve', destination: plan?.capital, front: null }, need, global, emergency, planState },
+          : { ...compositionTarget(g, side, null), deficit: liveGlobal.deficit },
+        context = { yard: yp, need, global: liveGlobal, emergency, planState },
         candidates = candidateBuilds(g, side, s, context);
       let choice = null;
       for (const cand of candidates) {
@@ -815,7 +838,10 @@
 
       let frontId = yp?.kind === 'reserve' ? 'reserve' : targetFront?.id || 'reserve';
       if (emergency.front && emergency.level >= 2) frontId = emergency.front.id;
-      if (plan) plan.assignments[result.unit.id] = { front: frontId, until: g.turn + FRONT.sticky };
+      if (plan) {
+        plan.assignments[result.unit.id] = { front: frontId, until: g.turn + FRONT.sticky };
+        if (frontId !== 'reserve' && targetFront) targetFront.assigned.push(result.unit);
+      }
       planState.productionHistory[frontId] = choice.branch;
       built.push({
         id: result.unit.id,
@@ -834,6 +860,10 @@
       savingForDreadnought: !!planState.saving,
       constructionReserve: { credits: constructionCredits, industry: constructionIndustry },
       reserve: { strength: reserve.strength, target: reserve.target, deficit: reserve.deficit },
+      fronts: (plan?.fronts || []).map(f => {
+        const need = frontProductionNeed(g, side, f);
+        return { id: f.id, name: f.anchor.name, type: f.type, desiredMix: need.mix, deficit: need.deficit };
+      }),
       yards: bases.map(s => ({
         id: s.id,
         name: s.name,
