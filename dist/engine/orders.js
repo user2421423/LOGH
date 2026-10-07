@@ -4,27 +4,65 @@
   const E = root.Galactic;
   if (!E) throw new Error('Galactic core must load before engine/orders.js');
 
+  // Route fields are reused heavily by the larger Conquest AI. Cache by game + destination + terrain mode,
+  // and use a binary min-heap instead of sorting the whole queue after every expanded hex.
+  const routeCache = new WeakMap();
   function routeField(g, destination, unit = null) {
-    const dest = E.tile(g, destination?.c, destination?.r);
-    const field = new Map();
+    const dest = E.tile(g, destination?.c, destination?.r),
+      field = new Map();
     if (!dest || dest.terrain === 'rift') return field;
-    const queue = [{ p: dest, cost: 0 }];
+    const ignoresTerrain = !!unit && (E.TYPES[unit.type]?.air || unit.admiral === 'yang'),
+      cacheKey = E.key(dest) + ':' + (ignoresTerrain ? 1 : 0);
+    let cache = routeCache.get(g);
+    if (!cache) routeCache.set(g, (cache = new Map()));
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+    const heap = [];
+    const push = item => {
+      let i = heap.length;
+      heap.push(item);
+      while (i) {
+        const p = (i - 1) >> 1;
+        if (heap[p].cost <= item.cost) break;
+        heap[i] = heap[p];
+        i = p;
+      }
+      heap[i] = item;
+    };
+    const pop = () => {
+      const root = heap[0],
+        last = heap.pop();
+      if (heap.length) {
+        let i = 0;
+        while (true) {
+          let child = i * 2 + 1;
+          if (child >= heap.length) break;
+          if (child + 1 < heap.length && heap[child + 1].cost < heap[child].cost) child++;
+          if (heap[child].cost >= last.cost) break;
+          heap[i] = heap[child];
+          i = child;
+        }
+        heap[i] = last;
+      }
+      return root;
+    };
+
     field.set(E.key(dest), 0);
-    const ignoresTerrain = !!unit && (E.TYPES[unit.type]?.air || unit.admiral === 'yang');
-    while (queue.length) {
-      queue.sort((a, b) => a.cost - b.cost);
-      const cur = queue.shift();
+    push({ p: dest, cost: 0 });
+    while (heap.length) {
+      const cur = pop();
       if (cur.cost !== field.get(E.key(cur.p))) continue;
       for (const n of E.adjacent(g, cur.p)) {
         if (n.terrain === 'rift') continue;
-        const step = ignoresTerrain ? 1 : n.terrain === 'nebula' || n.terrain === 'asteroid' ? 2 : 1;
-        const cost = cur.cost + step;
-        const k = E.key(n);
+        const step = ignoresTerrain ? 1 : n.terrain === 'nebula' || n.terrain === 'asteroid' ? 2 : 1,
+          cost = cur.cost + step,
+          k = E.key(n);
         if (cost >= (field.get(k) ?? Infinity)) continue;
         field.set(k, cost);
-        queue.push({ p: n, cost });
+        push({ p: n, cost });
       }
     }
+    cache.set(cacheKey, field);
     return field;
   }
 
