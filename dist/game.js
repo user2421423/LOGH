@@ -475,6 +475,10 @@ function attackHex(p) {
     toast(
       result.canMove ? 'Breakthrough! This fleet can move and fire again.' : 'Breakthrough! This fleet can fire again.',
     );
+  else if (result.reposition)
+    toast(
+      `${E.ADMIRALS[u.admiral]?.skill || 'Maneuver'}: reposition up to ${result.reposition} hex${result.reposition > 1 ? 'es' : ''}.`,
+    );
 }
 // WC4-style undo: a fleet that moved but has not fired returns to where it started.
 function undoMove() {
