@@ -1764,6 +1764,18 @@
 
       // The expanded front starts with a little more treasury, but total income is intentionally kept near the
       // old map's scale so the extra shipyards create strategic choice rather than exponential fleet spam.
+      // Equalize base-map per-turn yields despite asymmetric named fortresses.
+      const impYield = income(g, 'empire'),
+        allyYield = income(g, 'alliance'),
+        weaker = impYield.credits + impYield.industry + impYield.science > allyYield.credits + allyYield.industry + allyYield.science
+          ? g.stations.find(s => s.name === 'Heinessen')
+          : g.stations.find(s => s.name === 'Odin'),
+        strong = weaker.owner === 'alliance' ? impYield : allyYield,
+        weak = weaker.owner === 'alliance' ? allyYield : impYield;
+      weaker.income += strong.credits - weak.credits;
+      weaker.industry += strong.industry - weak.industry;
+      weaker.science += strong.science - weak.science;
+
       g.economy.empire = { credits: 500, industry: 180, science: 45 };
       g.economy.alliance = { credits: 500, industry: 180, science: 45 };
     }
