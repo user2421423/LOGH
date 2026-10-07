@@ -1283,6 +1283,7 @@
       destroyed,
       breakthrough,
       canMove: breakthrough && !a.moved,
+      reposition: a.repositionTurn === g.turn ? a.reposition || 0 : 0,
     };
   }
   function income(g, side) {
