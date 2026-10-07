@@ -819,7 +819,6 @@
     n += wears(g, u, 'star') ? 1 : 0;
     if (u.admiral === 'mittermeyer') n += 2;
     if (g?.rules?.blitz && u.side === g.rules.blitz.side && g.turn <= g.rules.blitz.turns) n++;
-    if (u.admiral === 'attenborough') n++;
     if (
       g &&
       g.units.some(
@@ -910,6 +909,7 @@
     u.c = c;
     u.r = r;
     u.moved = true;
+    u.lastMoveTurn = g.turn;
     if (u.repositionTurn === g.turn) u.reposition = 0;
     dest.owner = u.side;
     const s = stationAt(g, u);
@@ -944,7 +944,7 @@
           a.admiral === 'fischer'
             ? 0
             : a.admiral === 'eisenach'
-              ? 0.12
+              ? 0.08
               : a.admiral === 'merkatz' && (t.branch === 'Escort' || t.air)
                 ? 0.15
                 : 0.08;
@@ -960,15 +960,12 @@
     attack *= u.hp / maxHP(u) < 0.5 ? 0.72 : 1;
     attack *= 1 + auraBonus(g, u);
     if (u.inspiredTurn === g.turn) attack *= 1.15;
-    if (u.admiral === 'kircheis' && t.branch === 'Escort') attack *= 1.2;
     if (u.admiral === 'schonkopf' && t.branch === 'Escort') attack *= 1.35;
-    if (u.admiral === 'attenborough') attack *= 1.15;
     if (counter && u.admiral === 'yang') attack *= 1.65;
     // Recruitable admirals' signature abilities (attacker side).
     const k = u.admiral;
     if (k === 'bittenfeld' && !counter && target && target.hp / maxHP(target) < 0.5) attack *= 1.35;
     if (k === 'fahrenheit' && !counter && !u.moved) attack *= 1.3;
-    if (k === 'kempff' && (t.air || u.type === 'siege')) attack *= 1.25;
     if (
       k === 'lennenkampf' &&
       t.branch === 'Battle Line' &&
@@ -983,7 +980,13 @@
     )
       attack *= 1.18;
     if (counter && k === 'borodin' && u.hp / maxHP(u) < 0.5) attack *= 1.5;
-    if (k === 'nguyen' && !counter) attack *= 1.2;
+    if (
+      k === 'nguyen' &&
+      !counter &&
+      target &&
+      !g.units.some(v => v.hp > 0 && v.side === target.side && v.id !== target.id && distance(v, target) === 1)
+    )
+      attack *= 1.25;
     if (k === 'poplin' && victim?.air) attack *= 1.4;
     if (counter && k === 'steinmetz') attack *= 1.4;
     if (counter && k === 'bucock') attack *= 1.35;
@@ -996,6 +999,23 @@
             g.units.filter(v => v.hp > 0 && v.side === u.side && v.id !== u.id && distance(v, target) === 1).length,
           );
     if (target?.markSide === u.side && target.markTurn === g.turn) attack *= 1.15;
+    const flank =
+      !!target &&
+      g.units.some(v => v.hp > 0 && v.side === u.side && v.id !== u.id && distance(v, target) === 1);
+    if (u.admiral === 'reuenthal' && flank) attack *= 1.2;
+    if (
+      target?.comboSide === u.side &&
+      target.comboTurn === g.turn &&
+      ((target.comboKind === 'air' && t.branch === 'Artillery') ||
+        (target.comboKind === 'artillery' && t.air))
+    )
+      attack *= 1.25;
+    if (
+      counter &&
+      g.units.some(v => v.hp > 0 && v.side === u.side && v.admiral === 'eisenach' && distance(v, u) <= 2) &&
+      g.units.some(v => v.hp > 0 && v.side === u.side && v.id !== u.id && distance(v, u) === 1)
+    )
+      attack *= 1.2;
     if (t.boarding && (target ? victim.branch === 'Battle Line' : !!st)) attack *= 1.55;
     if (victim?.air && t.antiAir) attack *= t.antiAir;
     if (victim?.air && t.branch === 'Escort') attack *= 1.5;
@@ -1023,7 +1043,7 @@
       friends(u.side, target, v => v.branch !== 'Artillery')
     )
       attack *= 1.2;
-    const pen = clamp(t.pen + (u.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95);
+    const pen = clamp(t.pen + (u.admiral === 'reuenthal' && flank ? 0.2 : 0), 0, 0.95);
     const armor = target ? victim.armor + unitTech(g, target, 'armor') : 35;
     attack *= 100 / (100 + armor * (1 - pen) * 2);
     if (target) {
@@ -1054,7 +1074,26 @@
         )
       )
         attack *= 0.8;
-      if (dk === 'wahlen') attack *= 0.9;
+      const kircheisGuard = g.units.some(
+        v => v.hp > 0 && v.side === target.side && v.id !== target.id && v.admiral === 'kircheis' && distance(v, target) === 1,
+      );
+      if (target.admiral && kircheisGuard) attack *= target.admiral === 'reinhard' ? 0.75 : 0.85;
+      if (
+        g.units.some(
+          v =>
+            v.hp > 0 &&
+            v.side === target.side &&
+            v.admiral === 'wahlen' &&
+            v.lastMoveTurn !== g.turn &&
+            distance(v, target) <= 1,
+        )
+      )
+        attack *= 0.8;
+      if (
+        g.units.some(v => v.hp > 0 && v.side === target.side && v.admiral === 'eisenach' && distance(v, target) <= 2) &&
+        g.units.some(v => v.hp > 0 && v.side === target.side && v.id !== target.id && distance(v, target) === 1)
+      )
+        attack *= 0.9;
       if (dk === 'borodin' && target.hp / maxHP(target) < 0.5) attack *= 0.8;
       if (dk === 'konev') attack *= 0.7;
       if (dk === 'bittenfeld' && counter) attack *= 1.1;
@@ -1073,8 +1112,6 @@
       )
         attack *= 0.82;
       if (dk === 'kessler' && g.stations.some(s => s.owner === target.side && distance(s, target) <= 1)) attack *= 0.75;
-      if (g.units.some(v => v.hp > 0 && v.side === target.side && v.admiral === 'ulanhu' && distance(v, target) <= 1))
-        attack *= 0.9;
       const terrain = tile(g, target.c, target.r).terrain;
       if (terrain === 'asteroid') attack *= 0.85;
       if (victim.evasion) attack *= 1 - victim.evasion * 0.5;
@@ -1133,7 +1170,16 @@
       crit,
       critMult: (t.critMult || 1.55) + (a.admiral === 'lutz' ? 0.25 : 0),
       splash: t.splash ? t.splash + techValue(g, a.side, 'artillery.salvo') : 0,
-      armorPen: clamp(t.pen + (a.admiral === 'reuenthal' ? 0.25 : 0), 0, 0.95),
+      armorPen: clamp(
+        t.pen +
+          (a.admiral === 'reuenthal' &&
+          d &&
+          g.units.some(v => v.hp > 0 && v.side === a.side && v.id !== a.id && distance(v, d) === 1)
+            ? 0.2
+            : 0),
+        0,
+        0.95,
+      ),
     };
   }
   function kill(g, v, attacker) {
@@ -1192,6 +1238,14 @@
       d.markSide = a.side;
       d.markTurn = g.turn;
       d.markedBy = a.id;
+    }
+    if (a.admiral === 'kempff' && d && d.hp > 0) {
+      const branch = TYPES[a.type].branch;
+      if (TYPES[a.type].air || branch === 'Artillery') {
+        d.comboSide = a.side;
+        d.comboTurn = g.turn;
+        d.comboKind = TYPES[a.type].air ? 'air' : 'artillery';
+      }
     }
     let retaliation = 0;
     if (d && d.hp > 0 && pr.counterAllowed) {
@@ -1254,15 +1308,48 @@
     }
     // Gale Wolf: once per turn, an attack that would otherwise leave movement spent opens a short reposition.
     // It never restores the attack itself; breakthrough handling above remains unchanged.
+    let maneuver = 0,
+      maneuverSkill = null;
     if (pursuitTriggered && a.hp > 0) {
-      a.repositionTurn = g.turn;
-      a.reposition = movement(g, a);
-      a.moved = false;
+      maneuver = Math.max(maneuver, movement(g, a));
+      maneuverSkill = ADMIRALS[a.admiral]?.skill;
+    }
+    if (
+      destroyed &&
+      a.admiral === 'poplin' &&
+      TYPES[a.type].air &&
+      a.aceManeuverTurn !== g.turn
+    ) {
+      a.aceManeuverTurn = g.turn;
+      maneuver = Math.max(maneuver, 2);
+      maneuverSkill = ADMIRALS.poplin.skill;
+    }
+    if (
+      retaliation > 0 &&
+      a.admiral === 'attenborough' &&
+      a.flexManeuverTurn !== g.turn
+    ) {
+      a.flexManeuverTurn = g.turn;
+      maneuver = Math.max(maneuver, 2);
+      maneuverSkill = ADMIRALS.attenborough.skill;
+    }
+    if (
+      a.attacked &&
+      a.rearguardTurn !== g.turn &&
+      g.units.some(v => v.hp > 0 && v.side === a.side && v.admiral === 'ulanhu' && distance(v, a) <= 1)
+    ) {
+      a.rearguardTurn = g.turn;
+      maneuver = Math.max(maneuver, 1);
+      maneuverSkill = ADMIRALS.ulanhu.skill;
     }
     if (a.admiral === 'mittermeyer' && a.hp > 0 && a.moved && a.repositionUsedTurn !== g.turn) {
       a.repositionUsedTurn = g.turn;
+      maneuver = Math.max(maneuver, 2);
+      maneuverSkill = ADMIRALS.mittermeyer.skill;
+    }
+    if (maneuver > 0 && a.hp > 0) {
       a.repositionTurn = g.turn;
-      a.reposition = 2;
+      a.reposition = maneuver;
       a.moved = false;
     }
     log(
@@ -1284,6 +1371,7 @@
       breakthrough,
       canMove: breakthrough && !a.moved,
       reposition: a.repositionTurn === g.turn ? a.reposition || 0 : 0,
+      maneuverSkill,
     };
   }
   function income(g, side) {
@@ -1491,7 +1579,11 @@
     }
     g.strikes = [];
     for (const s of g.stations) {
-      if (s.owner === side) s.shield = Math.min(s.maxShield, s.shield + Math.round(s.maxShield * 0.12));
+      if (s.owner !== side) continue;
+      const guarded = g.units.some(
+        u => u.hp > 0 && u.side === side && u.admiral === 'kessler' && distance(u, s) <= 1,
+      );
+      s.shield = Math.min(s.maxShield, s.shield + Math.round(s.maxShield * (guarded ? 0.22 : 0.12)));
     }
     checkVictory(g);
   }

@@ -416,6 +416,133 @@ test('Reworked admirals use maneuver, pursuit, formation and target-designation 
   assert(lastStand.unit < healthy.unit);
   assert(lastStand.counter > healthy.counter);
 });
+test('Second-wave admirals use flanking, protection, withdrawal, combined strikes and defensive formations', () => {
+  // Reuenthal: a second friendly axis adjacent to the target improves both damage and penetration.
+  let g = blank();
+  g.phase = 'empire';
+  const reu = E.newUnit(g, 'heavy', 'empire', 4, 4, 1, 'reuenthal'),
+    reuTarget = E.newUnit(g, 'heavy', 'alliance', 5, 4, 2);
+  const reuSolo = E.preview(g, reu.id, reuTarget.c, reuTarget.r);
+  const flankHex = E.adjacent(g, reuTarget).find(p => !E.unitAt(g, p) && E.key(p) !== E.key(reu));
+  E.newUnit(g, 'corvette', 'empire', flankHex.c, flankHex.r);
+  const reuFlank = E.preview(g, reu.id, reuTarget.c, reuTarget.r);
+  assert(reuFlank.unit > reuSolo.unit);
+  assert(reuFlank.armorPen > reuSolo.armorPen);
+
+  // Kircheis: adjacent admiral fleets are protected, with stronger protection for Reinhard.
+  g = blank();
+  g.phase = 'alliance';
+  const rein = E.newUnit(g, 'heavy', 'empire', 4, 4, 1, 'reinhard'),
+    kir = E.newUnit(g, 'frigate', 'empire', 3, 4, 1, 'kircheis'),
+    kirAttacker = E.newUnit(g, 'heavy', 'alliance', 5, 4, 2);
+  const loyalGuard = E.preview(g, kirAttacker.id, rein.c, rein.r).unit;
+  kir.hp = 0;
+  const unguarded = E.preview(g, kirAttacker.id, rein.c, rein.r).unit;
+  assert(loyalGuard < unguarded);
+
+  // Attenborough: surviving counter-fire opens a 2-hex flexible reposition without another attack.
+  g = blank();
+  const att = E.newUnit(g, 'heavy', 'alliance', 4, 4, 1, 'attenborough'),
+    attTarget = E.newUnit(g, 'flagship', 'empire', 5, 4, 3);
+  const attShot = E.attack(g, att.id, attTarget.c, attTarget.r);
+  assert(attShot.counter > 0 && attTarget.hp > 0);
+  assert.equal(attShot.reposition, 2);
+  assert.equal(attShot.maneuverSkill, E.ADMIRALS.attenborough.skill);
+  assert(att.attacked);
+  assert(E.reachable(g, att).size > 0);
+  assert(Math.max(...E.reachable(g, att).values()) <= 2);
+
+  // Kempff: his air hit cues artillery, and his artillery hit cues air.
+  g = blank();
+  g.phase = 'empire';
+  const kAir = E.newUnit(g, 'fighter', 'empire', 4, 4, 1, 'kempff'),
+    artillery = E.newUnit(g, 'beam', 'empire', 4, 5),
+    comboTarget = E.newUnit(g, 'flagship', 'alliance', 5, 4, 3);
+  const artyBefore = E.preview(g, artillery.id, comboTarget.c, comboTarget.r).unit;
+  assert(E.attack(g, kAir.id, comboTarget.c, comboTarget.r).ok);
+  assert(comboTarget.hp > 0);
+  assert(E.preview(g, artillery.id, comboTarget.c, comboTarget.r).unit > artyBefore);
+
+  g = blank();
+  g.phase = 'empire';
+  const kArt = E.newUnit(g, 'beam', 'empire', 4, 4, 1, 'kempff'),
+    air = E.newUnit(g, 'fighter', 'empire', 4, 5),
+    reverseTarget = E.newUnit(g, 'flagship', 'alliance', 5, 4, 3);
+  const airBefore = E.preview(g, air.id, reverseTarget.c, reverseTarget.r).unit;
+  assert(E.attack(g, kArt.id, reverseTarget.c, reverseTarget.r).ok);
+  assert(reverseTarget.hp > 0);
+  assert(E.preview(g, air.id, reverseTarget.c, reverseTarget.r).unit > airBefore);
+
+  // Eisenach: formed fleets inside his 2-hex command net take less damage and return stronger fire.
+  g = blank();
+  g.phase = 'alliance';
+  const formed = E.newUnit(g, 'heavy', 'empire', 4, 4, 2),
+    wing = E.newUnit(g, 'light', 'empire', 3, 4),
+    eisenach = E.newUnit(g, 'heavy', 'empire', 4, 5, 1, 'eisenach'),
+    eAttacker = E.newUnit(g, 'heavy', 'alliance', 5, 4, 2);
+  const coordinated = E.preview(g, eAttacker.id, formed.c, formed.r);
+  eisenach.hp = 0;
+  const loose = E.preview(g, eAttacker.id, formed.c, formed.r);
+  assert(coordinated.unit < loose.unit);
+  assert(coordinated.counter > loose.counter);
+  assert(wing.hp > 0);
+
+  // Wahlen: a stationary Wahlen anchors himself and adjacent friendly fleets.
+  g = blank();
+  g.phase = 'alliance';
+  const held = E.newUnit(g, 'heavy', 'empire', 4, 4, 2),
+    wahlen = E.newUnit(g, 'heavy', 'empire', 3, 4, 1, 'wahlen'),
+    wAttacker = E.newUnit(g, 'heavy', 'alliance', 5, 4, 2);
+  const stationary = E.preview(g, wAttacker.id, held.c, held.r).unit;
+  wahlen.lastMoveTurn = g.turn;
+  const afterManeuver = E.preview(g, wAttacker.id, held.c, held.r).unit;
+  assert(stationary < afterManeuver);
+
+  // Kessler: a guarded friendly station regenerates 22% rather than the normal 12%.
+  g = blank();
+  g.phase = 'empire';
+  const post = station(g, 4, 4, 'empire', 0, 2);
+  post.shield = 0;
+  post.maxShield = 200;
+  E.newUnit(g, 'frigate', 'empire', 5, 4, 1, 'kessler');
+  E.beginTurn(g, 'empire', false);
+  assert.equal(post.shield, 44);
+
+  // Ulanhu: an adjacent fleet that spends its shot without breakthrough may withdraw one hex.
+  g = blank();
+  const ulanhu = E.newUnit(g, 'heavy', 'alliance', 3, 4, 1, 'ulanhu'),
+    rear = E.newUnit(g, 'heavy', 'alliance', 4, 4),
+    rearTarget = E.newUnit(g, 'flagship', 'empire', 5, 4, 3);
+  const withdraw = E.attack(g, rear.id, rearTarget.c, rearTarget.r);
+  assert(withdraw.ok && rearTarget.hp > 0);
+  assert.equal(withdraw.reposition, 1);
+  assert.equal(withdraw.maneuverSkill, E.ADMIRALS.ulanhu.skill);
+  assert(rear.attacked);
+  assert(E.reachable(g, rear).size > 0);
+  assert(Math.max(...E.reachable(g, rear).values()) <= 1);
+  assert(ulanhu.hp > 0);
+
+  // Poplin: first kill by his air wing grants a 2-hex evasive maneuver.
+  g = blank();
+  const poplin = E.newUnit(g, 'fighter', 'alliance', 4, 4, 1, 'poplin'),
+    popTarget = E.newUnit(g, 'corvette', 'empire', 5, 4);
+  popTarget.hp = 1;
+  const popShot = E.attack(g, poplin.id, popTarget.c, popTarget.r);
+  assert(popShot.destroyed);
+  assert.equal(popShot.reposition, 2);
+  assert.equal(popShot.maneuverSkill, E.ADMIRALS.poplin.skill);
+  assert(E.reachable(g, poplin).size > 0);
+
+  // Nguyen: isolated targets are more vulnerable than screened targets.
+  g = blank();
+  const nguyen = E.newUnit(g, 'heavy', 'alliance', 4, 4, 1, 'nguyen'),
+    raiderTarget = E.newUnit(g, 'heavy', 'empire', 5, 4, 2);
+  const isolated = E.preview(g, nguyen.id, raiderTarget.c, raiderTarget.r).unit;
+  const screenHex = E.adjacent(g, raiderTarget).find(p => !E.unitAt(g, p) && E.key(p) !== E.key(nguyen));
+  E.newUnit(g, 'corvette', 'empire', screenHex.c, screenHex.r);
+  const screened = E.preview(g, nguyen.id, raiderTarget.c, raiderTarget.r).unit;
+  assert(isolated > screened);
+});
 test('HQ research spends command tokens, respects tiers and prerequisites, and applies to the player only', () => {
   const p = { tokens: 0, wins: 0, research: {} };
   assert.equal(E.researchReason(p, 'line.armor'), 'Need 50 more command tokens');
