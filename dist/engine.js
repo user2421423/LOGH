@@ -941,11 +941,13 @@
       if (distance(a, u) > auraRange(g, a)) continue;
       const t = TYPES[u.type],
         b =
-          a.admiral === 'eisenach'
-            ? 0.12
-            : a.admiral === 'merkatz' && (t.branch === 'Escort' || t.air)
-              ? 0.15
-              : 0.08;
+          a.admiral === 'fischer'
+            ? 0
+            : a.admiral === 'eisenach'
+              ? 0.12
+              : a.admiral === 'merkatz' && (t.branch === 'Escort' || t.air)
+                ? 0.15
+                : 0.08;
       bonus = Math.max(bonus, b);
     }
     return bonus;
