@@ -1692,7 +1692,8 @@
       for (let c = 0; c < g.cols; c++) {
         const n = random(g);
         let terrain = n < mix.nebula ? 'nebula' : n < mix.nebula + mix.asteroid ? 'asteroid' : 'space';
-        if (rift && c === rift.col && !rift.open.includes(r)) terrain = 'rift';
+        const riftCols = rift ? (rift.cols || [rift.col]) : [];
+        if (rift && riftCols.includes(c) && !rift.open.includes(r)) terrain = 'rift';
         if (eraSpec?.band?.cols.includes(c) && random(g) < eraSpec.band.chance) terrain = eraSpec.band.terrain;
         g.tiles.push({
           c,
@@ -1734,56 +1735,37 @@
       tile(g, c, r).owner = owner;
       return s;
     }
-    // The galactic frontier: a WC4-scale 31 × 19 galaxy. The Empire's worlds mirror the Alliance's across a rift
-    // crossed only by the Iserlohn and Fezzan corridors.
+    // The galactic frontier is data-driven from engine/galaxy.js so the large Conquest map stays out of the rules core.
     function buildFrontier() {
-      const W = g.cols - 1,
-        worlds = [
-          // [Empire name, Alliance name, c, r, tier, capital, fort]
-          ['Odin', 'Heinessen', 2, 9, 3, true, false],
-          ['Valhalla', 'Rantemario', 4, 13, 2, false, false],
-          ['Freya', 'Palmeren', 4, 5, 2, false, false],
-          ['Rentenberg', 'Shiva', 2, 2, 1, false, false],
-          ['Westerland', 'Jamshid', 2, 16, 1, false, false],
-          ['Brauschweig', 'Dagon', 7, 3, 1, false, false],
-          ['Lippstadt', 'Doria', 7, 15, 1, false, false],
-          ['Garmisch', 'Amritsar', 9, 9, 2, false, false],
-          ['Kastrop', 'El Facil', 11, 5, 1, false, false],
-          ['Geiersburg', 'Vermilion', 11, 13, 2, false, true],
-          ['Kifeuser', 'Astarte', 13, 9, 1, false, false],
-        ];
-      for (const [imp, ally, c, r, tier, capital, fort] of worlds) {
-        claim(station(imp, c, r, 'empire', tier, capital, fort), 'empire');
-        claim(station(ally, W - c, r, 'alliance', tier, capital, fort), 'alliance');
+      const spec = ERAS.frontier,
+        W = g.cols - 1;
+      for (const [name, c, r, owner, tier, capital = false, fort = false] of spec.stations || [])
+        claim(station(name, c, r, owner, tier, capital, fort), owner);
+
+      // Keep ordinary frontier worlds economically meaningful without letting 44 shipyards create runaway income.
+      // Capitals / fortresses retain their normal yields; minor hubs are scaled down for the expanded map.
+      for (const s of g.stations) {
+        if (s.capital || s.fort || s.owner === 'neutral') continue;
+        s.income = s.tier >= 2 ? 26 : 18;
+        s.industry = s.tier >= 2 ? 14 : 8;
+        s.science = s.tier >= 2 ? 5 : 3;
       }
-      station('Iserlohn', 15, 3, 'neutral', 3, false, true);
-      station('Fezzan', 15, 15, 'neutral', 2);
+
       const leads = {
         empire: ['reinhard', 'mittermeyer', 'reuenthal', 'kircheis'],
         alliance: ['yang', 'attenborough', 'fischer', 'schonkopf'],
       };
       for (const side of ['empire', 'alliance']) {
-        const at = c => (side === 'empire' ? c : W - c),
-          [a0, a1, a2, a3] = leads[side];
-        [
-          ['flagship', 3, 9, 1, a0],
-          ['heavy', 5, 8, 2, a1],
-          ['battleship', 5, 10, 2, a2],
-          ['frigate', 8, 4, 2, a3],
-          ['heavy', 8, 14, 2],
-          ['light', 10, 6, 2],
-          ['light', 10, 12, 2],
-          ['beam', 6, 9, 2],
-          ['missile', 4, 8, 1],
-          ['siege', 4, 10, 1],
-          ['corvette', 12, 4, 2],
-          ['destroyer', 12, 14, 1],
-          ['corvette', 9, 10, 1],
-          ['fighter', 3, 8, 1],
-        ].forEach(([type, c, r, stack, admiral]) => newUnit(g, type, side, at(c), r, stack, admiral || null));
+        const at = x => (side === 'empire' ? x : W - x),
+          admirals = leads[side];
+        for (const [type, x, r, stack, admiralIndex] of spec.fleets || [])
+          newUnit(g, type, side, at(x), r, stack, admiralIndex == null ? null : admirals[admiralIndex]);
       }
-      g.economy.empire = { credits: 400, industry: 150, science: 40 };
-      g.economy.alliance = { credits: 400, industry: 150, science: 40 };
+
+      // The expanded front starts with a little more treasury, but total income is intentionally kept near the
+      // old map's scale so the extra shipyards create strategic choice rather than exponential fleet spam.
+      g.economy.empire = { credits: 500, industry: 180, science: 45 };
+      g.economy.alliance = { credits: 500, industry: 180, science: 45 };
     }
     const place = ([side, type, c, r, stack = 1, admiral = null, art = null]) => {
       const u = newUnit(g, type, side, c, r, stack, admiral);
@@ -1821,7 +1803,7 @@
       g.rules = spec.rules || null;
       for (const name of spec.removeStations || []) {
         const gone = g.stations.find(s => s.name === name);
-        if (rift && gone.c === rift.col) tile(g, gone.c, gone.r).terrain = 'rift';
+        if (rift && (rift.cols || [rift.col]).includes(gone.c)) tile(g, gone.c, gone.r).terrain = 'rift';
         g.stations = g.stations.filter(s => s !== gone);
       }
       g.stations.forEach((s, i) => (s.id = i));
