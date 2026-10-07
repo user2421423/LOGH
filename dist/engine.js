@@ -83,7 +83,7 @@
       crit: 0.12,
       pen: 0.2,
       breakthrough: true,
-      desc: 'Balanced early combatant. A kill lets it fire once more per turn (no extra movement).',
+      desc: 'Balanced early combatant. A kill lets it fire once more per turn; if it had not moved yet, movement remains available.',
     },
     heavy: {
       name: 'Heavy Cruiser',
@@ -103,7 +103,7 @@
       crit: 0.14,
       pen: 0.3,
       breakthrough: true,
-      desc: 'The fleet backbone. Heavy armor; a kill lets it fire once more per turn (no extra movement).',
+      desc: 'The fleet backbone. Heavy armor; a kill lets it fire once more per turn; if it had not moved yet, movement remains available.',
     },
     battleship: {
       name: 'Battleship',
@@ -124,7 +124,7 @@
       pen: 0.42,
       breakthrough: true,
       relentless: true,
-      desc: 'Heavy armor penetration and 1–2 hex guns. Exchanges counter-fire. Every kill lets it fire again; the first also refreshes its movement.',
+      desc: 'Heavy armor penetration and 1–2 hex guns. Exchanges counter-fire. Every kill lets it fire again and preserves any unused movement.',
     },
     flagship: {
       name: 'Dreadnought',
@@ -145,7 +145,7 @@
       pen: 0.48,
       breakthrough: true,
       relentless: true,
-      desc: 'Super-heavy capital ship. Immense armor, 1–2 hex guns and counter-fire. Every kill lets it fire again; the first also refreshes its movement.',
+      desc: 'Super-heavy capital ship. Immense armor, 1–2 hex guns and counter-fire. Every kill lets it fire again and preserves any unused movement.',
     },
     beam: {
       name: 'Artillery Frigate',
@@ -1869,8 +1869,11 @@
       crit = random(g) < pr.crit,
       mult = (0.92 + random(g) * 0.16) * (crit ? pr.critMult : 1),
       hit = [];
+    // Remember whether movement was still unused before the shot. A successful breakthrough
+    // preserves that movement instead of spending it; it never restores movement already used.
+    const hadMovement = !a.moved;
     // Carrier Operations II: an air wing that fires before moving may still move.
-    const sortie = !!TYPES[a.type].air && !a.moved && techLevel(g, a.side, 'air.carrier') >= 2;
+    const sortie = !!TYPES[a.type].air && hadMovement && techLevel(g, a.side, 'air.carrier') >= 2;
     a.attacked = true;
     a.moved = !sortie;
     a.sortie = sortie;
@@ -1915,16 +1918,18 @@
     }
     let breakthrough = false;
     if (destroyed && a.hp > 0 && TYPES[a.type].breakthrough && a.chain < cap) {
-      // Breakthrough: a kill lets the hull fire again. Cruisers get no extra movement; battleships and
-      // dreadnoughts also regain movement on their first kill.
+      // Breakthrough: a kill lets the hull fire again and preserves movement that was unused
+      // before the shot. Movement already spent earlier in the turn is never restored.
       a.chain++;
       a.attacked = false;
-      if (TYPES[a.type].relentless) a.moved = false;
+      if (hadMovement) a.moved = false;
       a.sortie = false;
       breakthrough = true;
     } else if (destroyed && a.hp > 0 && TYPES[a.type].relentless) {
       // Battleships and dreadnoughts always fire again after a kill, beyond the breakthrough cap.
+      // As above, keep movement available only if it was still unused before this shot.
       a.attacked = false;
+      if (hadMovement) a.moved = false;
       a.sortie = false;
       breakthrough = true;
     }
