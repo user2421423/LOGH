@@ -29,7 +29,7 @@ It is an unofficial fan game; see `ASSETS.md` for art sources and permissions.
 
 - **Run locally:** serve `dist/` with any static server (e.g. `npx serve dist` or `python3 -m http.server -d dist`)
   and open it. Opening `dist/index.html` directly also works in most browsers.
-- **Tests (local only):** `node --test tests/engine.test.cjs` (44 engine tests) and `node tests/ui-smoke.cjs`
+- **Tests (local only):** `node --test tests/engine.test.cjs` (including standing-order and theater-AI regressions) and `node tests/ui-smoke.cjs`
   (loads all UI scripts in a stubbed DOM and clicks through every dialog for both factions). Node 22.
 - **Deploy:** `.github/workflows/pages.yml` uploads `dist/` to GitHub Pages on every push to the working branch.
   It deliberately does **not** run the tests (owner's choice).
@@ -41,7 +41,14 @@ Everything ships from `dist/`; there is no bundler. Scripts load in this order f
 
 | File | Role |
 |---|---|
-| `dist/engine.js` | The deterministic rules engine (`window.Galactic`, aliased `E` in the UI; `module.exports` for Node). No DOM. Unit types, admirals, tech tree, combat, AI, maps, scenarios, campaigns, profile/roster logic. Seeded LCG via `random(g)`. |
+| `dist/engine.js` | Core deterministic rules (`window.Galactic`, aliased `E` in the UI; `module.exports` for Node): combat, movement, economy, profile/roster logic and save migration. Seeded LCG via `random(g)`. |
+| `dist/engine/admirals.js` | Admiral definitions and starting branch/movement ratings. Loaded as data before the core engine. |
+| `dist/engine/research.js` | HQ technology trees, nodes, tiers and branch metadata. |
+| `dist/engine/galaxy.js` | Conquest eras and galaxy/start-date data. |
+| `dist/engine/campaign.js` | Scenario definitions and campaign chapter order. |
+| `dist/engine/orders.js` | Standing-course route field, set/clear course, and automatic turn-start movement. |
+| `dist/engine/ai.js` | Strategic theater AI: front clustering, sticky assignments, reserves, rally/attack states, production and tactical orders. |
+| `dist/ui/orders.js` | Small UI state module for Set course targeting. |
 | `dist/art.js` | `ART`: sprite atlases (fleet, faction fleets, terrain, admiral portraits), air-wing PNGs, admiral portrait photos, drawn placeholder busts, canvas and SVG/HTML renderers. |
 | `dist/icons.js` | `ICONS`: inline SVG sprite (credits $ coin, industry, research, command token, attack/defense/move/range, air base, air wings) and the HP ring. |
 | `dist/audio.js` | `SFX`: Web Audio synthesized sounds (weapons per hull class and faction voice, explosions, crits, Thor's Hammer, fleet movement, air fly-by). Mute persists. |
@@ -76,9 +83,7 @@ Everything ships from `dist/`; there is no bundler. Scripts load in this order f
 
 ### Units (13 classes)
 - **Escort:** Corvette, Frigate (boarding: +55% vs Battle Line and stations), Destroyer (5 movement).
-- **Battle Line:** Light Cruiser, Heavy Cruiser, Battleship, Dreadnought. Cruiser kills grant one extra shot per
-  turn (no extra movement). Battleships and Dreadnoughts fire again after every kill; their first kill each turn
-  also restores movement. Mittermeyer, Attenborough and Nguyen allow two cruiser re-fires.
+- **Battle Line:** Light Cruiser, Heavy Cruiser, Battleship, Dreadnought. A qualifying kill grants another shot; if the fleet had not moved before that killing shot, its unused movement remains available. Movement already spent earlier in the turn is never restored. Battleships and Dreadnoughts can keep firing after kills; Mittermeyer, Attenborough and Nguyen raise the normal cruiser breakthrough cap.
 - **Artillery:** Artillery Frigate (range 1), Artillery Cruiser (exactly range 2, splash 45%), Siege Cannon
   (exactly range 2, +100% vs stations). Artillery suppresses counter-fire and cannot capture.
 - **Air:** Fighter, Bomber, Strategic Bomber wings, built at station air bases (levels 1–3). They ignore terrain,
@@ -157,9 +162,23 @@ chapter map with completion, best stars, remaining rewards and the next chapter.
   holding more stations at the 80-turn armistice.
 
 ### AI
-- `aiProduction` (fortress fire, repairs, saving for dreadnoughts, upgrades, research is not used by the AI,
-  stacked fleet production, no fleet cap) and `aiOrder` (per-fleet move/attack scoring, air supply aware,
-  chains up to 8 attacks). The AI never appoints admirals.
+- Conquest AI lives in `dist/engine/ai.js`. Each side identifies strategic objectives, clusters them into fronts,
+  keeps unit-to-front assignments sticky for several turns, reserves part of its fleet near the capital, and marks
+  offensives as **assembling** or **attacking**. Offensive fleets mass around a rally station before committing;
+  defensive fronts take priority when capitals, fortresses or corridor stations are threatened.
+- Tactical movement scores progress toward the assigned front together with attack opportunities, artillery spacing,
+  Battle Line concentration and air supply. Production still handles fortress fire, repairs, dreadnought saving,
+  station upgrades, reinforcement and stacked fleet construction, but forward and rear shipyards now favor different
+  mixes. Scenario battles use the same tactical executor without the Conquest theater layer.
+- The AI never appoints admirals. `E.frontSummary(g, side)` exposes the current front/state assignments for tests
+  and debugging.
+
+### Standing courses
+- A player fleet may store `u.destination = { c, r }`. **Set course** / **G** accepts any navigable non-rift hex,
+  draws a dashed route marker, and `runStandingOrders` advances every queued fleet at the start of the player's turn.
+- Automatic course movement consumes the move action but not the attack action. The route remains queued if temporarily
+  blocked, clears on arrival, and is cancelled by **Clear course** or **Hold position**. `engine/orders.js` owns the
+  route-field/pathing logic; `ui/orders.js` owns only targeting-mode state.
 
 ### Presentation
 - WC4-style HUD: resource bar with gold $ coin, faction-coloured unit plates (Empire navy/gold, Alliance

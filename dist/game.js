@@ -1,5 +1,6 @@
 'use strict';
 const E = Galactic,
+  OrdersUI = GalacticOrdersUI,
   $ = id => document.getElementById(id),
   app = $('app'),
   modal = $('modal-root');
@@ -220,7 +221,7 @@ function render() {
   const e = game.economy[game.player],
     inc = E.income(game, game.player),
     stations = game.stations.filter(s => s.owner === game.player).length;
-  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research. Banked research becomes command tokens when you win (5 research = 1 token)', e.science, inc.science)}${resource('token', 'Tokens', 'Command tokens · spent on HQ research, earned by winning operations', loadProfile().tokens || 0)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research">Research</button><button class="small" data-action="admirals" ${!interactive() ? `disabled title="${phaseReason()}"` : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${E.modeTitle(game)}</h2></div><p class="objective">${E.objectiveText(game)}${game.objective && game.mode !== 'conquest' ? ` <b>Turn ${game.turn} / ${game.objective.turns}</b>` : ''}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="${phaseReason() || (undoStack.length ? 'Return the last moved fleet to where it started (Z)' : 'No move to undo')}">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
+  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research. Banked research becomes command tokens when you win (5 research = 1 token)', e.science, inc.science)}${resource('token', 'Tokens', 'Command tokens · spent on HQ research, earned by winning operations', loadProfile().tokens || 0)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research">Research</button><button class="small" data-action="admirals" ${!interactive() ? `disabled title="${phaseReason()}"` : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${E.modeTitle(game)}</h2></div><p class="objective">${E.objectiveText(game)}${game.objective && game.mode !== 'conquest' ? ` <b>Turn ${game.turn} / ${game.objective.turns}</b>` : ''}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. G sets a standing course. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · G: set standing course · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet · <span class="kbd">G</span> course</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="${phaseReason() || (undoStack.length ? 'Return the last moved fleet to where it started (Z)' : 'No move to undo')}">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
   canvas = $('map');
   ctx = canvas.getContext('2d');
   attachMap();
@@ -316,7 +317,9 @@ function updateSelection() {
     ? 'Operation concluded'
     : `${ready} fleets ready <small>${E.FACTIONS[game.player].short} · ${E.DIFFICULTIES[game.difficulty]?.name || 'Normal'} · ${saveOk ? 'autosaved' : 'not saved'}</small>`;
   $('map-banner').textContent =
-    game.phase !== game.player
+    OrdersUI.active() != null
+      ? 'SET COURSE · Click a destination sector · Esc to cancel'
+      : game.phase !== game.player
       ? 'Enemy fleets are maneuvering…'
       : game.over
         ? 'Operation concluded'
@@ -352,7 +355,7 @@ function panel() {
       ours = u.side === game.player,
       st = E.stationAt(game, u),
       a = E.ADMIRALS[u.admiral];
-    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${t.branch}</span><span class="chip" style="color:${E.FACTIONS[u.side].color}">${E.FACTIONS[u.side].short}</span></div>${ART.ship(u.type, 'panel-ship', artSide(u))}<h2 class="unit-name">${a && u.type === 'flagship' ? a.hull : t.name}</h2><p class="description">${a && u.type === 'flagship' ? t.name + ' · ' : ''}${t.desc}</p><div class="hp-row">${ICONS.hp(u.hp, E.maxHP(u), 'hp-ring-lg')}<span>Hull integrity</span><span class="mono">${Math.ceil(u.hp)} / ${E.maxHP(u)}</span></div><div class="stat-grid"><div><span class="label">${ICONS.use('atk')} Attack</span><b>${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</b></div><div><span class="label">${ICONS.use('def')} Armor</span><b>${t.armor}</b></div><div><span class="label">${ICONS.use('mov')} Move</span><b>${E.movement(game, u)}</b></div><div><span class="label">${ICONS.use('rng')} Range</span><b>${rangeText(u)}</b></div><div><span class="label">Stack</span><b>${u.stack}/${t.elite ? 1 : 3}</b></div><div><span class="label">Veteran</span><b>${u.xp}/5</b></div></div><div class="status-line"><span class="status ${moveStatus(u) === 'Move ready' ? 'ready' : 'spent'}">${moveStatus(u)}</span><span class="status ${fireStatus(u) === 'Fire ready' ? 'ready' : 'spent'}">${fireStatus(u)}</span><span class="status">${moraleName(u.morale)}</span></div>${a ? admiralCard(u) : ''}${ours ? `<div class="actions">${!a ? act('data-action="assign"', 'Assign admiral', phaseReason(), 'Choose an officer') : ''}${a?.trait === 'magician' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '−2 morale · 2 hex radius', '', false) : ''}${act('data-action="reinforce"', 'Add a stack', phaseReason() || E.reinforceReason(game, u), costHTML(E.reinforceCost(u.type)))}${act('data-action="repair"', 'Repair fleet', phaseReason() || E.repairReason(game, u), '+35% HP · ' + costHTML({ credits: E.repairCost(u, game) }))}${act('data-action="wait"', 'Hold position', phaseReason() || holdReason(u), 'Finish this fleet’s turn')}</div><p class="description" style="font-size:11px">Repair and stacking require a friendly station within 1 hex and consume this fleet’s turn.</p>` : ''}${st ? `<div class="section-divider"><span class="label">Station beneath fleet</span><div class="station-buttons"><button data-station="${st.id}">${st.name} · Tier ${st.tier}</button>${st.owner === game.player ? `<button data-shop="${st.id}" ${!interactive() ? 'disabled' : ''}>Shipyard</button>` : ''}</div></div>` : ''}</section>`;
+    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${t.branch}</span><span class="chip" style="color:${E.FACTIONS[u.side].color}">${E.FACTIONS[u.side].short}</span></div>${ART.ship(u.type, 'panel-ship', artSide(u))}<h2 class="unit-name">${a && u.type === 'flagship' ? a.hull : t.name}</h2><p class="description">${a && u.type === 'flagship' ? t.name + ' · ' : ''}${t.desc}</p><div class="hp-row">${ICONS.hp(u.hp, E.maxHP(u), 'hp-ring-lg')}<span>Hull integrity</span><span class="mono">${Math.ceil(u.hp)} / ${E.maxHP(u)}</span></div><div class="stat-grid"><div><span class="label">${ICONS.use('atk')} Attack</span><b>${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</b></div><div><span class="label">${ICONS.use('def')} Armor</span><b>${t.armor}</b></div><div><span class="label">${ICONS.use('mov')} Move</span><b>${E.movement(game, u)}</b></div><div><span class="label">${ICONS.use('rng')} Range</span><b>${rangeText(u)}</b></div><div><span class="label">Stack</span><b>${u.stack}/${t.elite ? 1 : 3}</b></div><div><span class="label">Veteran</span><b>${u.xp}/5</b></div></div><div class="status-line"><span class="status ${moveStatus(u) === 'Move ready' ? 'ready' : 'spent'}">${moveStatus(u)}</span><span class="status ${fireStatus(u) === 'Fire ready' ? 'ready' : 'spent'}">${fireStatus(u)}</span><span class="status">${moraleName(u.morale)}</span></div>${a ? admiralCard(u) : ''}${ours ? `<div class="actions">${!a ? act('data-action="assign"', 'Assign admiral', phaseReason(), 'Choose an officer') : ''}${a?.trait === 'magician' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '−2 morale · 2 hex radius', '', false) : ''}${act('data-action="reinforce"', 'Add a stack', phaseReason() || E.reinforceReason(game, u), costHTML(E.reinforceCost(u.type)))}${act('data-action="repair"', 'Repair fleet', phaseReason() || E.repairReason(game, u), '+35% HP · ' + costHTML({ credits: E.repairCost(u, game) }))}${act('data-action="course"', OrdersUI.label(u), phaseReason(), OrdersUI.detail(u), '', false)}${u.destination ? act('data-action="course-clear"', 'Clear course', phaseReason(), 'Stop automatic movement', '', false) : ''}${act('data-action="wait"', 'Hold position', phaseReason() || holdReason(u), 'Finish this fleet’s turn')}</div><p class="description" style="font-size:11px">Repair and stacking require a friendly station within 1 hex and consume this fleet’s turn.</p>` : ''}${st ? `<div class="section-divider"><span class="label">Station beneath fleet</span><div class="station-buttons"><button data-station="${st.id}">${st.name} · Tier ${st.tier}</button>${st.owner === game.player ? `<button data-shop="${st.id}" ${!interactive() ? 'disabled' : ''}>Shipyard</button>` : ''}</div></div>` : ''}</section>`;
   } else if (s) {
     const ours = s.owner === game.player;
     main = `<section>${fleetPicker}<div class="side-title"><span class="label">${s.capital ? 'Capital' : s.fort ? 'Orbital fortress' : 'Sector hub'}</span><span class="chip" style="color:${E.FACTIONS[s.owner].color}">${E.FACTIONS[s.owner].short}</span></div>${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station', 'panel-ship')}<h2 class="unit-name">${s.name}</h2><p class="description">${s.fort ? 'Fortress defenses protect this strategic corridor.' : s.capital ? 'The seat of government and a major industrial center.' : 'Capture and hold this station to fund your fleets.'}</p><div class="hp-row"><span>Station defenses</span><span class="mono">${Math.ceil(s.shield)} / ${s.maxShield}</span></div><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%;background:${E.FACTIONS[s.owner].color}"></i></div><div class="stat-grid"><div><span class="label">${ICONS.use('credits')} Credits</span><b>+${s.income}</b></div><div><span class="label">${ICONS.use('industry')} Industry</span><b>+${s.industry}</b></div><div><span class="label">${ICONS.use('research')} Research</span><b>+${s.science}</b></div></div>${fortressPanel(s)}<div class="buildings">${Object.entries(
@@ -539,6 +542,21 @@ async function endTurn(force = false) {
   before = unitSnapshot();
   E.beginTurn(game, game.player, true);
   turnStartPopups(before, game.player);
+  const standing = E.runStandingOrders(game, game.player);
+  for (const o of standing) {
+    const u = game.units.find(v => v.id === o.id);
+    if (!u || !o.from || !o.to) continue;
+    SFX.play(E.TYPES[u.type].air ? 'flyby' : 'move', u.side);
+    effects.push({
+      kind: 'move',
+      unitId: u.id,
+      from: o.from,
+      to: o.to,
+      color: E.FACTIONS[u.side].color,
+      life: 0.5,
+      max: 0.5,
+    });
+  }
   render();
   save();
   if (game.over) resultDialog();
@@ -859,6 +877,26 @@ function fireFortressAt(s, p) {
 }
 function activateHex(p) {
   if (!p) return;
+  if (OrdersUI.active() != null) {
+    const id = OrdersUI.active(),
+      unit = game.units.find(u => u.id === id && u.hp > 0);
+    if (!unit || unit.side !== game.player) {
+      OrdersUI.cancel();
+      toast('Standing order cancelled.');
+      updateSelection();
+      return;
+    }
+    const order = E.setDestination(game, id, p.c, p.r);
+    if (!order.ok) {
+      toast(order.reason);
+      return;
+    }
+    OrdersUI.cancel();
+    selection = { kind: 'unit', id };
+    refreshAndSave();
+    toast(order.arrived ? 'Fleet is already at that sector.' : `Course set for [${p.c},${p.r}]. Automatic movement begins next turn.`);
+    return;
+  }
   const fort = selectedStation();
   if (fort && interactive() && targetCache.has(E.key(p))) {
     fireFortressAt(fort, p);
@@ -927,14 +965,16 @@ function attachMap() {
     }
     hover = hitHex(e.clientX, e.clientY);
     if (hover && !pointer?.dragged) {
-      canvas.style.cursor = readyCache.has(E.key(hover)) || targetCache.has(E.key(hover)) ? 'pointer' : 'default';
+      canvas.style.cursor = OrdersUI.active() != null ? 'crosshair' : readyCache.has(E.key(hover)) || targetCache.has(E.key(hover)) ? 'pointer' : 'default';
       const u = E.unitAt(game, hover),
         s = E.stationAt(game, hover),
         own = selectedUnit(),
         fort = selectedStation(),
         pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null;
       $('map-caption').textContent =
-        supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
+        OrdersUI.active() != null
+          ? 'Set course: click a navigable sector · Esc cancels'
+          : supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
           ? `⚠ Outside air supply · −10% hull at the start of each turn here · nearest coverage ${E.airSupply(game, own.side)} hexes from a friendly air base`
           : fort && u && targetCache.has(E.key(hover))
             ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
@@ -948,7 +988,7 @@ function attachMap() {
       // A click on an admiral's map portrait opens their Admiral Info, unless it lands on a move or attack hex.
       const p = hitHex(e.clientX, e.clientY),
         pin = hitPin(e.clientX, e.clientY);
-      if (pin && !(p && (targetCache.has(E.key(p)) || readyCache.has(E.key(p)))))
+      if (pin && OrdersUI.active() == null && !(p && (targetCache.has(E.key(p)) || readyCache.has(E.key(p)))))
         generalDialog(pin.admiral, !!pin.personal);
       else activateHex(p);
     }
@@ -1376,9 +1416,31 @@ document.addEventListener('click', e => {
       if (s) doAction(() => E.build(game, s.id, 'shipyard'));
       break;
     }
+    case 'course': {
+      const u = selectedUnit();
+      if (u && u.side === game.player && interactive()) {
+        OrdersUI.begin(u.id);
+        updateSelection();
+        canvas?.focus({ preventScroll: true });
+        toast('Set course: click any navigable sector. The fleet will move toward it at the start of future turns.');
+      }
+      break;
+    }
+    case 'course-clear': {
+      const u = selectedUnit();
+      if (u) {
+        E.clearDestination(game, u.id);
+        OrdersUI.cancel();
+        refreshAndSave();
+        toast('Standing course cleared.');
+      }
+      break;
+    }
     case 'wait': {
       const u = selectedUnit();
       if (u && u.side === game.player && interactive()) {
+        E.clearDestination(game, u.id);
+        OrdersUI.cancel();
         u.moved = u.attacked = true;
         refreshAndSave();
         nextFleet();
@@ -1424,6 +1486,15 @@ document.addEventListener('keydown', e => {
   }
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   const k = e.key.toLowerCase();
+  if (k === 'g') {
+    const u = selectedUnit();
+    if (u && u.side === game.player && interactive()) {
+      e.preventDefault();
+      OrdersUI.begin(u.id);
+      updateSelection();
+      toast('Set course: click a navigable sector. Esc cancels.');
+    }
+  }
   if (k === 'n') {
     e.preventDefault();
     nextFleet();
@@ -1433,8 +1504,14 @@ document.addEventListener('keydown', e => {
     undoMove();
   }
   if (k === 'escape') {
-    selection = null;
-    updateSelection();
+    if (OrdersUI.active() != null) {
+      OrdersUI.cancel();
+      updateSelection();
+      toast('Standing order cancelled.');
+    } else {
+      selection = null;
+      updateSelection();
+    }
   }
   if (k === '+' || k === '=') changeZoom(1.2);
   if (k === '-') changeZoom(1 / 1.2);
@@ -1516,7 +1593,7 @@ function dockHTML() {
       a = E.ADMIRALS[u.admiral],
       ours = u.side === game.player,
       canUndo = ours && interactive() && undoStack.at(-1)?.unitId === u.id;
-    return `<div class="dock-visual">${ART.ship(u.type, '', artSide(u))}${a ? generalPortrait(u.admiral, 'dock-portrait', !!u.personal) : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : u.side === 'alliance' ? 'A' : 'R'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${moraleName(u.morale)}${ours ? ' · ' + fireStatus(u) : ''}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '', 'small', false) : ''}${ours ? act('data-action="wait"', 'Hold position', phaseReason() || holdReason(u), '', 'small ghost') : ''}</div>`;
+    return `<div class="dock-visual">${ART.ship(u.type, '', artSide(u))}${a ? generalPortrait(u.admiral, 'dock-portrait', !!u.personal) : ''}<span class="faction-flag ${u.side}">${u.side === 'empire' ? 'I' : u.side === 'alliance' ? 'A' : 'R'}</span></div><div class="dock-unit"><span class="label">${a ? a.short + ' · ' : ''}${t.branch} · ×${u.stack}</span><strong>${a && u.type === 'flagship' ? a.hull : t.short}</strong><div class="dock-stats">${ICONS.hp(u.hp, E.maxHP(u))}${statRow(u, t)}</div><p>${Math.ceil(u.hp)} / ${E.maxHP(u)} hull · ${moraleName(u.morale)}${ours ? ' · ' + fireStatus(u) : ''}</p></div><div class="dock-actions">${canUndo ? '<button class="small undo-button" data-action="undo">↶ Undo move</button>' : ''}<button class="small" data-action="details">${ours ? 'Orders & upgrades' : 'Fleet details'}</button>${ours && !u.admiral ? '<button class="small" data-action="assign">Assign admiral</button>' : ''}${ours && u.admiral === 'yang' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '', 'small', false) : ''}${ours ? act('data-action="course"', OrdersUI.label(u), phaseReason(), OrdersUI.detail(u), 'small', false) : ''}${ours && u.destination ? act('data-action="course-clear"', 'Clear course', phaseReason(), '', 'small ghost', false) : ''}${ours ? act('data-action="wait"', 'Hold position', phaseReason() || holdReason(u), '', 'small ghost') : ''}</div>`;
   }
   if (s) {
     const ours = s.owner === game.player;
@@ -1898,6 +1975,21 @@ function draw(time, dt) {
           ? selection
           : null;
   if (selTile) selectedHex(hexCenter(selTile), time, scale);
+  for (const u of ownUnits()) {
+    if (!u.destination) continue;
+    const a = hexCenter(u),
+      b = hexCenter(u.destination);
+    drawLine(a.x, a.y, b.x, b.y, '#78d8ff99', 1.4 / scale, [6 / scale, 5 / scale]);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#78d8ff33';
+    ctx.strokeStyle = '#9fe6ffcc';
+    ctx.lineWidth = 1.4 / scale;
+    ctx.fillRect(-8 / scale, -8 / scale, 16 / scale, 16 / scale);
+    ctx.strokeRect(-8 / scale, -8 / scale, 16 / scale, 16 / scale);
+    ctx.restore();
+  }
   for (const s of game.stations) {
     const p = hexCenter(s),
       col = E.FACTIONS[s.owner].color,

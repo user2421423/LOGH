@@ -255,6 +255,54 @@ test('Battleships and dreadnoughts always fire again after a kill', () => {
     assert(a.moved, 'spent movement is not restored by a kill');
   }
 });
+test('Standing courses move at turn start, keep the attack action, and clear on arrival', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'heavy', 'alliance', 2, 2, 1);
+  assert(E.setDestination(g, u.id, 5, 2).ok);
+  assert.deepEqual(u.destination, { c: 5, r: 2 });
+  const events = E.runStandingOrders(g, 'alliance');
+  assert.equal(events.length, 1);
+  assert.equal(u.c, 5);
+  assert.equal(u.r, 2);
+  assert(u.moved);
+  assert(!u.attacked, 'automatic movement must leave the fleet able to fire');
+  assert.equal(u.destination, undefined, 'arrival clears the standing course');
+
+  E.beginTurn(g, 'alliance', false);
+  assert(E.setDestination(g, u.id, 8, 2).ok);
+  const next = E.runStandingOrders(g, 'alliance');
+  assert.equal(next.length, 1);
+  assert(u.c > 5 && u.c <= 8);
+  assert(!u.attacked);
+});
+test('Standing courses reject gravity rifts and keep blocked routes queued', () => {
+  const g = blank(),
+    u = E.newUnit(g, 'corvette', 'alliance', 2, 2);
+  E.tile(g, 4, 2).terrain = 'rift';
+  assert.match(E.setDestination(g, u.id, 4, 2).reason, /gravity rift/i);
+  assert(E.setDestination(g, u.id, 5, 2).ok);
+  E.newUnit(g, 'corvette', 'alliance', 3, 2);
+  E.newUnit(g, 'corvette', 'alliance', 2, 3);
+  E.newUnit(g, 'corvette', 'alliance', 1, 2);
+  const result = E.advanceDestination(g, u.id);
+  assert(!result.ok || result.standing);
+  if (!result.ok) assert.deepEqual(u.destination, { c: 5, r: 2 });
+});
+test('Conquest AI forms theater fronts around corridors and keeps persistent assignments', () => {
+  const g = E.createGame('empire', 'normal', 'conquest:frontier', 12345);
+  E.beginTurn(g, 'alliance', false);
+  E.aiProduction(g);
+  const fronts = E.frontSummary(g, 'alliance');
+  assert(fronts.length >= 2);
+  assert(fronts.some(f => f.name === 'Iserlohn' || f.name === 'Fezzan'));
+  const assignments = g.ai.alliance.assignments;
+  assert(Object.keys(assignments).length > 0);
+  const assigned = Object.entries(assignments).find(([, a]) => a.front !== 'reserve');
+  assert(assigned);
+  const [id, before] = assigned;
+  E.planFronts(g, 'alliance');
+  assert.equal(g.ai.alliance.assignments[id].front, before.front, 'front assignments should remain sticky');
+});
 test('Admirals have distinct movement, terrain, penetration and morale abilities', () => {
   const g = blank(),
     a = E.newUnit(g, 'heavy', 'alliance', 2, 2, 1, 'yang');
