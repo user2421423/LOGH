@@ -55,8 +55,11 @@
         }
         continue;
       }
-      const strategic = s.capital || s.fort || s.name === 'Iserlohn' || s.name === 'Fezzan';
-      if (s.owner === foe || strategic || nearOwn(s)) {
+      const corridor = s.name === 'Iserlohn' || s.name === 'Fezzan',
+        strategic = s.capital || s.fort || corridor;
+      // On the large galaxy, high command expands from its current network instead of planning against every
+      // far-side world at once. The two navigation corridors are always strategic objectives.
+      if (corridor || nearOwn(s)) {
         list.push({
           key: 's' + s.id,
           c: s.c,
@@ -66,6 +69,7 @@
           value: stationValue(s) + (s.owner === 'neutral' ? 8 : 0),
           seed: strategic ? -6 : -2,
           fortified: !!(s.fort || s.capital),
+          corridor,
         });
       }
     }
@@ -111,7 +115,7 @@
         enemyStrength = enemies.reduce((n, u) => n + unitStrength(u), 0),
         nearestHome = ownStations.length ? Math.min(...ownStations.map(s => E.distance(s, f.anchor))) : 20;
       f.type = defend.some(o => o.vital) || defendWorth > attackWorth ? 'defensive' : 'offensive';
-      f.vital = defend.some(o => o.vital);
+      f.vital = defend.some(o => o.vital) || f.objectives.some(o => o.corridor);
       f.score = attackWorth + defendWorth * 1.15 - nearestHome * 1.5;
       f.need = Math.max(2, enemyStrength * (f.type === 'defensive' ? 1.05 : 1.2) + attack.length * 0.7);
       f.rally = nearestStation(ownStations, f.anchor);
