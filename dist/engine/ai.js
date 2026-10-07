@@ -351,19 +351,328 @@
     return events;
   }
 
+  const PROD = {
+    mix: { 'Battle Line': 0.44, Escort: 0.22, Artillery: 0.22, Air: 0.12 },
+    constructionIndustry: 0.4,
+    constructionCredits: 0.18,
+    emergencyRange: 4,
+    dreadnoughts: 2,
+  };
+
+  const branchOfType = type => E.TYPES[type]?.air ? 'Air' : E.TYPES[type]?.branch;
+  const sumStrength = units => units.reduce((n, u) => n + unitStrength(u), 0);
+  const branchStrength = units => {
+    const out = { 'Battle Line': 0, Escort: 0, Artillery: 0, Air: 0 };
+    for (const u of units) {
+      const b = branchOfType(u.type);
+      if (out[b] != null) out[b] += unitStrength(u);
+    }
+    return out;
+  };
+  const normalizeMix = mix => {
+    const out = { ...mix },
+      total = Object.values(out).reduce((n, v) => n + Math.max(0.01, v), 0);
+    for (const k of Object.keys(out)) out[k] = Math.max(0.01, out[k]) / total;
+    return out;
+  };
+  const difficultyMind = g =>
+    g.difficulty === 'challenge'
+      ? { counter: 1, local: 1, cycle: 1, reserve: 1.2 }
+      : g.difficulty === 'hard'
+        ? { counter: 0.72, local: 0.85, cycle: 0.45, reserve: 1.08 }
+        : { counter: 0.35, local: 0.65, cycle: 0, reserve: 1 };
+
+  function routeDistance(g, p, destination, unit = null) {
+    if (!p || !destination) return 999;
+    const field = E.routeField ? E.routeField(g, destination, unit || { type: 'heavy' }) : null;
+    return field?.get(E.key(p)) ?? E.distance(p, destination);
+  }
+
+  function frontEnemyUnits(g, side, front, radius = 6) {
+    const enemy = hostileSide(side);
+    return alive(g, enemy).filter(u =>
+      front?.objectives?.some(o => routeDistance(g, u, o, u) <= radius || E.distance(u, o) <= radius),
+    );
+  }
+
+  function compositionTarget(g, side, front) {
+    const mind = difficultyMind(g),
+      mix = { ...PROD.mix },
+      enemies = front ? frontEnemyUnits(g, side, front) : alive(g, hostileSide(side)),
+      enemy = branchStrength(enemies),
+      total = Math.max(1, Object.values(enemy).reduce((n, v) => n + v, 0)),
+      ratio = Object.fromEntries(Object.entries(enemy).map(([k, v]) => [k, v / total])),
+      fortified = !!front?.objectives?.some(o => o.fortified),
+      defensive = front?.type === 'defensive';
+
+    // Counter-production: screens hunt artillery, fighters/screens answer air, frigates/artillery crack battle lines.
+    mix.Escort += mind.counter * (ratio.Artillery * 0.24 + ratio.Air * 0.1 + ratio['Battle Line'] * 0.07);
+    mix.Artillery += mind.counter * (ratio['Battle Line'] * 0.2 + (fortified ? 0.12 : 0));
+    mix.Air += mind.counter * (ratio.Air * 0.15 + (fortified ? 0.07 : 0));
+    mix['Battle Line'] += mind.counter * (ratio.Escort * 0.1 + (defensive ? 0.08 : 0));
+    return { mix: normalizeMix(mix), enemy, enemyRatio: ratio, fortified, enemies };
+  }
+
+  function frontProductionNeed(g, side, front) {
+    const target = compositionTarget(g, side, front),
+      assigned = front?.assigned || [],
+      have = branchStrength(assigned),
+      totalHave = Math.max(1, sumStrength(assigned)),
+      strengthGoal = Math.max(front?.need || 2, totalHave),
+      deficit = {};
+    for (const branch of Object.keys(PROD.mix))
+      deficit[branch] = Math.max(0, strengthGoal * target.mix[branch] - have[branch]);
+    return { ...target, have, deficit, strengthGoal };
+  }
+
+  function emergencyState(g, side, plan) {
+    const enemies = alive(g, hostileSide(side)),
+      capital = plan?.capital,
+      vitalStations = g.stations.filter(
+        s => s.owner === side && (s.capital || s.fort || s.name === 'Iserlohn' || s.name === 'Fezzan'),
+      );
+    let level = 0,
+      target = null;
+    if (capital) {
+      const d = enemies.length ? Math.min(...enemies.map(u => routeDistance(g, u, capital, u))) : 999;
+      if (d <= PROD.emergencyRange) {
+        level = 2;
+        target = capital;
+      }
+    }
+    for (const s of vitalStations) {
+      const d = enemies.length ? Math.min(...enemies.map(u => routeDistance(g, u, s, u))) : 999;
+      if (d <= 3 && level < 2) {
+        level = 2;
+        target = s;
+      } else if (d <= 5 && level < 1) {
+        level = 1;
+        target = s;
+      }
+    }
+    const defensive = plan?.fronts?.find(f => f.vital && f.type === 'defensive');
+    if (defensive && level < 1) {
+      level = 1;
+      target = defensive.anchor;
+    }
+    return { level, target, front: defensive || null };
+  }
+
+  function reserveStatus(g, side, plan) {
+    const ownUnits = alive(g, side),
+      total = sumStrength(ownUnits),
+      reserveUnits = ownUnits.filter(u => plan?.assignments?.[u.id]?.front === 'reserve'),
+      strength = sumStrength(reserveUnits),
+      target = total * FRONT.reserve * difficultyMind(g).reserve;
+    return { units: reserveUnits, strength, target, deficit: Math.max(0, target - strength) };
+  }
+
+  function yardPlan(g, side, station, plan) {
+    const fronts = plan?.fronts || [],
+      probe = { type: 'heavy' };
+    let best = null;
+    for (const f of fronts) {
+      const destination = f.rally || f.anchor,
+        distance = routeDistance(g, station, destination, probe);
+      if (!best || distance < best.distance) best = { front: f, distance, destination };
+    }
+    const reserve = reserveStatus(g, side, plan),
+      frontDistances = fronts.map(f => routeDistance(g, station, f.anchor, probe)).filter(Number.isFinite),
+      minFront = frontDistances.length ? Math.min(...frontDistances) : 999,
+      forward = minFront <= 7,
+      rear = minFront >= 11;
+    if (reserve.deficit > 0 && rear) return { kind: 'reserve', distance: minFront, destination: plan?.capital, front: null, forward, rear };
+    return { kind: 'front', ...(best || { front: null, distance: 999, destination: plan?.capital }), forward, rear };
+  }
+
+  function globalDeficits(g, side) {
+    const units = alive(g, side),
+      have = branchStrength(units),
+      total = Math.max(1, sumStrength(units)),
+      deficit = {};
+    for (const branch of Object.keys(PROD.mix)) deficit[branch] = Math.max(0, total * PROD.mix[branch] - have[branch]);
+    return { have, total, deficit };
+  }
+
+  function typeSpecialtyScore(g, side, type, need, context) {
+    const t = E.TYPES[type],
+      branch = branchOfType(type),
+      er = need.enemyRatio || {},
+      fortified = need.fortified,
+      emergency = context.emergency.level,
+      front = context.yard.front;
+    let score = 0;
+
+    if (type === 'destroyer') score += 42 * ((er.Artillery || 0) + (er.Air || 0) * 0.65);
+    if (type === 'frigate') score += 38 * (er['Battle Line'] || 0) + (fortified ? 14 : 0);
+    if (type === 'fighter') score += 50 * (er.Air || 0);
+    if (type === 'missile') score += 35 * (er['Battle Line'] || 0) + (fortified ? 12 : 0);
+    if (type === 'siege') score += fortified ? 55 : 8;
+    if (type === 'bomber') score += fortified ? 36 : 8;
+    if (type === 'strategic') score += fortified ? 44 : 6;
+    if (type === 'heavy') score += 10;
+    if (type === 'battleship') score += 16;
+
+    if (emergency) {
+      if (['destroyer', 'light', 'heavy', 'frigate', 'corvette', 'fighter'].includes(type)) score += 28 * emergency;
+      if (['flagship', 'siege', 'strategic'].includes(type)) score -= 18 * emergency;
+    }
+    if (context.yard.forward) {
+      if (branch === 'Battle Line' || branch === 'Escort') score += 18;
+      if (type === 'siege' || type === 'strategic') score -= 10;
+    }
+    if (context.yard.rear) {
+      if (branch === 'Artillery' || branch === 'Air') score += 16;
+      if (type === 'flagship') score += 12;
+    }
+    if (front?.type === 'defensive' && ['heavy', 'battleship', 'frigate', 'fighter'].includes(type)) score += 10;
+    return score;
+  }
+
+  function combatEfficiency(type, stack) {
+    const t = E.TYPES[type],
+      hpFactor = 1 + 0.7 * (stack - 1),
+      fireFactor = 1 + 0.45 * (stack - 1),
+      range = (t.max || 1) + (t.noCounter ? 0.6 : 0),
+      value = t.attack * fireFactor + t.hp * hpFactor * 0.12 + t.armor * 2 + t.move * 7 + range * 8;
+    return value;
+  }
+
+  function chooseDeployment(g, side, station, type, destination) {
+    const spots = E.recruitOptions(g, station, side);
+    if (!spots.length) return null;
+    const branch = branchOfType(type),
+      enemies = alive(g, hostileSide(side)),
+      field = destination && E.routeField ? E.routeField(g, destination, { type }) : null,
+      stationRoute = field?.get(E.key(station)) ?? (destination ? E.distance(station, destination) : 0);
+    let best = spots[0],
+      bestScore = -Infinity;
+    for (const p of spots) {
+      const route = field?.get(E.key(p)) ?? (destination ? E.distance(p, destination) : 0),
+        progress = stationRoute - route,
+        danger = enemies.filter(u => E.distance(u, p) <= 1).length,
+        nearestEnemy = enemies.length ? Math.min(...enemies.map(u => E.distance(u, p))) : 12;
+      let score = progress * 14 - danger * 40;
+      if (branch === 'Artillery') {
+        score -= Math.max(0, 2 - nearestEnemy) * 35;
+        if (progress > 0) score -= 8;
+      } else if (branch === 'Air') {
+        score += E.airSupplied(g, side, p) ? 20 : -50;
+        score += progress * 3;
+      } else if (branch === 'Escort') score += progress * 5;
+      else score += progress * 3;
+      if (E.stationAt(g, p) === station) score += branch === 'Artillery' ? 8 : -2;
+      if (score > bestScore) {
+        bestScore = score;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  function candidateBuilds(g, side, station, context) {
+    const e = g.economy[side],
+      mind = difficultyMind(g),
+      global = context.global,
+      need = context.need,
+      desired = context.yard.kind === 'reserve'
+        ? { 'Battle Line': 1.2, Escort: 1.05, Artillery: 0.25, Air: 0.65 }
+        : need.deficit,
+      lastBranch = context.planState.productionHistory?.[context.yard.front?.id || 'reserve'],
+      types = Object.keys(E.TYPES).filter(type => !E.TYPES[type].elite),
+      candidates = [];
+
+    for (const type of types) {
+      const branch = branchOfType(type);
+      if (!['Battle Line', 'Escort', 'Artillery', 'Air'].includes(branch)) continue;
+      for (let stack = 1; stack <= 3; stack++) {
+        if (!E.canBuy(g, station, type, stack)) continue;
+        const cost = E.price(type, stack, g, side);
+        if (cost.credits > e.credits || cost.industry > e.industry) continue;
+        const localNeed = Number(desired[branch] || 0),
+          globalNeed = Number(global.deficit[branch] || 0),
+          efficiency = combatEfficiency(type, stack) / Math.max(40, cost.credits + cost.industry * 1.7);
+        let score = localNeed * 32 * mind.local + globalNeed * 10 + efficiency * 22;
+        score += typeSpecialtyScore(g, side, type, need, context);
+
+        // Larger stacks trade resource efficiency for density. Favor them only when a front is pressured and the economy is healthy.
+        score += (stack - 1) * (context.emergency.level ? 9 : context.yard.forward ? 4 : -5);
+        if (stack > 1 && cost.credits > e.credits * 0.58) score -= 24;
+        if (stack > 1 && cost.industry > e.industry * 0.58) score -= 18;
+
+        // Challenge high command deliberately alternates combat and support arms to assemble combined forces.
+        if (mind.cycle && lastBranch) {
+          const support = branch === 'Artillery' || branch === 'Air',
+            lastSupport = lastBranch === 'Artillery' || lastBranch === 'Air';
+          if (support !== lastSupport) score += 18 * mind.cycle;
+          else score -= 7 * mind.cycle;
+        }
+
+        // Rear reserve production should be flexible rather than specialist-heavy.
+        if (context.yard.kind === 'reserve') {
+          if (['heavy', 'destroyer', 'fighter'].includes(type)) score += 35;
+          if (['siege', 'strategic', 'flagship'].includes(type)) score -= 20;
+        }
+        candidates.push({ type, stack, branch, cost, score });
+      }
+    }
+    return candidates.sort((a, b) => b.score - a.score || a.cost.credits - b.cost.credits);
+  }
+
+  function reinforcementScore(g, u, plan) {
+    const t = E.TYPES[u.type],
+      assignment = plan?.assignments?.[u.id],
+      front = assignment && assignment.front !== 'reserve' ? plan.byId[assignment.front] : null;
+    let score = t.cost / 12 + (u.admiral ? 35 : 0) + (u.type === 'flagship' ? 45 : u.type === 'battleship' ? 28 : 0);
+    if (front?.vital) score += 16;
+    if (front?.type === 'defensive') score += 10;
+    if (t.branch === 'Artillery') score += 10;
+    if (t.branch === 'Escort' && !u.admiral) score -= 18;
+    score -= (u.stack - 1) * 12;
+    return score;
+  }
+
+  function shouldSaveForDreadnought(g, side, plan, emergency, reserve) {
+    const e = g.economy[side],
+      ownUnits = alive(g, side),
+      flagships = ownUnits.filter(u => u.type === 'flagship').length,
+      tier3 = g.stations.filter(s => s.owner === side && s.tier >= 3),
+      inc = E.income(g, side),
+      frontsStable = !(plan?.fronts || []).some(f => f.vital && f.type === 'defensive');
+    if (g.turn < 4 || flagships >= PROD.dreadnoughts || !tier3.length || emergency.level || !frontsStable) return false;
+    if (reserve.deficit > Math.max(0.5, reserve.target * 0.35)) return false;
+    return e.credits >= 220 && e.industry >= 65 && inc.credits >= 120 && inc.industry >= 55;
+  }
+
+  function productionSummary(g, side) {
+    const p = g.ai?.[side]?.procurement;
+    return p ? JSON.parse(JSON.stringify(p)) : null;
+  }
+
   function aiProduction(g) {
     const side = g.phase,
       e = g.economy[side],
-      own = () => alive(g, side),
       enemy = hostileSide(side),
+      own = () => alive(g, side),
       enemyUnits = alive(g, enemy),
-      frontDistance = p => (enemyUnits.length ? Math.min(...enemyUnits.map(u => E.distance(u, p))) : 99),
-      bases = g.stations.filter(s => s.owner === side).sort((a, b) => frontDistance(a) - frontDistance(b)),
-      planState = ((g.ai ||= {})[side] ||= {});
+      planState = ((g.ai ||= {})[side] ||= {}),
+      plan = g.mode === 'conquest' ? planFor(g, side) : null,
+      emergency = emergencyState(g, side, plan),
+      reserve = reserveStatus(g, side, plan),
+      global = globalDeficits(g, side),
+      bases = g.stations.filter(s => s.owner === side),
+      usableYards = bases.filter(s => E.recruitOptions(g, s, side).length),
+      yardPlans = new Map(bases.map(s => [s.id, yardPlan(g, side, s, plan)])),
+      built = [],
+      reinforced = [],
+      upgraded = [];
 
+    planState.productionHistory ||= {};
     g.strikes = [];
+
+    // Fortresses always fire before spending resources.
     for (const s of bases) {
-      const target = E.fortressTargets(g, s)
+      const target = E.fortressTargets(g, s.id != null ? s : s)
         .map(p => E.unitAt(g, p))
         .filter(Boolean)
         .sort((a, b) => b.hp - a.hp)[0];
@@ -373,95 +682,178 @@
       }
     }
 
+    // Preserve crippled fleets before procurement, but do not drain the treasury below a minimal construction floor.
+    const repairCreditFloor = emergency.level ? 25 : Math.min(90, Math.floor(e.credits * 0.18));
     for (const u of own()
       .filter(u => u.hp / E.maxHP(u) < 0.55 && g.stations.some(s => s.owner === side && E.distance(s, u) <= 1))
       .sort((a, b) => a.hp / E.maxHP(a) - b.hp / E.maxHP(b))) {
-      if (!E.repairReason(g, u) && e.credits - E.repairCost(u, g) >= 60) E.repair(g, u.id);
+      if (!E.repairReason(g, u) && e.credits - E.repairCost(u, g) >= repairCreditFloor) E.repair(g, u.id);
     }
 
-    const flagships = own().filter(u => u.type === 'flagship').length,
+    const flagPrice = E.price('flagship'),
       tier3 = bases.filter(s => s.tier >= 3),
-      flagPrice = E.price('flagship');
-    if (!tier3.length || flagships >= 2) planState.saving = false;
-    else if (!planState.saving && g.turn >= 3 && E.random(g) < 0.3) planState.saving = true;
-    if (planState.saving) {
-      const yard = tier3.find(s => E.canBuy(g, s, 'flagship', 1));
-      if (yard && e.credits >= flagPrice.credits && e.industry >= flagPrice.industry) {
-        E.recruit(g, yard.id, 'flagship', 1);
-        planState.saving = false;
+      strategicSave = shouldSaveForDreadnought(g, side, plan, emergency, reserve);
+    planState.saving = strategicSave;
+
+    // Healthy theaters deliberately save for a second dreadnought. Emergencies cancel saving immediately.
+    if (strategicSave && e.credits >= flagPrice.credits && e.industry >= flagPrice.industry) {
+      const yard = tier3
+        .filter(s => E.canBuy(g, s, 'flagship', 1))
+        .sort((a, b) => (yardPlans.get(b.id)?.distance || 0) - (yardPlans.get(a.id)?.distance || 0))[0];
+      if (yard) {
+        const yp = yardPlans.get(yard.id),
+          position = chooseDeployment(g, side, yard, 'flagship', yp?.destination),
+          r = E.recruit(g, yard.id, 'flagship', 1, position);
+        if (r.ok) {
+          const frontId = yp?.front?.id || 'reserve';
+          if (plan) plan.assignments[r.unit.id] = { front: frontId, until: g.turn + FRONT.sticky };
+          built.push({ id: r.unit.id, station: yard.id, type: 'flagship', stack: 1, front: frontId });
+          planState.productionHistory[frontId] = 'Battle Line';
+          planState.saving = false;
+        }
       }
     }
 
-    const reserveCredits = planState.saving ? Math.min(e.credits, flagPrice.credits) : 70,
-      reserveIndustry = planState.saving ? Math.min(e.industry, flagPrice.industry) : 0,
-      affordable = cost =>
-        e.credits - (cost.credits || 0) >= reserveCredits &&
-        e.industry - (cost.industry || 0) >= reserveIndustry;
+    const constructionIndustry =
+        usableYards.length && !emergency.level ? Math.floor(e.industry * PROD.constructionIndustry) : 0,
+      constructionCredits =
+        usableYards.length && !emergency.level ? Math.floor(e.credits * PROD.constructionCredits) : 0,
+      dreadCredits = planState.saving ? Math.min(e.credits, flagPrice.credits) : 0,
+      dreadIndustry = planState.saving ? Math.min(e.industry, flagPrice.industry) : 0,
+      supportAffordable = cost =>
+        e.credits - (cost.credits || 0) >= Math.max(constructionCredits, dreadCredits) &&
+        e.industry - (cost.industry || 0) >= Math.max(constructionIndustry, dreadIndustry);
 
-    if (!planState.saving && g.turn >= 2) {
-      const safe = bases.slice().sort((a, b) => frontDistance(b) - frontDistance(a));
+    // Infrastructure is a rear-area investment. Never upgrade while a vital front is in emergency.
+    if (!emergency.level && !planState.saving && g.turn >= 2) {
+      const safe = bases
+        .slice()
+        .sort((a, b) => (yardPlans.get(b.id)?.distance || 999) - (yardPlans.get(a.id)?.distance || 999));
       for (const s of safe) {
-        const options = ['shipyard', 'lab', 'air']
-          .map(kind => ({ kind, level: E.buildingLevel(s, kind), cost: E.buildCost(s, kind) }))
-          .filter(o => o.level < 3 && affordable(o.cost))
-          .sort((a, b) => a.level - b.level);
-        if (options[0] && e.credits - options[0].cost.credits >= 180) {
-          E.build(g, s.id, options[0].kind);
+        const yp = yardPlans.get(s.id),
+          need = yp?.front ? frontProductionNeed(g, side, yp.front) : compositionTarget(g, side, null),
+          airNeed = Number(need.deficit?.Air || 0);
+        const options = ['shipyard', 'air', 'lab']
+          .map(kind => ({
+            kind,
+            level: E.buildingLevel(s, kind),
+            cost: E.buildCost(s, kind),
+            score:
+              (kind === 'air' ? airNeed * 12 : 0) +
+              (kind === 'shipyard' && s.tier < 2 ? 30 : 0) +
+              (kind === 'lab' ? 5 : 0) -
+              E.buildingLevel(s, kind) * 3,
+          }))
+          .filter(o => o.level < 3 && supportAffordable(o.cost))
+          .sort((a, b) => b.score - a.score);
+        if (options[0] && e.credits - options[0].cost.credits >= Math.max(160, constructionCredits)) {
+          const up = E.build(g, s.id, options[0].kind);
+          if (up.ok) upgraded.push({ station: s.id, kind: options[0].kind });
           break;
         }
       }
     }
 
+    // Reinforcement is selective: protect admirals/capital ships and pressured fronts, but preserve new-build industry.
     for (const u of own()
       .filter(
         u =>
           u.stack < 3 &&
           !u.moved &&
           !u.attacked &&
-          E.TYPES[u.type].branch !== 'Escort' &&
           u.hp / E.maxHP(u) >= 0.7 &&
           g.stations.some(s => s.owner === side && E.distance(s, u) <= 1),
       )
-      .sort((a, b) => E.TYPES[b.type].cost - E.TYPES[a.type].cost)) {
-      const cost = E.reinforceCost(u.type);
-      if (!E.reinforceReason(g, u) && affordable(cost)) E.reinforce(g, u.id);
+      .sort((a, b) => reinforcementScore(g, b, plan) - reinforcementScore(g, a, plan))) {
+      const cost = E.reinforceCost(u.type),
+        score = reinforcementScore(g, u, plan);
+      if (score < (emergency.level ? 30 : 42)) continue;
+      if (!E.reinforceReason(g, u) && supportAffordable(cost)) {
+        const r = E.reinforce(g, u.id);
+        if (r.ok) reinforced.push(u.id);
+      }
     }
 
-    // Front-line yards favor line ships; rear yards provide artillery and air support.
-    bases.forEach((s, i) => {
-      if (s.producedTurn === g.turn) return;
-      const forward = i < Math.ceil(bases.length / 2),
-        ships =
-          s.tier >= 3
-            ? forward
-              ? ['battleship', 'heavy', 'frigate', 'missile', 'siege', 'corvette']
-              : ['siege', 'missile', 'battleship', 'heavy', 'beam', 'corvette']
-            : s.tier === 2
-              ? forward
-                ? ['heavy', 'destroyer', 'missile', 'corvette']
-                : ['missile', 'heavy', 'destroyer', 'corvette']
-              : ['light', 'frigate', 'beam', 'corvette'],
-        air = ['strategic', 'bomber', 'fighter'].filter(k => (s.air || 0) >= E.TYPES[k].tier),
-        menu = forward ? [...ships, ...air] : [...air, ...ships];
-      for (const type of menu) {
-        let built = false;
-        for (let n = 3; n >= 1; n--) {
-          const cost = E.price(type, n, g, side);
-          if (!E.canBuy(g, s, type, n) || !affordable(cost)) continue;
-          if (n > 1 && cost.credits > Math.max(1, e.credits - reserveCredits) * 0.65) continue;
-          E.recruit(g, s.id, type, n);
-          built = true;
-          break;
-        }
-        if (built) break;
+    // Build by strategic demand rather than a fixed hull list. Each yard is tied to its nearest reachable front
+    // (or to the reserve), so Iserlohn and Fezzan can request different force mixes.
+    const buildOrder = usableYards.slice().sort((a, b) => {
+      const ya = yardPlans.get(a.id),
+        yb = yardPlans.get(b.id);
+      if (emergency.level) {
+        const da = emergency.target ? routeDistance(g, a, emergency.target) : ya?.distance || 999,
+          db = emergency.target ? routeDistance(g, b, emergency.target) : yb?.distance || 999;
+        return da - db;
       }
+      if (reserve.deficit > 0 && ya?.kind !== yb?.kind) return ya?.kind === 'reserve' ? -1 : 1;
+      return (ya?.distance || 999) - (yb?.distance || 999);
     });
 
-    // Production changes the available force pool; rebuild the theater plan before fleets move.
+    for (const s of buildOrder) {
+      if (s.producedTurn === g.turn) continue;
+      const yp = yardPlans.get(s.id),
+        targetFront = emergency.front && emergency.level >= 2 ? emergency.front : yp?.front,
+        need = targetFront
+          ? frontProductionNeed(g, side, targetFront)
+          : { ...compositionTarget(g, side, null), deficit: global.deficit },
+        context = { yard: yp || { kind: 'reserve', destination: plan?.capital, front: null }, need, global, emergency, planState },
+        candidates = candidateBuilds(g, side, s, context);
+      let choice = null;
+      for (const cand of candidates) {
+        // During dreadnought saving, spend only true surplus unless there is an emergency.
+        const creditFloor = !emergency.level && planState.saving ? dreadCredits : 0,
+          industryFloor = !emergency.level && planState.saving ? dreadIndustry : 0;
+        if (e.credits - cand.cost.credits < creditFloor || e.industry - cand.cost.industry < industryFloor) continue;
+        choice = cand;
+        break;
+      }
+      if (!choice) continue;
+
+      const destination = emergency.level >= 2 && emergency.target ? emergency.target : yp?.destination,
+        position = chooseDeployment(g, side, s, choice.type, destination),
+        result = E.recruit(g, s.id, choice.type, choice.stack, position);
+      if (!result.ok) continue;
+
+      let frontId = yp?.kind === 'reserve' ? 'reserve' : targetFront?.id || 'reserve';
+      if (emergency.front && emergency.level >= 2) frontId = emergency.front.id;
+      if (plan) plan.assignments[result.unit.id] = { front: frontId, until: g.turn + FRONT.sticky };
+      planState.productionHistory[frontId] = choice.branch;
+      built.push({
+        id: result.unit.id,
+        station: s.id,
+        type: choice.type,
+        stack: choice.stack,
+        branch: choice.branch,
+        front: frontId,
+        score: Math.round(choice.score),
+      });
+    }
+
+    planState.procurement = {
+      turn: g.turn,
+      emergency: emergency.level,
+      savingForDreadnought: !!planState.saving,
+      constructionReserve: { credits: constructionCredits, industry: constructionIndustry },
+      reserve: { strength: reserve.strength, target: reserve.target, deficit: reserve.deficit },
+      yards: bases.map(s => ({
+        id: s.id,
+        name: s.name,
+        role: yardPlans.get(s.id)?.kind || 'front',
+        front: yardPlans.get(s.id)?.front?.anchor?.name || null,
+        route: yardPlans.get(s.id)?.distance ?? null,
+        forward: !!yardPlans.get(s.id)?.forward,
+        rear: !!yardPlans.get(s.id)?.rear,
+      })),
+      built,
+      reinforced,
+      upgraded,
+    };
+
+    // New construction has an explicit assignment immediately; rebuilding keeps that sticky assignment while
+    // incorporating the new strength into rally and reserve calculations.
     planState._planTurn = null;
     if (g.mode === 'conquest') planFor(g, side);
   }
 
-  root.GalacticAI = { FRONT, unitStrength, frontObjectives, planFronts, frontSummary, aiProduction, aiOrder };
-  Object.assign(E, { FRONT, frontSummary, planFronts });
+  root.GalacticAI = { FRONT, PROD, unitStrength, frontObjectives, planFronts, frontSummary, productionSummary, aiProduction, aiOrder };
+  Object.assign(E, { FRONT, PROD, frontSummary, productionSummary, planFronts });
 })(typeof window !== 'undefined' ? window : globalThis);
