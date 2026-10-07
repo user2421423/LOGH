@@ -72,7 +72,7 @@ const env = {
 };
 env.window = env;
 const context = vm.createContext(env);
-for (const file of ['engine.js', 'art.js', 'icons.js', 'audio.js', 'game.js'])
+for (const file of ['engine/admirals.js', 'engine/research.js', 'engine/galaxy.js', 'engine/campaign.js', 'engine.js', 'engine/orders.js', 'engine/ai.js', 'art.js', 'icons.js', 'audio.js', 'ui/orders.js', 'game.js'])
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../dist', file), 'utf8'), context);
 const run = s => vm.runInContext(s, context);
 (async () => {
