@@ -86,6 +86,28 @@ const run = s => vm.runInContext(s, context);
     assert(run('game.player') === side);
     assert(run('getSave().player') === side);
     run('nextFleet();updateSelection();');
+    // C clears a selected friendly fleet's standing course, but not browser Copy
+    // shortcuts or a course while the user is typing into a form field.
+    run('selectedUnit().destination = {c:selectedUnit().c+1,r:selectedUnit().r};updateSelection();');
+    assert(node('selection-dock').innerHTML.includes('Clear course (C)'));
+    let prevented = 0;
+    const key = (k, flags = {}, tagName = 'CANVAS') => events.keydown({
+      key: k, ctrlKey: !!flags.ctrlKey, metaKey: !!flags.metaKey, altKey: !!flags.altKey,
+      target: { tagName, dataset: {} }, preventDefault() { prevented++; },
+    });
+    key('c', { ctrlKey: true });
+    assert(run('!!selectedUnit().destination'), 'Ctrl+C must leave the standing course intact');
+    key('c', {}, 'INPUT');
+    assert(run('!!selectedUnit().destination'), 'C typed into inputs must not clear a course');
+    key('C');
+    assert.equal(prevented, 1);
+    assert(!run('selectedUnit().destination'), 'C must clear the standing course');
+    assert(!node('selection-dock').innerHTML.includes('data-action="course-clear"'));
+    run('selectedUnit().destination = {c:selectedUnit().c+1,r:selectedUnit().r};');
+    events.click({ target: { closest(selector) {
+      return selector === 'button' ? { disabled: false, dataset: { action: 'course-clear' }, getAttribute() { return null; } } : null;
+    } } });
+    assert(!run('selectedUnit().destination'), 'The Clear Course button must still work');
     assert(node('side').innerHTML.includes('Hull integrity'));
     assert(node('side').innerHTML.includes('assets/' + side + '-fleet.png'));
     assert(node('selection-dock').innerHTML.includes('assets/' + side + '-fleet.png'));
