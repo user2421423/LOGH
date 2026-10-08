@@ -1095,6 +1095,76 @@ test('A fleet whose only order is holding position has no orders left', () => {
   u.attacked = false;
   assert(E.hasOrders(g, u));
 });
+test('Frontier rift provides three navigable rows at Iserlohn and Fezzan only', () => {
+  const g = E.createGame('empire', 'normal', 'conquest:frontier', 3);
+  for (const col of [24, 25, 26]) {
+    for (const row of [5, 6, 7, 21, 22, 23])
+      assert.notEqual(E.tile(g, col, row).terrain, 'rift', `hex ${col},${row} should be traversable`);
+    for (const row of [0, 4, 8, 14, 20, 24, 28])
+      assert.equal(E.tile(g, col, row).terrain, 'rift', `hex ${col},${row} should remain impassable`);
+  }
+  assert.equal(g.stations.length, 44);
+  assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
+});
+
+test('Both corridor flank lanes require station shields down, in both directions', () => {
+  for (const [name, row] of [['Iserlohn', 6], ['Fezzan', 22]])
+    for (const side of ['empire', 'alliance']) {
+      const g = E.createGame(side, 'normal', 'conquest:frontier', 33),
+        gate = g.stations.find(st => st.name === name),
+        entrance = { c: side === 'empire' ? 23 : 27, r: row - 1 },
+        farBank = { c: side === 'empire' ? 27 : 23, r: row },
+        flank = { c: 25, r: row - 1 };
+      g.units = [];
+      g.phase = side;
+      const ship = E.newUnit(g, 'destroyer', side, entrance.c, entrance.r);
+      assert(E.corridorLocked(g, flank, side), name + ' should defend its flanking lanes');
+      assert(!E.reachable(g, ship).has(E.key(flank)), 'shield must prevent entering the side passage');
+      assert.equal(E.routeField(g, farBank, ship).get(E.key(ship)), undefined,
+        'route planner must also see the shielded gate as closed');
+      assert.match(E.setDestination(g, ship.id, flank.c, flank.r).reason, /corridor station shields/i);
+
+      gate.shield = 0;
+      assert(!E.corridorLocked(g, flank, side));
+      assert(E.reachable(g, ship).has(E.key(flank)), 'flank must open as soon as shields fall');
+      assert.notEqual(E.routeField(g, farBank, ship).get(E.key(ship)), undefined,
+        'route cache must update after the fortress shields fall');
+      assert(E.move(g, ship.id, flank.c, flank.r).ok);
+      E.beginTurn(g, side, false);
+      assert(E.reachable(g, ship).has(E.key(farBank)), 'fleet must be able to reach the opposite bank');
+      assert(E.move(g, ship.id, farBank.c, farBank.r).ok);
+      gate.owner = side;
+      gate.shield = gate.maxShield;
+      assert(!E.corridorLocked(g, flank, side), 'the station owner always has passage rights');
+      assert(E.corridorLocked(g, flank, E.opponent(side)), 'opponents still need to break the shields');
+    }
+});
+
+test('Existing Conquest saves acquire wider corridors without losing progress', () => {
+  const g = E.createGame('alliance', 'normal', 'conquest:frontier', 60);
+  const originalFleet = g.units[0], originalId = originalFleet.id,
+    originalLocation = { c: originalFleet.c, r: originalFleet.r },
+    originalCredit = g.economy.alliance.credits;
+  g.turn = 13;
+  g.stations.find(st => st.name === 'Fezzan').owner = 'alliance';
+  g.stations.find(st => st.name === 'Fezzan').shield = 36;
+  for (const col of [24, 25, 26])
+    for (const row of [5, 7, 21, 23]) E.tile(g, col, row).terrain = 'rift';
+  const save = JSON.parse(JSON.stringify(g)), loaded = E.migrateSave(save);
+  assert(loaded);
+  for (const col of [24, 25, 26])
+    for (const row of [5, 7, 21, 23])
+      assert.equal(E.tile(loaded, col, row).terrain, 'space');
+  assert.equal(E.tile(loaded, 25, 14).terrain, 'rift', 'other rift tiles must stay blocked');
+  assert.equal(loaded.turn, 13);
+  assert.deepEqual({ c: loaded.units[0].c, r: loaded.units[0].r }, originalLocation);
+  assert.equal(loaded.units[0].id, originalId);
+  assert.equal(loaded.economy.alliance.credits, originalCredit);
+  assert.equal(loaded.stations.find(st => st.name === 'Fezzan').owner, 'alliance');
+  assert.equal(loaded.stations.find(st => st.name === 'Fezzan').shield, 36);
+  assert.equal(E.migrateSave(loaded), loaded, 'migration should be safe on repeated loads');
+});
+
 test('Conquest is a 51 × 29, 44-system galaxy with only the Iserlohn and Fezzan corridors', () => {
   const g = E.createGame('empire', 'normal', 'conquest', 3);
   assert.equal(g.cols, 51);
@@ -1105,8 +1175,8 @@ test('Conquest is a 51 × 29, 44-system galaxy with only the Iserlohn and Fezzan
   assert.deepEqual(E.income(g, 'empire'), E.income(g, 'alliance'));
   for (const c of [24, 25, 26]) {
     assert.equal(E.tile(g, c, 14).terrain, 'rift');
-    assert.notEqual(E.tile(g, c, 6).terrain, 'rift');
-    assert.notEqual(E.tile(g, c, 22).terrain, 'rift');
+    for (const row of [5, 6, 7, 21, 22, 23])
+      assert.notEqual(E.tile(g, c, row).terrain, 'rift');
   }
   assert.equal(g.units.filter(u => u.side === 'empire').length, 16);
   assert.equal(g.units.filter(u => u.side === 'alliance').length, 16);

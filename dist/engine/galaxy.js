@@ -5,12 +5,13 @@
     frontier: {
       name: 'The galactic frontier',
       year: 'Standard',
-      desc: 'A 51 × 29 strategic galaxy of 44 named systems. The Empire and Alliance are separated by a broad gravity rift crossed only through the fortified Iserlohn and Fezzan corridors.',
+      desc: 'A 51 × 29 strategic galaxy of 44 named systems. The Empire and Alliance are separated by a broad gravity rift, with three-hex-wide Iserlohn and Fezzan passages controlled by their station shields.',
       rulesText: 'Take both capitals, or hold more stations at the 80-turn armistice.',
       cols: 51,
       rows: 29,
-      // Three columns of impassable gravity rift make each crossing a real strategic corridor rather than one door hex.
-      rift: { cols: [24, 25, 26], open: [6, 22] },
+      // Three navigable rows at each crossing: fleets can maneuver around one another.
+      // Iserlohn/Fezzan shield generators still control the middle-column crossing lanes.
+      rift: { cols: [24, 25, 26], open: [5, 6, 7, 21, 22, 23] },
       // [name, c, r, owner, tier, capital, fort]
       stations: [
         // Galactic Empire

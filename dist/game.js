@@ -1055,7 +1055,9 @@ function attachMap() {
             ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
             : pr
               ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
-              : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
+              : E.corridorLocked(game, hover, own?.side || game.player)
+                ? `Hex ${hover.c}, ${hover.r} · Shielded corridor gate: bombard Iserlohn or Fezzan to open flanking lanes`
+                : `Hex ${hover.c}, ${hover.r} · ${u ? E.TYPES[u.type].short + ' · ' : ''}${s ? s.name + ' · ' : ''}${hover.terrain === 'space' ? 'Deep space' : hover.terrain === 'rift' ? 'Impassable rift' : hover.terrain === 'nebula' ? 'Nebula · cost 2 · attrition' : 'Asteroids · cost 2 · −15% damage'}`;
     }
   };
   canvas.onpointerup = e => {

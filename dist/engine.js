@@ -772,6 +772,17 @@
   function stationAt(g, p) {
     return g.stations.find(s => s.c === p.c && s.r === p.r);
   }
+  // Three navigable rows flank each frontier corridor fortress. Its active
+  // shields prevent hostile fleets from bypassing the station via side lanes;
+  // once the shields fall, both side lanes open to a coordinated breakthrough.
+  // This affects movement and strategic route planning, never other scenarios.
+  function corridorLocked(g, p, side) {
+    if (g.era !== 'frontier' || p.c !== 25) return false;
+    const gate = g.stations.find(s =>
+      (s.name === 'Iserlohn' || s.name === 'Fezzan') &&
+      s.c === p.c && Math.abs(s.r - p.r) <= 1);
+    return !!gate && gate.owner !== side && gate.shield > 0;
+  }
   function random(g) {
     g.seed = (Math.imul(g.seed, 1664525) + 1013904223) >>> 0;
     return g.seed / 4294967296;
@@ -809,6 +820,15 @@
       g.units = g.units.filter(u => !TYPES[u.type].air);
       g.rulesVersion = 12;
       g.ai = {};
+    }
+    // Older frontier saves embed the former one-row-wide corridors in their
+    // own tile arrays. Widen only the previously impassable flanking cells,
+    // preserving all existing fleets, ownership, shields and progress.
+    if (g.era === 'frontier' && g.cols === 51 && g.rows === 29) {
+      for (const col of [24, 25, 26]) for (const row of [5, 7, 21, 23]) {
+        const p = tile(g, col, row);
+        if (p && p.terrain === 'rift') p.terrain = 'space';
+      }
     }
     return g;
   }
@@ -877,7 +897,7 @@
       const { p, cost } = queue.shift();
       if (cost > costs.get(key(p))) continue;
       for (const n of adjacent(g, p)) {
-        if (n.terrain === 'rift') continue;
+        if (n.terrain === 'rift' || corridorLocked(g, n, u.side)) continue;
         const occ = unitAt(g, n),
           st = stationAt(g, n);
         if (occ && occ.side !== u.side) continue;
@@ -2351,6 +2371,7 @@
     adjacent,
     unitAt,
     stationAt,
+    corridorLocked,
     random,
     log,
     maxHP,

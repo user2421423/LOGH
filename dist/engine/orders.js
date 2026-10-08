@@ -10,9 +10,20 @@
   function routeField(g, destination, unit = null) {
     const dest = E.tile(g, destination?.c, destination?.r),
       field = new Map();
-    if (!dest || dest.terrain === 'rift') return field;
+    // A shield-locked flank is not a valid destination. Shielded stations
+    // themselves remain valid *goals* so fleets can route to and siege them.
+    if (!dest || dest.terrain === 'rift' ||
+        (E.corridorLocked(g, dest, unit?.side) && !E.stationAt(g, dest))) return field;
     const ignoresTerrain = !!unit && (E.TYPES[unit.type]?.air || unit.admiral === 'yang'),
-      cacheKey = E.key(dest) + ':' + (ignoresTerrain ? 1 : 0);
+      side = unit?.side,
+      // Passage ownership and shields can change mid-turn. They must be part
+      // of the cached route key or the AI will follow a stale blocked passage.
+      gateState = g.era === 'frontier'
+        ? g.stations.filter(s => s.name === 'Iserlohn' || s.name === 'Fezzan')
+          .map(s => `${s.name}:${s.owner}:${s.shield > 0 ? 1 : 0}`).join(',')
+        : '',
+      cacheKey = E.key(dest) + ':' + (ignoresTerrain ? 1 : 0) + ':' +
+        (side || '?') + ':' + gateState;
     let cache = routeCache.get(g);
     if (!cache) routeCache.set(g, (cache = new Map()));
     if (cache.has(cacheKey)) return cache.get(cacheKey);
@@ -53,7 +64,7 @@
       const cur = pop();
       if (cur.cost !== field.get(E.key(cur.p))) continue;
       for (const n of E.adjacent(g, cur.p)) {
-        if (n.terrain === 'rift') continue;
+        if (n.terrain === 'rift' || E.corridorLocked(g, n, side)) continue;
         const step = ignoresTerrain ? 1 : n.terrain === 'nebula' || n.terrain === 'asteroid' ? 2 : 1,
           cost = cur.cost + step,
           k = E.key(n);
@@ -73,6 +84,8 @@
     const p = E.tile(g, c, r);
     if (!p) return 'That sector is outside the map.';
     if (p.terrain === 'rift') return 'A fleet cannot set course into a gravity rift.';
+    if (E.corridorLocked(g, p, unit.side) && !E.stationAt(g, p))
+      return 'Corridor station shields must fall before that flank opens.';
     if (!routeField(g, p, unit).has(E.key(unit))) return 'No navigable route reaches that sector.';
     return null;
   }
