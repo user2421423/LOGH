@@ -1138,16 +1138,20 @@ function strikeEffects(s, delay = 0) {
   SFX.play('thor', 'empire', delay);
   setTimeout(() => bump(16), reducedMotion() ? 0 : delay * 1000 + 550);
 }
-// A sortie is one real aircraft formation, rendered at its original fleet sprite size.
-// Impact text, explosions and sound are triggered when the formation arrives, not at launch.
+// Single-aircraft sortie using existing art. Fly to the enemy, strike, then RETURN
+// to the launch station; the aircraft remains visible until it reaches home.
 function addAirStrikeEffects(result, delay = 0) {
-  const flightTime = 1.05;
+  const outboundTime = 0.68, // ~17% faster than the previous 0.82s to impact
+    impactPause = 0.36,     // complete the short blast before the plane turns home
+    returnTime = 0.68,
+    cycle = outboundTime + impactPause + returnTime;
   effects.push({
     kind: 'air-sortie', type: result.type, side: result.side,
     from: result.from, to: result.to,
     unitDamage: result.unitDamage || 0, shieldDamage: result.shieldDamage || 0,
     destroyed: !!result.destroyed, hit: result.hit || [],
-    delay, flightTime, life: flightTime + delay, max: flightTime + delay,
+    delay, outboundTime, impactPause, returnTime,
+    life: cycle + delay, max: cycle + delay,
     impactShown: false,
   });
   SFX.play('flyby', result.side, delay);
@@ -2237,32 +2241,43 @@ function draw(time, dt) {
     } else if (e.kind === 'air-sortie') {
       const elapsed = e.max - e.life - e.delay;
       if (elapsed >= 0) {
-        const progress = Math.min(1, elapsed / e.flightTime),
-          flight = Math.min(1, progress / 0.78),
-          eased = flight * flight * (3 - 2 * flight),
-          x = a.x + (b.x - a.x) * eased,
-          y = a.y + (b.y - a.y) * eased;
-        if (progress < 0.78) {
-          ctx.save();
-          ctx.globalAlpha = 1; // Prior code faded aircraft to invisibility during flight.
-          const trail = Math.min(0.18, eased),
-            tx = a.x + (b.x - a.x) * Math.max(0, eased - trail),
-            ty = a.y + (b.y - a.y) * Math.max(0, eased - trail);
-          drawLine(tx, ty, x, y, E.FACTIONS[e.side].color, 3 / scale);
-          ctx.translate(x, y);
-          ctx.shadowColor = '#000a';
-          ctx.shadowBlur = 5;
-          ctx.shadowOffsetY = 4;
-          // Draw the native model unrotated at exactly the old air-wing footprint (R * 2).
-          ART.drawShip(ctx, e.type, e.side, 0, -6, R * 2, R * 2);
-          ctx.restore();
-        } else if (!e.impactShown) {
+        const turnAt = e.outboundTime,
+          returnAt = e.outboundTime + e.impactPause,
+          finishedAt = returnAt + e.returnTime,
+          returning = elapsed >= returnAt,
+          // Symmetric smooth movement (no sudden teleport at the target).
+          smooth = n => { const t = E.clamp(n, 0, 1); return t * t * (3 - 2 * t); };
+        if (elapsed >= turnAt && !e.impactShown) {
+          // Show this impact exactly once and only after the outbound flight.
           e.impactShown = true;
           SFX.play('explosion', e.side);
           bump((HEAVY_SHAKE[e.type] || 2) + (e.destroyed ? 4 : 0));
-          effects.push({ kind: 'boom', to: e.to, life: 0.7, max: 0.7 });
+          effects.push({ kind: 'boom', to: e.to, life: e.impactPause, max: e.impactPause });
           if (e.shieldDamage) popup(e.to, `−${e.shieldDamage} DEF`, '#7cc8ff', { dy: 25, size: 15 });
           for (const hit of e.hit) popup(hit, `−${hit.damage}`, '#ff9a7a', { size: 18, pop: true });
+        }
+        if (elapsed <= finishedAt) {
+          // Route progress is 0 -> 1 on attack, held at the target while firing,
+          // and 1 -> 0 on the return flight.
+          const route = elapsed < turnAt
+            ? smooth(elapsed / e.outboundTime)
+            : elapsed < returnAt ? 1
+              : 1 - smooth((elapsed - returnAt) / e.returnTime),
+            x = a.x + (b.x - a.x) * route,
+            y = a.y + (b.y - a.y) * route,
+            tailRoute = returning ? Math.min(1, route + 0.16) : Math.max(0, route - 0.16);
+          ctx.save();
+          ctx.globalAlpha = 1;
+          drawLine(a.x + (b.x - a.x) * tailRoute, a.y + (b.y - a.y) * tailRoute,
+            x, y, E.FACTIONS[e.side].color, 3 / scale);
+          ctx.translate(x, y);
+          if (returning) ctx.rotate(Math.PI); // Face back toward the home air base.
+          ctx.shadowColor = '#000a';
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetY = 4;
+          // Preserve the original map-unit footprint, now showing a single PNG aircraft.
+          ART.drawShip(ctx, e.type, e.side, 0, -6, R * 2, R * 2);
+          ctx.restore();
         }
       }
     } else if (e.kind === 'boom') {

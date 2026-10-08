@@ -805,9 +805,24 @@ const ART = {
   airUrl(type, side) {
     return `assets/air/${side === 'alliance' ? 'alliance' : 'empire'}-${type}.png`;
   },
+  // Keep the six original air PNGs intact. They are formation composites, so the
+  // rendering window isolates one intact aircraft rather than making new assets.
+  // Entries: [sourceX, sourceY, sourceWidth, sourceHeight, pngWidth, pngHeight].
+  airFrames: {
+    empire: {
+      fighter: [276, 0, 341, 225, 900, 379], // middle/top Valkyrie, not either wingman
+      bomber: [52, 17, 415, 263, 900, 339], // left bomber
+      strategic: [0, 0, 900, 590, 900, 590],
+    },
+    alliance: {
+      fighter: [295, 0, 395, 264, 900, 546], // upper Spartanian
+      bomber: [41, 29, 425, 306, 900, 363], // left bomber
+      strategic: [0, 0, 900, 609, 900, 609],
+    },
+  },
   airWings: {
-    fighter: { count: 3, size: 0.2, span: 0.55 },
-    bomber: { count: 2, size: 0.28, span: 0.75 },
+    fighter: { count: 1, size: 0.46, span: 0.55 },
+    bomber: { count: 1, size: 0.46, span: 0.75 },
     strategic: { count: 1, size: 0.46, span: 1.05 },
   },
   airLivery: {
@@ -818,10 +833,11 @@ const ART = {
     const key = `air-${side}-${type}`,
       img = this.images[key];
     if (this.ready[key] && img) {
-      const ratio = Math.min((width * 1.15) / img.naturalWidth, (width * 0.95) / img.naturalHeight),
-        dw = img.naturalWidth * ratio,
-        dh = img.naturalHeight * ratio;
-      context.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+      const [sx, sy, sw, sh] = this.airFrames[side][type],
+        ratio = Math.min((width * 1.15) / sw, (width * 0.95) / sh),
+        dw = sw * ratio, dh = sh * ratio;
+      // Source clipping is done by canvas; no generated or altered PNGs.
+      context.drawImage(img, sx, sy, sw, sh, x - dw / 2, y - dh / 2, dw, dh);
       return true;
     }
     const w = this.airWings[type],
@@ -906,8 +922,12 @@ const ART = {
     return `<span class="${name === 'portraits' ? 'portrait-art' : 'ship-art'} ${extra}" aria-hidden="true"><svg viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid ${name === 'portraits' ? 'slice' : 'meet'}" xmlns="http://www.w3.org/2000/svg">${def}<image href="${this.urls[name]}" width="${this.factionSprites[name] ? 1983 : 1254}" height="${this.factionSprites[name] ? 793 : 1254}" ${mask ? 'clip-path="url(#' + id + ')"' : ''}/></svg></span>`;
   },
   ship(type, extra = '', side = 'alliance') {
-    if (this.airWings[type])
-      return `<span class="ship-art air-art ${side} ${extra}" aria-hidden="true"><img src="${this.airUrl(type, side)}" alt="" draggable="false"></span>`;
+    if (this.airWings[type]) {
+      const s = side === 'neutral' ? 'empire' : side,
+        [x, y, w, h, iw, ih] = this.airFrames[s][type];
+      // SVG viewBox shows the SAME single-aircraft crop as the canvas renderer.
+      return `<span class="ship-art air-art ${s} ${extra}" aria-hidden="true"><svg viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><image href="${this.airUrl(type, s)}" width="${iw}" height="${ih}"/></svg></span>`;
+    }
     if (side === 'neutral') side = 'empire';
     const name = ['station', 'fortress', 'capital'].includes(type) ? 'fleet' : side;
     return this.svg(name, this.frames[type] ?? 13, extra);
