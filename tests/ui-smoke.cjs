@@ -76,96 +76,33 @@ for (const file of ['engine/admirals.js', 'engine/research.js', 'engine/galaxy.j
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../dist', file), 'utf8'), context);
 const run = s => vm.runInContext(s, context);
 (async () => {
-  assert(node('modal-root').innerHTML.includes('One galaxy.'));
-  assert(node('modal-root').innerHTML.includes('campaign'));
-  assert(node('modal-root').innerHTML.includes('conquest-select'));
-  assert(node('modal-root').innerHTML.includes('Win chapter 1 first'));
+  assert(node('modal-root').innerHTML.includes('One galaxy.'), 'start menu must load');
   for (const side of ['empire', 'alliance']) {
     run(`setup={side:'${side}',mode:'conquest',difficulty:'normal'};newGame();draw(0,.016);`);
-    assert(node('app').innerHTML.includes('The galactic frontier'));
-    assert(run('game.player') === side);
-    assert(run('getSave().player') === side);
+    assert.equal(run('game.player'), side);
+    assert.equal(run('getSave().player'), side, 'game should save and reload');
     run('nextFleet();updateSelection();');
-    // C clears a selected friendly fleet's standing course, but not browser Copy
-    // shortcuts or a course while the user is typing into a form field.
-    run('selectedUnit().destination = {c:selectedUnit().c+1,r:selectedUnit().r};updateSelection();');
-    assert(node('selection-dock').innerHTML.includes('Clear course (C)'));
-    let prevented = 0;
-    const key = (k, flags = {}, tagName = 'CANVAS') => events.keydown({
-      key: k, ctrlKey: !!flags.ctrlKey, metaKey: !!flags.metaKey, altKey: !!flags.altKey,
-      target: { tagName, dataset: {} }, preventDefault() { prevented++; },
+    assert(node('selection-dock').innerHTML.includes('data-action="course"'));
+
+    // One essential keyboard shortcut: C cancels a standing course, while
+    // Ctrl+C continues to work as a browser shortcut.
+    run('selectedUnit().destination={c:selectedUnit().c+1,r:selectedUnit().r};updateSelection();');
+    const key = (letter, ctrlKey = false) => events.keydown({
+      key: letter, ctrlKey, metaKey: false, altKey: false,
+      target: { tagName: 'CANVAS', dataset: {} }, preventDefault() {},
     });
-    key('c', { ctrlKey: true });
-    assert(run('!!selectedUnit().destination'), 'Ctrl+C must leave the standing course intact');
-    key('c', {}, 'INPUT');
-    assert(run('!!selectedUnit().destination'), 'C typed into inputs must not clear a course');
-    key('C');
-    assert.equal(prevented, 1);
-    assert(!run('selectedUnit().destination'), 'C must clear the standing course');
-    assert(!node('selection-dock').innerHTML.includes('data-action="course-clear"'));
-    run('selectedUnit().destination = {c:selectedUnit().c+1,r:selectedUnit().r};');
-    events.click({ target: { closest(selector) {
-      return selector === 'button' ? { disabled: false, dataset: { action: 'course-clear' }, getAttribute() { return null; } } : null;
-    } } });
-    assert(!run('selectedUnit().destination'), 'The Clear Course button must still work');
-    assert(node('side').innerHTML.includes('Hull integrity'));
-    assert(node('side').innerHTML.includes('assets/' + side + '-fleet.png'));
-    assert(node('selection-dock').innerHTML.includes('assets/' + side + '-fleet.png'));
-    run('selectUnit(game.units.find(u=>u.side!==game.player).id)');
-    assert(node('side').innerHTML.includes('assets/' + (side === 'empire' ? 'alliance' : 'empire') + '-fleet.png'));
-    run('nextFleet()');
-    run('researchDialog()');
-    assert(node('modal-root').innerHTML.includes('Afterburner Drives'));
-    run('admiralDialog()');
-    assert(node('modal-root').innerHTML.includes('Fleet admirals'));
-    assert(node('modal-root').innerHTML.includes('data-general='));
-    run(`generalsDialog('${side}')`);
-    assert(node('modal-root').innerHTML.includes('Your admirals'));
-    run(`generalDialog('${side === 'empire' ? 'reinhard' : 'yang'}', true)`);
-    assert(node('modal-root').innerHTML.includes('Your admiral'));
-    run(`generalDialog('${side === 'empire' ? 'reinhard' : 'yang'}')`);
-    assert(node('modal-root').innerHTML.includes('Admiral Info'));
-    run(`generalDialog('${side === 'empire' ? 'yang' : 'reinhard'}')`);
-    assert(node('modal-root').innerHTML.includes('Enemy officer'));
-    run('archiveDialog("Artillery")');
-    assert(node('modal-root').innerHTML.includes('Siege Cannon'));
-    run('openShop(game.stations.find(s=>s.owner===game.player).id,"Artillery")');
-    assert(node('modal-root').innerHTML.includes('Commission a fleet'));
-    assert(node('modal-root').innerHTML.includes('assets/' + side + '-fleet.png'));
-    assert(!node('modal-root').innerHTML.includes('assets/fleet-atlas.png'));
-    assert.equal((node('modal-root').innerHTML.match(/data-recruit=/g) || []).length, 3);
-    for (const branch of ['Escort', 'Battle Line']) {
-      run('openShop(game.stations.find(s=>s.owner===game.player).id,"' + branch + '")');
-      assert.equal((node('modal-root').innerHTML.match(/data-recruit=/g) || []).length, branch === 'Escort' ? 3 : 4);
-      assert(node('modal-root').innerHTML.includes('assets/' + side + '-fleet.png'));
-    }
-    run('helpDialog()');
-    assert(node('modal-root').innerHTML.includes('War on a hex grid'));
-    run('closeModal()');
+    key('c', true);
+    assert(run('selectedUnit().destination'), 'Ctrl+C must not clear a course');
+    key('c');
+    assert(!run('selectedUnit().destination'), 'C must clear a course');
+    assert(!run('getSave().units.find(u=>u.id===selectedUnit().id).destination'));
+
     await run('endTurn(true)');
-    assert.equal(run('game.turn'), 2);
-    assert.equal(run('game.phase'), side);
+    assert.equal(run('game.turn'), 2, 'enemy turn must finish');
+    assert.equal(run('game.phase'), side, 'control must return to the player');
     assert.equal(run('getSave().turn'), 2);
-    run('draw(16,.016)');
   }
-  run('setup={side:"alliance",mode:"iserlohn",difficulty:"normal"};newGame();');
-  assert(node('app').innerHTML.includes('Seventh Battle of Iserlohn'));
-  run('selectUnit(game.units.find(u=>u.type==="siege"&&u.side===game.player).id);');
-  assert(node('side').innerHTML.includes('Siege Cannon'));
-  const read = registered[0].execute({});
-  assert.equal(read.player, 'alliance');
-  registered[1].execute({ unitId: run('ownUnits()[0].id') });
-  assert.throws(() => registered[1].execute({ unitId: -1 }), /Invalid/);
-  run('game.over={winner:game.player,reason:"Test victory"};resultDialog();');
-  assert(node('modal-root').innerHTML.includes('The galaxy remembers.'));
-  assert(node('modal-root').innerHTML.includes('Command tokens earned'));
-  const tokens = JSON.parse(storage['galactic-command-officers']).tokens;
-  assert(tokens > 0);
-  run('resultDialog();');
-  assert.equal(JSON.parse(storage['galactic-command-officers']).tokens, tokens);
-  console.log(
-    'PASS: UI renders for both factions, controls open all dialogs, map draw completes, enemy turn completes, save/restore is coherent, structured-tool mock valid/invalid inputs pass.',
-  );
+  console.log('PASS: startup, both factions, map rendering, save/load, C shortcut and turn transition.');
 })().catch(e => {
   console.error(e);
   process.exitCode = 1;

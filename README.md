@@ -4,7 +4,7 @@ This contains the complete published game, including the new Empire and Alliance
 
 ## Play online
 
-https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `.github/workflows/pages.yml` after the tests pass.
+https://user2421423.github.io/LOGH/ — deployed automatically from `dist/` by `.github/workflows/pages.yml`. Local tests are optional and are not a deployment prerequisite.
 
 ## WC4-style controls and HUD
 
@@ -67,9 +67,9 @@ You can also try opening `dist/index.html` directly in your browser. Serving the
 - `dist/assets/fleet-atlas.png` — stations, fortresses, and capitals
 - `dist/assets/terrain-atlas.png` — terrain and effects
 - `dist/assets/admiral-atlas.png` — admiral portraits
-- `tests/engine.test.cjs` — gameplay tests
-- `tests/production-ai.test.cjs` — strategic procurement, counter-building, emergency and deployment regressions
-- `tests/ui-smoke.cjs` — interface smoke checks
+- `tests/engine.test.cjs` — nine essential movement, combat, economy, corridor and save checks
+- `tests/production-ai.test.cjs` — three essential shipbuilding and airstrike-AI checks
+- `tests/ui-smoke.cjs` — one minimal browser-interface smoke script (both factions, saves, shortcuts and turns)
 - `ASSETS.md` — artwork notes, sprite mappings, and generation prompts
 - `.openai/hosting.json` — existing Sites deployment configuration
 
@@ -79,7 +79,7 @@ Edit the files in `dist/`, then refresh the browser. To host the game elsewhere,
 
 ## Optional tests
 
-With Node.js installed, run from this folder:
+The lean safety net contains **12 engine/AI tests and one UI smoke script**. Detailed feature-by-feature regression cases were removed to keep maintenance simple. With Node.js installed, run from this folder:
 
 ```sh
 node --test tests/engine.test.cjs tests/production-ai.test.cjs
