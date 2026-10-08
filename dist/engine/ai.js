@@ -8,7 +8,7 @@
     radius: 6,
     near: 10,
     max: 3,
-    sticky: 3,
+    sticky: 5,
     rally: 2,
     reserve: 0.12,
     wait: 2,
@@ -43,7 +43,7 @@
       if (s.owner === side) {
         if (threatened(s)) {
           list.push({
-            key: 'd' + s.id,
+            key: 'p' + s.id,
             c: s.c,
             r: s.r,
             name: s.name,
@@ -61,7 +61,7 @@
       // far-side world at once. The two navigation corridors are always strategic objectives.
       if (corridor || nearOwn(s)) {
         list.push({
-          key: 's' + s.id,
+          key: 'p' + s.id,
           c: s.c,
           r: s.r,
           name: s.name,
@@ -122,7 +122,9 @@
       f.assigned = [];
       const prev = saved[f.id] || {};
       f.wait = prev.wait || 0;
-      f.state = prev.state || (f.type === 'offensive' ? 'assembling' : 'defending');
+      f.transition = prev.type === 'offensive' && f.type === 'defensive';
+      f.state = f.type === 'offensive' && prev.type === 'offensive' && prev.state === 'attacking'
+        ? 'attacking' : (f.type === 'offensive' ? 'assembling' : 'defending');
     }
 
     const vital = fronts.filter(f => f.vital);
@@ -138,8 +140,10 @@
     const emergency = fronts.some(f => f.vital && f.type === 'defensive');
     const reserveTarget = emergency ? 0 : totalStrength * FRONT.reserve;
     let reserveStrength = 0;
+    // Admirals must lead active formations. A small ordinary-fleet reserve is
+    // sufficient; keeping Yang at Heinessen wastes his strongest abilities.
     const candidates = units
-      .slice()
+      .filter(u => !u.admiral)
       .sort((a, b) => {
         const da = capital ? E.distance(a, capital) : 0,
           db = capital ? E.distance(b, capital) : 0;
@@ -148,33 +152,77 @@
     const reserveIds = new Set();
     for (const u of candidates) {
       if (reserveStrength >= reserveTarget) break;
-      if (u.admiral && unitStrength(u) > totalStrength * 0.18) continue;
       reserveIds.add(u.id);
       reserveStrength += unitStrength(u);
     }
 
-    // Preserve front assignments for a few turns unless that front disappears or becomes an emergency elsewhere.
+    // A captured corridor changes from an offensive to a defensive objective.
+    // Keep a local garrison, but continue the rest of its assault force toward
+    // stations on the far side instead of recalling everyone to the new fort.
+    const previous = new Map(units.map(u => [u.id, assignments[u.id]]));
+    const garrison = new Map();
     const unassigned = [];
     for (const u of units) {
       if (reserveIds.has(u.id)) {
         assignments[u.id] = { front: 'reserve', until: g.turn + 1 };
         continue;
       }
-      const old = assignments[u.id];
-      if (old && old.front !== 'reserve' && old.until >= g.turn && byId[old.front]) {
-        byId[old.front].assigned.push(u);
-      } else unassigned.push(u);
+      const old = assignments[u.id], front = old && byId[old.front];
+      if (front?.transition) {
+        const nearby = E.distance(u, front.anchor) <= 3;
+        const slots = garrison.get(front.id) || 0;
+        // Prefer a small, expendable garrison; committed admirals continue the breakthrough.
+        if (nearby && !u.admiral && slots < 2) {
+          front.assigned.push(u);
+          garrison.set(front.id, slots + 1);
+          assignments[u.id] = { front: front.id, until: g.turn + FRONT.sticky, garrison: true };
+          continue;
+        }
+      } else if (front && (old.until >= g.turn ||
+          (old.garrison && front.type === 'defensive' &&
+            E.distance(u, front.anchor) <= 5))) {
+        front.assigned.push(u);
+        continue;
+      }
+      unassigned.push(u);
     }
 
     const assignedStrength = f => f.assigned.reduce((n, u) => n + unitStrength(u), 0);
+    const routeTo = (u, p) => {
+      const field = E.routeField?.(g, p, u);
+      return field?.get(E.key(u)) ?? Infinity;
+    };
     for (const u of unassigned) {
+      const old = previous.get(u.id), oldFront = old && saved[old.front];
+      const oldAnchor = oldFront?.anchor;
+      const captured = oldFront?.type === 'offensive' && oldAnchor &&
+        ownStations.some(st => st.c === oldAnchor.c && st.r === oldAnchor.r);
+      const nearCorridor = captured && (oldAnchor.name === 'Iserlohn' || oldAnchor.name === 'Fezzan');
+      const farSide = p => nearCorridor &&
+        (side === 'empire' ? p.c >= 27 : p.c <= 23);
+      const nextFronts = fronts.filter(f => f.type === 'offensive' && farSide(f.anchor));
+      const continuation = nearCorridor && nextFronts.length
+        ? nextFronts.slice().sort((a,b) => E.distance(a.anchor, oldAnchor) - E.distance(b.anchor, oldAnchor))[0]
+        : null;
+
       const options = fronts
-        .map(f => ({
-          f,
-          deficit: Math.max(FRONT.floor, f.need - assignedStrength(f)),
-          distance: E.distance(u, f.rally || f.anchor),
-        }))
-        .sort((a, b) => b.deficit / (1 + b.distance * 0.08) - a.deficit / (1 + a.distance * 0.08));
+        .map(f => {
+          const distance = routeTo(u, f.anchor);
+          if (!Number.isFinite(distance)) return null;
+          const deficit = Math.max(FRONT.floor, f.need - assignedStrength(f));
+          const sameTheater = oldFront?.anchor &&
+            E.distance(f.anchor, oldFront.anchor) <= FRONT.radius + 5;
+          let score = deficit / (1 + distance * 0.25);
+          if (old?.front === f.id && f.type === 'offensive') score *= 2.2;
+          if (continuation && f.id === continuation.id) score *= 3.5;
+          if (sameTheater && f.type === 'offensive') score *= 1.3;
+          // Avoid sending the offensive force from one corridor to defend the other.
+          if (nearCorridor && f.type === 'defensive' && f.anchor.name !== oldAnchor.name)
+            score *= 0.25;
+          return { f, score };
+        })
+        .filter(Boolean)
+        .sort((a,b) => b.score - a.score);
       const pick = options[0]?.f;
       if (pick) {
         pick.assigned.push(u);
@@ -193,7 +241,10 @@
             .filter(u => E.distance(u, rally) <= FRONT.rally)
             .reduce((n, u) => n + unitStrength(u), 0),
           contact = enemyUnits.some(v => f.assigned.some(u => E.distance(u, v) <= 3));
-        if (contact || strength === 0 || massed >= Math.max(1, strength * 0.6) || f.wait >= FRONT.wait) {
+        // Once an assault is underway it remains underway until the objective
+        // changes, even if reinforcements have not reached the rally point.
+        if (f.state === 'attacking' || contact || strength === 0 ||
+            massed >= Math.max(1, strength * 0.6) || f.wait >= FRONT.wait) {
           f.state = 'attacking';
           f.wait = 0;
         } else {
@@ -260,7 +311,11 @@
     const f = plan.byId[assignment.front];
     if (!f) return plan.capital;
     if (f.type === 'defensive') return f.anchor;
-    if (f.state === 'assembling') return f.rally || f.anchor;
+    if (f.state === 'assembling') {
+      const rally = f.rally || f.anchor;
+      // Never order a fleet that already advanced beyond the rally point back to base.
+      if (E.distance(u, f.anchor) > E.distance(rally, f.anchor) + 1) return rally;
+    }
     return f.objectives
       .filter(o => !o.defend)
       .sort((a, b) => b.value - a.value)[0] || f.anchor;
@@ -276,13 +331,19 @@
       foes = alive(g, hostileSide(u.side)),
       allies = alive(g, u.side).filter(v => v.id !== u.id),
       old = { c: u.c, r: u.r },
-      currentRoute = field?.get(E.key(u)) ?? E.distance(u, destination);
+      currentRoute = field?.get(E.key(u));
+    // A shielded gate can make a goal temporarily unreachable. Do not march
+    // toward it using misleading straight-line distance instead of a legal route.
+    if (field && currentRoute == null) return null;
     let best = null,
       bestScore = -Infinity;
 
     for (const p of spots) {
-      const route = field?.get(E.key(p)) ?? E.distance(p, destination);
-      let score = (currentRoute - route) * 18;
+      const route = field ? field.get(E.key(p)) : E.distance(p, destination);
+      if (route == null) continue;
+      let score = ((currentRoute ?? E.distance(u, destination)) - route) * 18;
+      if (u.aiLastFrom && u.aiLastMoveTurn >= g.turn - 2 &&
+          E.key(u.aiLastFrom) === E.key(p)) score -= 80;
       const st = E.stationAt(g, p);
       if (st && st.owner !== u.side && st.shield === 0) score += 300 + stationValue(st);
       const danger = foes.filter(v => E.distance(v, p) <= 1).length,
@@ -293,6 +354,17 @@
       } else score -= danger * 10;
       if (E.TYPES[u.type].branch === 'Battle Line')
         score += Math.min(3, allies.filter(v => E.TYPES[v.type].branch === 'Battle Line' && E.distance(v, p) === 1).length) * 8;
+      // Flagship admirals should reach the battlefield early, but remain with
+      // their escorts and avoid advancing into concentrated fire alone.
+      if (u.admiral && u.type === 'flagship') {
+        const support = allies.filter(v => E.distance(v, p) <= 2 && v.hp > 0).length;
+        score += Math.min(3, support) * 12;
+        if (nearestEnemy <= 4) {
+          score -= danger * 75;
+          if (support === 0) score -= 125;
+          else if (support < 2) score -= 65;
+        }
+      }
       if (E.TYPES[u.type].air && u.admiral !== 'konev' && !E.airSupplied(g, u.side, p)) score -= 100;
       if (st?.owner === u.side && u.hp / E.maxHP(u) < 0.5) score += 25;
 
@@ -327,7 +399,11 @@
       const p = bestMove(g, u, destination, plan || {});
       if (p) {
         const moved = E.move(g, id, p.c, p.r);
-        if (moved.ok) events.push({ kind: 'move', ...moved, id });
+        if (moved.ok) {
+          u.aiLastFrom = moved.from;
+          u.aiLastMoveTurn = g.turn;
+          events.push({ kind: 'move', ...moved, id });
+        }
       }
     }
 
@@ -345,7 +421,11 @@
       const p = bestMove(g, u, destination, plan || {});
       if (p) {
         const moved = E.move(g, id, p.c, p.r);
-        if (moved.ok) events.push({ kind: 'move', ...moved, id, maneuver: true });
+        if (moved.ok) {
+          u.aiLastFrom = moved.from;
+          u.aiLastMoveTurn = g.turn;
+          events.push({ kind: 'move', ...moved, id, maneuver: true });
+        }
       }
     }
     return events;
@@ -905,6 +985,13 @@
           !u.moved &&
           !u.attacked &&
           u.hp / E.maxHP(u) >= 0.7 &&
+          // Do not pin important commanders to the rear for consecutive
+          // reinforcement turns; move them toward their front first.
+          (!u.admiral || !plan || (() => {
+            const f = plan.byId[plan.assignments[u.id]?.front];
+            return !f || E.distance(u, f.anchor) <= 12 ||
+              enemyUnits.some(v => E.distance(v, u) <= 5);
+          })()) &&
           g.stations.some(s => s.owner === side && E.distance(s, u) <= 1),
       )
       .sort((a, b) => reinforcementScore(g, b, plan) - reinforcementScore(g, a, plan))) {

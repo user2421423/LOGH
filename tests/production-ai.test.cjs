@@ -21,6 +21,14 @@ test('production AI builds fleets and immediately assigns them to theaters', () 
     assert.equal(g.ai.alliance.assignments[rec.id].front, rec.front);
     assert.equal(g.stations.find(s => s.id === rec.station).producedTurn, g.turn);
   }
+  // A commander flagship must lead a live front, not idle as a capital reserve.
+  const yang = g.units.find(u => u.admiral === 'yang');
+  const approach = { c: 25, r: 6 };
+  const beforeDistance = E.distance(yang, approach);
+  assert.notEqual(g.ai.alliance.assignments[yang.id]?.front, 'reserve');
+  const orders = E.aiOrder(g, yang.id);
+  assert(orders.some(o => o.kind === 'move'), 'Yang should deploy toward Iserlohn immediately');
+  assert(E.distance(yang, approach) < beforeDistance);
 });
 
 test('airstrike spending never reduces same-turn ship purchases', () => {
