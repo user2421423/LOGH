@@ -30,7 +30,8 @@ let game = E.createGame('empire'),
 let detailOpen = false,
   saveOk = true,
   shake = 0;
-let airOrder = null;
+let airOrder = null,
+  stationView = 'overview'; // Independent station overview / aerospace command pages
 const R = 43,
   SQ = Math.sqrt(3),
   count = n => Math.round(n).toLocaleString('en-US'),
@@ -95,6 +96,7 @@ function newGame() {
   hqBack = 'game';
   game = E.applyProfile(E.createGame(setup.side, setup.difficulty, setup.mode, Date.now() >>> 0), loadProfile());
   airOrder = null;
+  stationView = 'overview';
   selection = { kind: 'unit', id: ownUnits().find(u => u.admiral)?.id };
   undoStack = [];
   effects = [];
@@ -308,7 +310,7 @@ function updateSelection() {
         : [],
   );
   $('side').innerHTML =
-    '<button class="drawer-close small" data-action="details" aria-label="Close fleet orders">×</button>' + panel();
+    '<button class="drawer-close small" data-action="close-panel" aria-label="Close orders panel">×</button>' + panel();
   $('side').classList.toggle('open', detailOpen);
   $('selection-dock').innerHTML = dockHTML();
   const ready = readyIds.size;
@@ -324,6 +326,8 @@ function updateSelection() {
       ? 'Enemy fleets are maneuvering…'
       : game.over
         ? 'Operation concluded'
+        : st && stationView === 'air'
+          ? `${st.name} · Aerospace command · choose a sortie`
         : u?.side === game.player
           ? `${u.admiral ? E.ADMIRALS[u.admiral].short + ' · ' : ''}${E.TYPES[u.type].short} ×${u.stack}${u.morale <= -3 ? ' · In confusion' : u.side === game.player && !hasOrders(u) ? ' · Orders complete' : ''}`
           : selectedStation()
@@ -350,6 +354,7 @@ function panel() {
         `<option value="${v.id}" ${u?.id === v.id ? 'selected' : ''}>${v.admiral ? E.ADMIRALS[v.admiral].short + ' · ' : ''}${E.TYPES[v.type].short} ×${v.stack} [${v.c},${v.r}]${!hasOrders(v) ? ' · spent' : ''}</option>`,
     )
     .join('')}</select>`;
+  if (s && stationView === 'air' && s.owner === game.player) return airPanel(s);
   let main = '';
   if (u) {
     const t = E.TYPES[u.type],
@@ -359,7 +364,7 @@ function panel() {
     main = `<section>${fleetPicker}<div class="side-title"><span class="label">${t.branch}</span><span class="chip" style="color:${E.FACTIONS[u.side].color}">${E.FACTIONS[u.side].short}</span></div>${ART.ship(u.type, 'panel-ship', artSide(u))}<h2 class="unit-name">${a && u.type === 'flagship' ? a.hull : t.name}</h2><p class="description">${a && u.type === 'flagship' ? t.name + ' · ' : ''}${t.desc}</p><div class="hp-row">${ICONS.hp(u.hp, E.maxHP(u), 'hp-ring-lg')}<span>Hull integrity</span><span class="mono">${Math.ceil(u.hp)} / ${E.maxHP(u)}</span></div><div class="stat-grid"><div><span class="label">${ICONS.use('atk')} Attack</span><b>${Math.round(t.attack * (1 + 0.45 * (u.stack - 1)))}</b></div><div><span class="label">${ICONS.use('def')} Armor</span><b>${t.armor}</b></div><div><span class="label">${ICONS.use('mov')} Move</span><b>${E.movement(game, u)}</b></div><div><span class="label">${ICONS.use('rng')} Range</span><b>${rangeText(u)}</b></div><div><span class="label">Stack</span><b>${u.stack}/${t.elite ? 1 : 3}</b></div><div><span class="label">Veteran</span><b>${u.xp}/5</b></div></div><div class="status-line"><span class="status ${moveStatus(u) === 'Move ready' ? 'ready' : 'spent'}">${moveStatus(u)}</span><span class="status ${fireStatus(u) === 'Fire ready' ? 'ready' : 'spent'}">${fireStatus(u)}</span><span class="status">${moraleName(u.morale)}</span></div>${a ? admiralCard(u) : ''}${ours ? `<div class="actions">${!a ? act('data-action="assign"', 'Assign admiral', phaseReason(), 'Choose an officer') : ''}${a?.trait === 'magician' ? act('data-action="confuse"', 'Confusion', phaseReason() || E.confuseReason(game, u), '−2 morale · 2 hex radius', '', false) : ''}${act('data-action="reinforce"', 'Add a stack', phaseReason() || E.reinforceReason(game, u), costHTML(E.reinforceCost(u.type)))}${act('data-action="repair"', 'Repair fleet', phaseReason() || E.repairReason(game, u), '+35% HP · ' + costHTML({ credits: E.repairCost(u, game) }))}${act('data-action="course"', OrdersUI.label(u), phaseReason(), OrdersUI.detail(u), '', false)}${u.destination ? act('data-action="course-clear"', 'Clear course', phaseReason(), 'Stop automatic movement', '', false) : ''}${act('data-action="wait"', 'Hold position', phaseReason() || holdReason(u), 'Finish this fleet’s turn')}</div><p class="description" style="font-size:11px">Repair and stacking require a friendly station within 1 hex and consume this fleet’s turn.</p>` : ''}${st ? `<div class="section-divider"><span class="label">Station beneath fleet</span><div class="station-buttons"><button data-station="${st.id}">${st.name} · Tier ${st.tier}</button>${st.owner === game.player ? `<button data-shop="${st.id}" ${!interactive() ? 'disabled' : ''}>Shipyard</button>` : ''}</div></div>` : ''}</section>`;
   } else if (s) {
     const ours = s.owner === game.player;
-    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${s.capital ? 'Capital' : s.fort ? 'Orbital fortress' : 'Sector hub'}</span><span class="chip" style="color:${E.FACTIONS[s.owner].color}">${E.FACTIONS[s.owner].short}</span></div>${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station', 'panel-ship')}<h2 class="unit-name">${s.name}</h2><p class="description">${s.fort ? 'Fortress defenses protect this strategic corridor.' : s.capital ? 'The seat of government and a major industrial center.' : 'Capture and hold this station to fund your fleets.'}</p><div class="hp-row"><span>Station defenses</span><span class="mono">${Math.ceil(s.shield)} / ${s.maxShield}</span></div><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%;background:${E.FACTIONS[s.owner].color}"></i></div><div class="stat-grid"><div><span class="label">${ICONS.use('credits')} Credits</span><b>+${s.income}</b></div><div><span class="label">${ICONS.use('industry')} Industry</span><b>+${s.industry}</b></div><div><span class="label">${ICONS.use('research')} Research</span><b>+${s.science}</b></div></div>${fortressPanel(s)}${airPanel(s)}<div class="buildings">${Object.entries(
+    main = `<section>${fleetPicker}<div class="side-title"><span class="label">${s.capital ? 'Capital' : s.fort ? 'Orbital fortress' : 'Sector hub'}</span><span class="chip" style="color:${E.FACTIONS[s.owner].color}">${E.FACTIONS[s.owner].short}</span></div>${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station', 'panel-ship')}<h2 class="unit-name">${s.name}</h2><p class="description">${s.fort ? 'Fortress defenses protect this strategic corridor.' : s.capital ? 'The seat of government and a major industrial center.' : 'Capture and hold this station to fund your fleets.'}</p><div class="hp-row"><span>Station defenses</span><span class="mono">${Math.ceil(s.shield)} / ${s.maxShield}</span></div><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%;background:${E.FACTIONS[s.owner].color}"></i></div><div class="stat-grid"><div><span class="label">${ICONS.use('credits')} Credits</span><b>+${s.income}</b></div><div><span class="label">${ICONS.use('industry')} Industry</span><b>+${s.industry}</b></div><div><span class="label">${ICONS.use('research')} Research</span><b>+${s.science}</b></div></div>${fortressPanel(s)}<div class="buildings">${Object.entries(
       E.BUILDINGS,
     )
       .map(([k, b]) => {
@@ -368,7 +373,7 @@ function panel() {
       })
       .join(
         '',
-      )}</div>${ours ? `<div class="actions">${act(`data-shop="${s.id}"`, 'Open shipyard', shipyardReason(s), 'Build a fleet', 'primary')}</div><p class="description">One fleet per station per turn. New fleets act next turn. Garrisons repair 8% hull here each turn.</p>` : '<p class="description">Reduce defenses to zero and eliminate any garrison, then enter with an Escort or Battle Line unit to capture. Artillery cannot capture stations.</p>'}</section>`;
+      )}</div>${ours ? `<div class="actions">${act(`data-shop="${s.id}"`, 'Open shipyard', shipyardReason(s), 'Build a fleet', 'primary')}${act('data-action="air-sorties"', 'Aircraft Sorties', phaseReason(), `Open air operations · Air Base ${s.air || 0}`, 'small')}</div><p class="description">One fleet per station per turn. New fleets act next turn. Garrisons repair 8% hull here each turn.</p>` : '<p class="description">Reduce defenses to zero and eliminate any garrison, then enter with an Escort or Battle Line unit to capture. Artillery cannot capture stations.</p>'}</section>`;
   } else {
     main = `<section>${fleetPicker}<div class="empty-panel"><span class="eyebrow">Command the frontier</span><h3>Position.<br>Concentrate.<br>Break through.</h3><p class="description">Select a fleet to see its movement and attack range. Select a station to build new ships.</p><div class="info-strip">Green hexes move, red hexes attack with one click. Undo takes back a move until the fleet fires. A Battle Line kill can refresh both actions.</div><button data-action="next">Select a ready fleet</button></div></section>`;
   }
@@ -414,8 +419,14 @@ function fortressPanel(s) {
 function airPanel(station) {
   if (station.owner !== game.player) return '';
   const active = airOrder?.stationId === station.id ? airOrder.type : null;
-  return `<div class="target-box airstrike-panel"><span class="label">Aerospace command</span>
-    <h3>Launch aircraft sorties</h3><p>Unlimited launches as long as you have credits and industry. Each strike originates here.</p>
+  return `<section class="air-operations"><div class="airstrike-heading">
+    <button class="small ghost airstrike-back" data-action="station-overview">← Station overview</button>
+    <span class="label">Aerospace command · ${esc(station.name)}</span>
+    <h2>Aircraft Sorties</h2>
+    <p class="description">Air Base Level ${station.air || 0} · Unlimited sorties per turn, with a resource cost for each launch. Click a type, then a red hex on the map.</p>
+    <div class="cost">${costHTML(game.economy[game.player], true)}</div>
+    </div>
+    <div class="airstrike-panel"><h3>Available sorties</h3>
     <div class="airstrike-options">${Object.entries(E.AIR_STRIKES).map(([type, strike]) => {
       const price = E.airStrikeCost(game, game.player, type),
         locked = (station.air || 0) < strike.level, funds = game.economy[game.player],
@@ -428,7 +439,7 @@ function airPanel(station) {
       </div>`;
     }).join('')}</div>
     ${active ? '<button class="small ghost" data-action="cancel-air">Cancel targeting</button><p>Click a red target. You can launch again immediately.</p>' : ''}
-  </div>`;
+  </div></section>`;
 }
 function terrainDescription(t) {
   return t.terrain === 'nebula'
@@ -443,6 +454,7 @@ function selectUnit(id, center = false) {
   const u = game.units.find(v => v.id === id && v.hp > 0);
   if (!u) return;
   airOrder = null;
+  stationView = 'overview';
   selection = { kind: 'unit', id };
   updateSelection();
   if (center) centerOn(u);
@@ -450,7 +462,10 @@ function selectUnit(id, center = false) {
 function selectStation(id, center = false) {
   const s = game.stations.find(v => v.id === id);
   if (!s) return;
-  if (airOrder?.stationId !== id) airOrder = null;
+  if (selection?.kind !== 'station' || selection.id !== id) {
+    airOrder = null;
+    stationView = 'overview';
+  }
   selection = { kind: 'station', id };
   updateSelection();
   if (center) centerOn(s);
@@ -525,6 +540,7 @@ async function endTurn(force = false) {
   }
   closeModal();
   airOrder = null;
+  stationView = 'overview';
   undoStack = [];
   save();
   const token = ++aiToken;
@@ -1122,17 +1138,19 @@ function strikeEffects(s, delay = 0) {
   SFX.play('thor', 'empire', delay);
   setTimeout(() => bump(16), reducedMotion() ? 0 : delay * 1000 + 550);
 }
+// A sortie is one real aircraft formation, rendered at its original fleet sprite size.
+// Impact text, explosions and sound are triggered when the formation arrives, not at launch.
 function addAirStrikeEffects(result, delay = 0) {
-  const duration = 1.05 + delay;
-  effects.push({ kind: 'air-sortie', type: result.type, side: result.side, from: result.from,
-    to: result.to, life: duration, max: duration });
-  if (result.destroyed || result.shieldDamage)
-    effects.push({ kind: 'boom', to: result.to, life: 0.75 + delay, max: 0.75 + delay });
-  if (result.shieldDamage) popup(result.to, `−${result.shieldDamage} DEF`, '#7cc8ff', { dy: 25, size: 15 });
-  for (const hit of result.hit || []) popup(hit, `−${hit.damage}`, '#ff9a7a', { size: 18, pop: true });
+  const flightTime = 1.05;
+  effects.push({
+    kind: 'air-sortie', type: result.type, side: result.side,
+    from: result.from, to: result.to,
+    unitDamage: result.unitDamage || 0, shieldDamage: result.shieldDamage || 0,
+    destroyed: !!result.destroyed, hit: result.hit || [],
+    delay, flightTime, life: flightTime + delay, max: flightTime + delay,
+    impactShown: false,
+  });
   SFX.play('flyby', result.side, delay);
-  SFX.play('explosion', result.side, delay + 0.45);
-  bump((HEAVY_SHAKE[result.type] || 2) + (result.destroyed ? 4 : 0));
 }
 function addCombatEffects(result, attacker) {
   const side = attacker.side,
@@ -1248,6 +1266,8 @@ document.addEventListener('click', e => {
     const station = game.stations.find(s => s.id === +d.airStation), strike = E.AIR_STRIKES[d.airType];
     if (!station || !strike || station.owner !== game.player || !interactive() || (station.air || 0) < strike.level) return;
     airOrder = { stationId: station.id, type: d.airType };
+    stationView = 'air';
+    detailOpen = true;
     selection = { kind: 'station', id: station.id };
     updateSelection();
     toast(`${strike.name}: select a red target to pay and launch. Unlimited sorties.`);
@@ -1353,7 +1373,27 @@ document.addEventListener('click', e => {
     return;
   }
   switch (d.action) {
+    case 'air-sorties': {
+      const station = selectedStation();
+      if (!station || station.owner !== game.player || !interactive()) break;
+      stationView = 'air';
+      detailOpen = true;
+      updateSelection();
+      break;
+    }
+    case 'station-overview':
+      stationView = 'overview';
+      airOrder = null;
+      detailOpen = true;
+      updateSelection();
+      break;
     case 'cancel-air':
+      airOrder = null;
+      updateSelection();
+      break;
+    case 'close-panel':
+      detailOpen = false;
+      stationView = 'overview';
       airOrder = null;
       updateSelection();
       break;
@@ -1389,6 +1429,7 @@ document.addEventListener('click', e => {
         hqBack = 'game';
         game = E.applyProfile(s, loadProfile());
         airOrder = null;
+        stationView = 'overview';
         selection = null;
         undoStack = [];
         zoom = 1;
@@ -1670,7 +1711,7 @@ function dockHTML() {
   }
   if (s) {
     const ours = s.owner === game.player;
-    return `<div class="dock-visual">${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station')}<span class="faction-flag ${s.owner}">${s.owner === 'empire' ? 'I' : s.owner === 'alliance' ? 'A' : 'N'}</span></div><div class="dock-unit"><span class="label">${s.fort ? 'Fortress' : s.capital ? 'Capital' : 'Sector hub'} · Shipyard ${s.tier}</span><strong>${s.name}</strong><div class="dock-health"><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%"></i></div><span>${Math.ceil(s.shield)} / ${s.maxShield} DEF</span></div><p>Income +${s.income} &nbsp; Industry +${s.industry}</p></div><div class="dock-actions">${ours ? act(`data-shop="${s.id}"`, 'Shipyard', shipyardReason(s), '', 'primary') : ''}${ours && (s.air || 0) > 0 ? '<button class="small" data-action="details">Air sorties</button>' : ''}<button class="small" data-action="details">Station details</button></div>`;
+    return `<div class="dock-visual">${ART.ship(s.capital ? 'capital' : s.fort ? 'fortress' : 'station')}<span class="faction-flag ${s.owner}">${s.owner === 'empire' ? 'I' : s.owner === 'alliance' ? 'A' : 'N'}</span></div><div class="dock-unit"><span class="label">${s.fort ? 'Fortress' : s.capital ? 'Capital' : 'Sector hub'} · Shipyard ${s.tier}</span><strong>${s.name}</strong><div class="dock-health"><div class="bar"><i style="width:${(s.shield / s.maxShield) * 100}%"></i></div><span>${Math.ceil(s.shield)} / ${s.maxShield} DEF</span></div><p>Income +${s.income} &nbsp; Industry +${s.industry}</p></div><div class="dock-actions">${ours ? act(`data-shop="${s.id}"`, 'Shipyard', shipyardReason(s), '', 'primary') : ''}${ours ? '<button class="small" data-action="air-sorties">Air Sorties</button>' : ''}<button class="small" data-action="station-overview">Station details</button></div>`;
   }
   return `<div class="dock-idle"><span class="label">Fleet command</span><strong>Select a fleet or station</strong><p>Click a ship to move and attack. Click a station to build.</p></div><div class="dock-actions"><button class="small" data-action="next">Select a ready fleet</button><button class="small ghost" data-action="details">Fleet directory</button></div>`;
 }
@@ -2165,9 +2206,13 @@ function draw(time, dt) {
     ctx.strokeStyle = '#dcebe769';
     ctx.lineWidth = 1.2 / scale;
     ctx.stroke();
-    const pr = u && targetCache.has(E.key(hover)) ? E.preview(game, u.id, hover.c, hover.r) : null;
+    const st = selectedStation();
+    const pr = targetCache.has(E.key(hover))
+      ? u ? E.preview(game, u.id, hover.c, hover.r)
+        : st && airOrder ? E.airStrikePreview(game, st.id, airOrder.type, hover.c, hover.r) : null
+      : null;
     if (pr) {
-      const a = hexCenter(u);
+      const a = hexCenter(u || st);
       drawLine(a.x, a.y, p.x, p.y, '#ff9a6ac0', 1.4 / scale, [6, 6]);
       drawEstimate(p, pr, scale);
     }
@@ -2190,18 +2235,35 @@ function draw(time, dt) {
         95 * (1.15 - (e.life / e.max) * 0.45),
       );
     } else if (e.kind === 'air-sortie') {
-      const progress = Math.min(1, (1 - e.life / e.max) / 0.78),
-        ease = progress * progress * (3 - 2 * progress),
-        x = a.x + (b.x - a.x) * ease, y = a.y + (b.y - a.y) * ease;
-      ctx.save(); ctx.translate(x, y);
-      ctx.rotate(Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2);
-      ctx.shadowColor = E.FACTIONS[e.side].color;
-      ctx.shadowBlur = 11 / scale;
-      ART.drawShip(ctx, e.type, e.side, 0, 0, 63 / Math.sqrt(scale));
-      ctx.restore();
-      if (progress > 0.82) {
-        drawLine(x, y, b.x, b.y, '#fff1c6', 3 / scale);
-        ART.draw(ctx, 'terrain', 15, b.x, b.y, 52 + progress * 38, 52 + progress * 38);
+      const elapsed = e.max - e.life - e.delay;
+      if (elapsed >= 0) {
+        const progress = Math.min(1, elapsed / e.flightTime),
+          flight = Math.min(1, progress / 0.78),
+          eased = flight * flight * (3 - 2 * flight),
+          x = a.x + (b.x - a.x) * eased,
+          y = a.y + (b.y - a.y) * eased;
+        if (progress < 0.78) {
+          ctx.save();
+          ctx.globalAlpha = 1; // Prior code faded aircraft to invisibility during flight.
+          const trail = Math.min(0.18, eased),
+            tx = a.x + (b.x - a.x) * Math.max(0, eased - trail),
+            ty = a.y + (b.y - a.y) * Math.max(0, eased - trail);
+          drawLine(tx, ty, x, y, E.FACTIONS[e.side].color, 3 / scale);
+          ctx.translate(x, y);
+          ctx.shadowColor = '#000a';
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetY = 4;
+          // Draw the native model unrotated at exactly the old air-wing footprint (R * 2).
+          ART.drawShip(ctx, e.type, e.side, 0, -6, R * 2, R * 2);
+          ctx.restore();
+        } else if (!e.impactShown) {
+          e.impactShown = true;
+          SFX.play('explosion', e.side);
+          bump((HEAVY_SHAKE[e.type] || 2) + (e.destroyed ? 4 : 0));
+          effects.push({ kind: 'boom', to: e.to, life: 0.7, max: 0.7 });
+          if (e.shieldDamage) popup(e.to, `−${e.shieldDamage} DEF`, '#7cc8ff', { dy: 25, size: 15 });
+          for (const hit of e.hit) popup(hit, `−${hit.damage}`, '#ff9a7a', { size: 18, pop: true });
+        }
       }
     } else if (e.kind === 'boom') {
       const grow = 1 - e.life / e.max;
