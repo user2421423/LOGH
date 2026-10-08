@@ -351,54 +351,135 @@
     return events;
   }
 
-  function aiAirStrikes(g) {
-    const side = g.phase, economy = g.economy[side];
-    if (!economy || g.over) return [];
-    const bases = g.stations.filter(st => st.owner === side && (st.air || 0) > 0),
-      opposing = () => g.units.filter(u => u.hp > 0 && u.side !== side),
-      reports = [];
-    if (!bases.length) return reports;
-    const emergency = g.units.some(u => u.hp > 0 && u.side !== side &&
-      g.stations.some(st => st.owner === side && E.distance(u, st) <= 4));
-    const initial = { credits: economy.credits, industry: economy.industry },
-      reserveCredits = Math.floor(initial.credits * (emergency ? 0.75 : 0.8)),
-      reserveIndustry = Math.floor(initial.industry * (emergency ? 0.7 : 0.8));
-    // No hard sortie limit. Every loop consumes resources, removes targets or stops.
+  // Paid strikes are strictly secondary to recruiting, repairing and reinforcing fleets.
+  // Never impose a per-turn sortie count; affordable, worthwhile attacks determine the count.
+  function aiAirStrikes(g, options = {}) {
+    const side = g.phase, bank = g.economy[side];
+    if (!bank || g.over) return [];
+    const bases = g.stations.filter(s => s.owner === side && s.air > 0);
+    if (!bases.length) return [];
+    const reports = [];
+    const frigate = E.price('frigate');
+    // Protect both the next turn's fleet purchase and a portion of the remaining treasury.
+    // Never spend the last fleet's worth of resources on air support.
+    const creditFloor = Math.max(frigate.credits, Math.floor(bank.credits * 0.55),
+      options.savingForDreadnought ? E.price('flagship').credits : 0);
+    const industryFloor = Math.max(frigate.industry, Math.floor(bank.industry * 0.5),
+      options.savingForDreadnought ? E.price('flagship').industry : 0);
+    const canPay = (credits, industry) =>
+      bank.credits - credits >= creditFloor && bank.industry - industry >= industryFloor;
+
+    const opportunities = (target, unitOnly = false) => {
+      const out = [];
+      for (const base of bases) for (const [type, strike] of Object.entries(E.AIR_STRIKES)) {
+        if (base.air < strike.level || E.distance(base, target) > E.airStrikeRange(g, side, type)) continue;
+        const view = E.airStrikePreview(g, base.id, type, target.c, target.r);
+        if (view && (unitOnly ? view.unit > 0 : view.shield > 0))
+          out.push({ base, type, view, credits: view.cost.credits, industry: view.cost.industry,
+            weight: view.cost.credits + view.cost.industry * 2.2 });
+      }
+      return out;
+    };
+
+    // Find the least expensive mixture of fighters/bombers/strategic bombers
+    // that can deliver a meaningful *same-turn* shield salvo, not a futile
+    // fighter tap erased by enemy shield regeneration.
+    const shieldSalvo = (station, possibilities) => {
+      if (!possibilities.length) return null;
+      const regen = Math.round(station.maxShield *
+        (g.units.some(u => u.hp > 0 && u.side === station.owner &&
+          u.admiral === 'kessler' && E.distance(u, station) <= 1) ? 0.22 : 0.12));
+      const nearFleet = g.units.some(u => u.hp > 0 && u.side === side && E.distance(u, station) <= 3);
+      if (!nearFleet) return null; // Breaching a station without approaching fleets is wasted money.
+      const bestByType = Object.values(possibilities.reduce((acc, p) => {
+        if (!acc[p.type] || p.view.shield / p.weight > acc[p.type].view.shield / acc[p.type].weight)
+          acc[p.type] = p;
+        return acc;
+      }, {}));
+      // Prefer breaching all shields when we can afford it. Otherwise a volley
+      // must exceed next-turn regeneration by a meaningful margin.
+      const budgetCredits = Math.max(0, bank.credits - creditFloor),
+        budgetIndustry = Math.max(0, bank.industry - industryFloor);
+      const solve = threshold => {
+        const sorted = bestByType.slice().sort((a,b) => a.type.localeCompare(b.type));
+        const [first, second, third] = [sorted[0], sorted[1], sorted[2]];
+        let best = null;
+        const limit = p => p ? Math.min(Math.ceil(threshold / p.view.shield),
+          Math.floor(budgetCredits / p.credits), Math.floor(budgetIndustry / p.industry)) : 0;
+        for (let i = 0; i <= limit(first); i++) for (let j = 0; j <= limit(second); j++) {
+          const dealt = i * first.view.shield + (second ? j * second.view.shield : 0);
+          const remain = Math.max(0, threshold - dealt);
+          const k = remain > 0 && third ? Math.ceil(remain / third.view.shield) : 0;
+          if (remain > 0 && !third) {
+            if (dealt < threshold) continue;
+          }
+          if (third && k > limit(third)) continue;
+          const credits = i * first.credits + (second ? j * second.credits : 0) + (third ? k * third.credits : 0),
+            industry = i * first.industry + (second ? j * second.industry : 0) + (third ? k * third.industry : 0);
+          if (!credits || credits > budgetCredits || industry > budgetIndustry) continue;
+          const weight = credits + industry * 2.2;
+          if (!best || weight < best.weight) {
+            best = { weight, credits, industry, actions: [
+              ...Array(i).fill(first), ...(second ? Array(j).fill(second) : []),
+              ...(third ? Array(k).fill(third) : []),
+            ] };
+          }
+        }
+        return best;
+      };
+      const full = solve(station.shield);
+      const threshold = Math.min(station.shield, regen + Math.max(22, Math.round(station.maxShield * 0.06)));
+      const selected = full || solve(threshold);
+      if (!selected) return null;
+      const expectedDamage = Math.min(station.shield, selected.actions.reduce((n,p)=>n+p.view.shield,0));
+      const net = full ? expectedDamage : Math.max(0, expectedDamage - regen);
+      const relevance = station.capital || station.fort ? 1.3 : 1;
+      const score = (net * 0.85 * relevance) / selected.weight;
+      return { score, station, actions: selected.actions, cost: selected };
+    };
+
+    // Re-evaluate after each attack: enemies die, budgets shrink and shields drop.
+    // We may launch any number of cost-effective sorties; no arbitrary sortie cap.
     while (!g.over) {
-      const targets = [
-        ...opposing().map(u => ({ c: u.c, r: u.r })),
-        ...g.stations.filter(st => st.owner !== side && st.shield > 0).map(st => ({ c: st.c, r: st.r })),
-      ];
+      const budget = bank.credits - creditFloor;
+      if (budget < Math.min(...Object.values(E.AIR_STRIKES).map(t => t.credits * 0.8))) break;
       let best = null;
-      for (const station of bases) for (const [type, strike] of Object.entries(E.AIR_STRIKES)) {
-        if ((station.air || 0) < strike.level) continue;
-        const price = E.airStrikeCost(g, side, type);
-        if (economy.credits - price.credits < reserveCredits ||
-            economy.industry - price.industry < reserveIndustry) continue;
-        for (const point of targets) {
-          if (E.distance(station, point) > E.airStrikeRange(g, side, type)) continue;
-          const view = E.airStrikePreview(g, station.id, type, point.c, point.r);
-          if (!view) continue;
-          const unit = E.unitAt(g, point), defendedStation = E.stationAt(g, point);
-          const effectiveUnit = unit && unit.side !== side ? Math.min(unit.hp, view.unit) : 0,
-            effectiveShield = defendedStation && defendedStation.owner !== side ?
-              Math.min(defendedStation.shield, view.shield) : 0;
-          let priority = effectiveUnit + effectiveShield * 0.75;
-          if (unit && unit.side !== side && effectiveUnit >= unit.hp) priority += 25;
-          if (defendedStation && defendedStation.owner !== side && defendedStation.shield > 0)
-            priority += defendedStation.capital || defendedStation.fort ? 18 : 7;
-          if (unit?.admiral && unit.side !== side) priority += 10;
-          const efficiency = priority / Math.max(1, price.credits + price.industry * 2.2);
-          if (efficiency > 0.2 && (!best || efficiency > best.score))
-            best = { station, type, point, score: efficiency };
+      const enemies = g.units.filter(u => u.hp > 0 && u.side !== side);
+      for (const foe of enemies) {
+        for (const p of opportunities(foe, true)) {
+          if (!canPay(p.credits, p.industry)) continue;
+          const effective = Math.min(foe.hp, p.view.unit);
+          const nearHome = bases.some(s => E.distance(s, foe) <= 4);
+          const threat = nearHome ? 1.2 : 1;
+          const kill = effective >= foe.hp ? 1.4 : 1;
+          const elite = foe.admiral ? 1.15 : 1;
+          const score = effective * threat * kill * elite / p.weight;
+          if (score > 0.17 && (!best || score > best.score)) best = { score, actions: [p] };
         }
       }
+      for (const station of g.stations.filter(s => s.owner !== side && s.shield > 0)) {
+        // If a garrison is present, focus hull damage first; shield damage is secondary.
+        if (g.units.some(u => u.hp > 0 && u.side !== side && u.c === station.c && u.r === station.r))
+          continue;
+        const salvo = shieldSalvo(station, opportunities(station));
+        if (salvo && salvo.score > 0.13 && (!best || salvo.score > best.score)) best = salvo;
+      }
       if (!best) break;
-      const fired = E.airStrike(g, best.station.id, best.type, best.point.c, best.point.r);
-      if (!fired.ok) break;
-      reports.push({ station: best.station.name, type: best.type, c: best.point.c, r: best.point.r,
-        damage: fired.unitDamage, shields: fired.shieldDamage });
-      (g.strikes ||= []).push(fired);
+      let launched = false;
+      for (const p of best.actions) {
+        if (g.over || !canPay(p.credits, p.industry)) break;
+        const target = best.station || E.unitAt(g, p.view.to);
+        if (!target) break;
+        const fired = E.airStrike(g, p.base.id, p.type, target.c, target.r);
+        if (!fired.ok) break;
+        reports.push({ station: p.base.name, type: p.type, c: target.c, r: target.r,
+          damage: fired.unitDamage, shields: fired.shieldDamage, credits: fired.cost.credits,
+          industry: fired.cost.industry });
+        (g.strikes ||= []).push(fired);
+        launched = true;
+        if (best.station && best.station.shield <= 0) break;
+      }
+      if (!launched) break;
     }
     return reports;
   }
@@ -750,8 +831,7 @@
       if (!E.repairReason(g, u) && e.credits - E.repairCost(u, g) >= repairCreditFloor) E.repair(g, u.id);
     }
 
-    // Reserve most of the treasury for production; do not pre-empt emergency defenses.
-    const airstrikes = emergency.level >= 2 ? [] : aiAirStrikes(g);
+    // Shipbuilding and emergency reinforcements always have priority over air support.
     const flagPrice = E.price('flagship'),
       tier3 = bases.filter(s => s.tier >= 3),
       strategicSave = shouldSaveForDreadnought(g, side, plan, emergency, reserve);
@@ -905,8 +985,35 @@
       });
     }
 
-    // Emergency spending first: air support can only use funds remaining after new ships.
-    if (emergency.level >= 2 && !g.over) airstrikes.push(...aiAirStrikes(g));
+    // Invest in higher-grade air bases only AFTER purchasing all available fleets.
+    // A new bomber/strategic base is valuable only if it can support actual nearby
+    // operations. Keep enough cash and alloy to buy another frigate next turn.
+    if (!emergency.level && !planState.saving && !upgraded.length && g.turn >= 3) {
+      const nextFleet = E.price('frigate');
+      const upgradeBases = bases.filter(s => s.air > 0 && s.air < 3 &&
+        own().some(u => E.distance(u, s) <= 5))
+        .map(st => {
+          const nextType = st.air === 1 ? 'bomber' : 'strategic';
+          const reach = E.airStrikeRange(g, side, nextType);
+          const enemyFleet = enemyUnits.some(u => u.hp > 0 && E.distance(st, u) <= reach),
+            enemyStation = g.stations.some(t => t.owner !== side && E.distance(st, t) <= reach &&
+              own().some(u => E.distance(u, t) <= 5));
+          return { st, value: (enemyFleet ? 2 : 0) + (enemyStation ? 1 : 0) + st.air * 0.1 };
+        }).filter(o => o.value >= 1)
+        .sort((a,b) => b.value - a.value);
+      for (const { st } of upgradeBases) {
+        const price = E.buildCost(st, 'air');
+        if (e.credits - price.credits < Math.max(175, nextFleet.credits) ||
+            e.industry - price.industry < nextFleet.industry || E.buildReason(g, st, 'air'))
+          continue;
+        const result = E.build(g, st.id, 'air');
+        if (result.ok) upgraded.push({ station: st.id, kind: 'air' });
+        break;
+      }
+    }
+
+    // Only genuinely surplus cash is available for airstrikes; fleets have already been purchased.
+    const airstrikes = aiAirStrikes(g, { savingForDreadnought: planState.saving });
     planState.procurement = {
       turn: g.turn,
       emergency: emergency.level,
@@ -938,6 +1045,6 @@
     if (g.mode === 'conquest') planFor(g, side);
   }
 
-  root.GalacticAI = { FRONT, PROD, unitStrength, frontObjectives, planFronts, frontSummary, productionSummary, aiProduction, aiOrder };
+  root.GalacticAI = { aiAirStrikes, FRONT, PROD, unitStrength, frontObjectives, planFronts, frontSummary, productionSummary, aiProduction, aiOrder };
   Object.assign(E, { FRONT, PROD, frontSummary, productionSummary, planFronts });
 })(typeof window !== 'undefined' ? window : globalThis);
