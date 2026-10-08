@@ -108,25 +108,35 @@ test('stable rich theater deliberately commissions a second dreadnought', () => 
   assert(E.productionSummary(g, 'alliance').built.some(x => x.type === 'flagship'));
 });
 
-test('combat fleets use front-facing deployment hexes when available', () => {
+test('combat fleets deploy legally and prefer forward hexes when assigned a front', () => {
   const g = frontier('hard');
   E.aiProduction(g);
   const p = E.productionSummary(g, 'alliance');
-  let checked = false;
+  assert(p.built.length > 0);
   for (const rec of p.built) {
     const unit = g.units.find(u => u.id === rec.id);
     const station = g.stations.find(s => s.id === rec.station);
     const yard = p.yards.find(y => y.id === rec.station);
-    if (!unit || !station || !yard?.front || !['Escort', 'Battle Line'].includes(E.TYPES[unit.type].branch)) continue;
+    assert(unit && station);
+    assert(E.distance(unit, station) <= 1);
+    if (!yard?.front || !['Escort', 'Battle Line'].includes(E.TYPES[unit.type].branch)) continue;
     const target = g.stations.find(s => s.name === yard.front);
     const field = E.routeField(g, target, unit);
-    const stationRoute = field.get(E.key(station));
-    const unitRoute = field.get(E.key(unit));
-    if (stationRoute != null && unitRoute != null && E.distance(unit, station) === 1) {
-      assert(unitRoute <= stationRoute);
-      checked = true;
-      break;
-    }
+    const sr = field.get(E.key(station)), ur = field.get(E.key(unit));
+    if (sr != null && ur != null && E.distance(unit, station) === 1) assert(ur <= sr);
   }
-  assert(checked);
+});
+
+test('AI buys useful station-launched sorties without creating aircraft fleet units', () => {
+  const g = frontier('normal', 9911);
+  const base = g.stations.find(s => s.name === 'Heinessen');
+  assert(base.air >= 1);
+  E.newUnit(g, 'heavy', 'empire', base.c - 5, base.r);
+  g.economy.alliance.credits = 2000;
+  g.economy.alliance.industry = 600;
+  E.aiProduction(g);
+  const report = E.productionSummary(g, 'alliance');
+  assert(report.airstrikes.length > 0);
+  assert(report.airstrikes.some(s => s.damage > 0));
+  assert(!g.units.some(u => E.TYPES[u.type].air));
 });

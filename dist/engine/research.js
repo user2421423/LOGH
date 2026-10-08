@@ -219,7 +219,7 @@
     },
     air: {
       name: 'Aerospace',
-      desc: 'Fighter, bomber and strategic bomber wings flown from station air bases.',
+      desc: 'Unlimited paid fighter, bomber and strategic-bomber sorties launched directly from upgraded station air bases.',
       nodes: {
         guns: {
           name: 'Avionics',
@@ -229,28 +229,25 @@
           text: v => `+${pct(v)} damage`,
         },
         hull: {
-          name: 'Reinforced Airframes',
-          values: [0.1, 0.2, 0.32],
+          name: 'Armor-Piercing Munitions',
+          values: [0.05, 0.1, 0.15],
           tiers: [1, 2, 3],
           costs: [40, 100, 200],
-          text: v => `+${pct(v)} hull`,
+          text: v => `+${pct(v)} armor penetration for station-launched airstrikes`,
         },
         fuel: {
           name: 'Fuel Cells',
           values: [0.05, 0.1, 0.15],
           tiers: [1, 2, 3],
           costs: [60, 120, 220],
-          text: v => `Air wings cost ${pct(v)} less`,
+          text: v => `Airstrikes cost ${pct(v)} less each launch`,
         },
         carrier: {
-          name: 'Carrier Operations',
+          name: 'Long-Range Sorties',
           values: [1, 2],
           tiers: [2, 3],
           costs: [140, 260],
-          text: v =>
-            v === 1
-              ? 'Air supply range grows from 3 to 5 hexes'
-              : 'Hit and run: a wing that attacks before moving may still move',
+          text: v => v === 1 ? '+2 sortie range from all air bases' : '+3 total sortie range from all air bases',
         },
         bombing: {
           name: 'Bombing Doctrine',
@@ -266,15 +263,15 @@
           tiers: [3],
           costs: [260],
           req: ['guns', 2],
-          text: v => `Air wings take ${pct(v)} less counter-fire`,
+          text: v => `+${pct(v)} damage against enemy fleets from precision targeting`,
         },
         stealth: {
-          name: 'Stealth Coating',
+          name: 'Electronic Warfare',
           values: [0.2],
           tiers: [4],
           costs: [380],
           req: ['guidance', 1],
-          text: v => `+${pct(v)} air attack damage`,
+          text: v => `+${pct(v)} damage from launched sorties`,
         },
       },
     },

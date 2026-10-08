@@ -287,6 +287,13 @@
       desc: 'Heavy bombers: +120% damage against station defenses. Only escorts and fighters can return fire. Needs a friendly air base within 3 hexes.',
     },
   };
+  // Air artwork and identifiers remain in TYPES, but these are paid station actions, not fleet units.
+  // No per-turn sortie limit: credits, industry, air-base level and range are the only restrictions.
+  const AIR_STRIKES = {
+    fighter: { name: 'Fighter Sortie', level: 1, range: 5, credits: 65, industry: 14, damage: 28, pen: 0.18, desc: 'Fast precision raid. Strongest against light escort hulls.' },
+    bomber: { name: 'Bomber Sortie', level: 2, range: 6, credits: 130, industry: 28, damage: 45, pen: 0.38, desc: 'Anti-ship torpedoes. Strongest against Battle Line hulls.' },
+    strategic: { name: 'Strategic Bomber Sortie', level: 3, range: 7, credits: 230, industry: 52, damage: 62, pen: 0.48, desc: 'Costly shield-breaking raid against fortified stations.' },
+  };
   const ADMIRALS = root.GalacticData.ADMIRALS;
   // HQ technology, as in World Conqueror 4: bought with command tokens earned by winning operations, kept in the
   // player's profile across every operation and side. Each level unlocks at a tier gated by total victories.
@@ -581,6 +588,7 @@
   function buyReason(g, s, type, stack = 1) {
     const t = TYPES[type];
     if (!t || !s) return 'Unavailable';
+    if (t.air) return 'Air wings launch as paid sorties from a station, not as fleets';
     return (
       (g.over ? 'Operation over' : s.owner !== g.phase ? 'Not your station' : null) ||
       (t.air
@@ -786,8 +794,23 @@
   }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
-    if (!g || g.version !== 2 || g.rulesVersion !== 11 || !Array.isArray(g.units)) return null;
-    return g.units.every(u => TYPES[u.type]) ? g : null;
+    if (!g || g.version !== 2 || ![11, 12].includes(g.rulesVersion) || !Array.isArray(g.units)) return null;
+    if (!g.units.every(u => TYPES[u.type])) return null;
+    if (g.rulesVersion === 11) {
+      // Retire old permanent wings without erasing a campaign; reimburse their original fleet price.
+      for (const u of g.units.filter(u => TYPES[u.type].air && u.hp > 0)) {
+        const refund = price(u.type, u.stack);
+        const purse = g.economy?.[u.side];
+        if (purse) {
+          purse.credits += refund.credits;
+          purse.industry += refund.industry;
+        }
+      }
+      g.units = g.units.filter(u => !TYPES[u.type].air);
+      g.rulesVersion = 12;
+      g.ai = {};
+    }
+    return g;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
     const u = {
@@ -1181,6 +1204,100 @@
         0.95,
       ),
     };
+  }
+  function airStrikeRange(g, side, type) {
+    const strike = AIR_STRIKES[type];
+    if (!strike) return 0;
+    const level = techLevel(g, side, 'air.carrier');
+    return strike.range + (level >= 2 ? 3 : level >= 1 ? 2 : 0);
+  }
+  function airStrikeCost(g, side, type) {
+    const strike = AIR_STRIKES[type];
+    if (!strike) return { credits: 0, industry: 0 };
+    const discount = 1 - techValue(g, side, 'air.fuel');
+    return { credits: Math.round(strike.credits * discount), industry: Math.round(strike.industry * discount) };
+  }
+  // The gravity rift cannot be flown across directly; either corridor must be captured first.
+  function airStrikeBlockedByRift(g, source, target) {
+    const era = ERAS[g.era] || ERAS[SCENARIOS[g.mode]?.conquestMap];
+    const cols = era?.rift && (era.rift.cols || (era.rift.col == null ? [] : [era.rift.col]));
+    if (!cols?.length) return false;
+    const min = Math.min(...cols), max = Math.max(...cols);
+    return (source.c < min && target.c > max) || (target.c < min && source.c > max);
+  }
+  function airStrikeReason(g, stationId, type, c, r) {
+    const station = g.stations.find(s => s.id === stationId), strike = AIR_STRIKES[type];
+    if (!station || !strike) return 'Unknown air base or sortie';
+    if (g.over || station.owner !== g.phase) return 'Not your turn or station';
+    if ((station.air || 0) < strike.level) return `Requires air base level ${strike.level}`;
+    const point = tile(g, c, r);
+    if (!point || point.terrain === 'rift' && !stationAt(g, point)) return 'Invalid strike target';
+    if (airStrikeBlockedByRift(g, station, point)) return 'Gravity rift blocks the strike corridor';
+    if (distance(station, point) > airStrikeRange(g, station.owner, type)) return 'Outside sortie range';
+    const victim = unitAt(g, point), fort = stationAt(g, point);
+    if (!((victim && victim.side !== station.owner) || (fort && fort.owner !== station.owner && fort.shield > 0)))
+      return 'No hostile fleet or shielded station here';
+    return shortfall(funds(g, station.owner), airStrikeCost(g, station.owner, type));
+  }
+  function airStrikePreview(g, stationId, type, c, r) {
+    if (airStrikeReason(g, stationId, type, c, r)) return null;
+    const station = g.stations.find(s => s.id === stationId), strike = AIR_STRIKES[type],
+      point = tile(g, c, r), victim = unitAt(g, point), fort = stationAt(g, point),
+      tech = 1 + techValue(g, station.owner, 'air.guns'),
+      stealth = 1 + techValue(g, station.owner, 'air.stealth'),
+      precision = techValue(g, station.owner, 'air.guidance'),
+      pen = Math.min(0.85, strike.pen + techValue(g, station.owner, 'air.hull')),
+      base = strike.damage * tech * stealth;
+    let unit = 0, shield = 0;
+    if (victim && victim.side !== station.owner) {
+      const targetType = TYPES[victim.type];
+      const classBonus = type === 'fighter' && targetType.branch === 'Escort' ? 1.15
+        : type === 'bomber' && targetType.branch === 'Battle Line' ? 1.3 : 1;
+      const armor = targetType.armor + unitTech(g, victim, 'armor');
+      unit = base * classBonus * (1 + precision) * 100 / (100 + armor * (1 - pen) * 1.2);
+      if (targetType.branch === 'Battle Line') unit *= 1 - techValue(g, victim.side, 'line.flak');
+      if (g.stations.some(s => s.owner === victim.side && distance(s, victim) <= 1))
+        unit *= 1 - techValue(g, victim.side, 'station.flak');
+      if (tile(g, c, r).terrain === 'asteroid') unit *= 0.85;
+      if (fort?.shield > 0) unit *= 0.55;
+    }
+    if (fort && fort.owner !== station.owner && fort.shield > 0) {
+      shield = base * (type === 'strategic' ? 1.6 : 0.85) *
+        (1 + techValue(g, station.owner, 'air.bombing'));
+      const interceptors = techLevel(g, fort.owner, 'station.interceptors');
+      if (interceptors >= 2) shield *= 0.5;
+      else if (interceptors >= 1 && type === 'strategic') shield *= 0.7;
+    }
+    return { unit: Math.max(0, Math.round(unit)), shield: Math.max(0, Math.round(shield)),
+      cost: airStrikeCost(g, station.owner, type), type, from: { c: station.c, r: station.r },
+      to: { c, r } };
+  }
+  function airStrikeTargets(g, stationId, type) {
+    const station = g.stations.find(s => s.id === stationId);
+    if (!station) return [];
+    return g.tiles.filter(p => distance(station, p) <= airStrikeRange(g, station.owner, type)
+      && !!airStrikePreview(g, stationId, type, p.c, p.r));
+  }
+  function airStrike(g, stationId, type, c, r) {
+    const why = airStrikeReason(g, stationId, type, c, r);
+    if (why) return { ok: false, reason: why };
+    const view = airStrikePreview(g, stationId, type, c, r),
+      station = g.stations.find(s => s.id === stationId),
+      point = tile(g, c, r), target = unitAt(g, point), fort = stationAt(g, point),
+      randomFactor = 0.94 + random(g) * 0.12,
+      unitDamage = target && target.side !== station.owner ? Math.round(view.unit * randomFactor) : 0,
+      shieldDamage = fort && fort.owner !== station.owner
+        ? Math.min(fort.shield, Math.round(view.shield * randomFactor)) : 0;
+    funds(g, station.owner).credits -= view.cost.credits;
+    funds(g, station.owner).industry -= view.cost.industry;
+    if (target && unitDamage) target.hp = Math.max(0, target.hp - unitDamage);
+    if (fort) fort.shield = Math.max(0, fort.shield - shieldDamage);
+    if (target && target.hp <= 0) kill(g, target, null);
+    log(g, `${station.name} launches ${AIR_STRIKES[type].name}: ${unitDamage} hull / ${shieldDamage} station damage.`, station.owner);
+    checkVictory(g);
+    return { ok: true, kind: 'air', type, side: station.owner, from: view.from, to: view.to,
+      damage: unitDamage, unitDamage, shieldDamage, cost: view.cost,
+      destroyed: !!target && target.hp <= 0, hit: unitDamage ? [{ c, r, damage: unitDamage }] : [] };
   }
   function kill(g, v, attacker) {
     if (v.hp > 0) return;
@@ -1824,7 +1941,7 @@
     if (def?.side) player = def.side;
     const g = {
       version: 2,
-      rulesVersion: 11,
+      rulesVersion: 12,
       player,
       difficulty,
       mode: era ? 'conquest' : scen,
@@ -1930,7 +2047,7 @@
         const at = x => (side === 'empire' ? x : W - x),
           admirals = leads[side];
         for (const [type, x, r, stack, admiralIndex] of spec.fleets || [])
-          newUnit(g, type, side, at(x), r, stack, admiralIndex == null ? null : admirals[admiralIndex]);
+          if (!TYPES[type].air) newUnit(g, type, side, at(x), r, stack, admiralIndex == null ? null : admirals[admiralIndex]);
       }
 
       // The expanded front starts with a little more treasury, but total income is intentionally kept near the
@@ -1951,6 +2068,7 @@
       g.economy.alliance = { credits: 500, industry: 180, science: 45 };
     }
     const place = ([side, type, c, r, stack = 1, admiral = null, art = null]) => {
+      if (TYPES[type].air) return null;
       const u = newUnit(g, type, side, c, r, stack, admiral);
       if (art) u.art = art;
       return u;
@@ -2145,6 +2263,13 @@
     repairCost,
     upgradeCost,
     BUILDINGS,
+    AIR_STRIKES,
+    airStrikeRange,
+    airStrikeCost,
+    airStrikeReason,
+    airStrikePreview,
+    airStrikeTargets,
+    airStrike,
     buildingLevel,
     buildCost,
     build,

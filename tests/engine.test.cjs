@@ -64,7 +64,7 @@ function station(g, c, r, owner = 'alliance', shield = 150, tier = 3) {
   g.stations.push(s);
   return s;
 }
-test('All 13 classes (10 hulls, 3 air wings) exist and hex distance is symmetric', () => {
+test('All 10 permanent hulls and 3 airstrike descriptors exist and hex distance is symmetric', () => {
   assert.equal(Object.keys(E.TYPES).length, 13);
   assert.equal(E.distance({ c: 2, r: 2 }, { c: 2, r: 3 }), 1);
   for (let r = 0; r < 4; r++)
@@ -780,31 +780,42 @@ test('Station buildings upgrade to level 3 and raise industry and research', () 
   assert.equal(s.air, 3);
   assert(!E.build(g, s.id, 'air').ok);
 });
-test('Air wings: built at air bases, ignore terrain, immune to artillery, escorts return fire, need supply', () => {
-  assert.equal(Object.values(E.TYPES).filter(t => t.air).length, 3);
-  const g = blank(),
-    s = station(g, 2, 2);
-  s.air = 0;
-  assert(!E.canBuy(g, s, 'fighter'));
+test('Airstrikes launch from station bases, consume resources and have no sortie cap', () => {
+  const g = blank(), s = station(g, 2, 2, 'alliance', 150, 3);
   s.air = 1;
-  assert(E.canBuy(g, s, 'fighter'));
-  assert(!E.canBuy(g, s, 'bomber'));
-  const f = E.newUnit(g, 'fighter', 'alliance', 4, 4);
-  E.tile(g, 5, 4).terrain = 'nebula';
-  assert.equal(E.reachable(g, f).get('5,4'), 1);
-  assert(!E.canCapture(f));
-  const arty = E.newUnit(g, 'beam', 'empire', 4, 5);
-  assert.equal(E.preview(g, arty.id, f.c, f.r), null);
-  const bomber = E.newUnit(g, 'bomber', 'alliance', 6, 6),
-    heavy = E.newUnit(g, 'heavy', 'empire', 7, 6),
-    corvette = E.newUnit(g, 'corvette', 'empire', 6, 7);
-  assert.equal(E.preview(g, bomber.id, heavy.c, heavy.r).counterAllowed, false);
-  assert.equal(E.preview(g, bomber.id, corvette.c, corvette.r).counterAllowed, true);
-  const stray = E.newUnit(g, 'strategic', 'alliance', 8, 1);
-  E.beginTurn(g, 'alliance');
-  assert.equal(stray.hp, E.maxHP(stray) - Math.round(E.maxHP(stray) * 0.1));
-  assert.equal(f.hp, E.maxHP(f));
+  const enemy = E.newUnit(g, 'heavy', 'empire', 4, 2);
+  assert(!E.canBuy(g, s, 'fighter'));
+  assert(!E.airStrike(g, s.id, 'bomber', enemy.c, enemy.r).ok);
+  const first = E.airStrike(g, s.id, 'fighter', enemy.c, enemy.r);
+  assert(first.ok);
+  assert(first.unitDamage > 0 && enemy.hp < E.maxHP(enemy));
+  const second = E.airStrike(g, s.id, 'fighter', enemy.c, enemy.r);
+  assert(second.ok, 'same station must be able to fire repeatedly on the same turn');
+  assert.equal(g.economy.alliance.credits, 5000 - E.airStrikeCost(g, 'alliance', 'fighter').credits * 2);
+  assert.equal(g.economy.alliance.industry, 5000 - E.airStrikeCost(g, 'alliance', 'fighter').industry * 2);
+  assert.equal(g.units.filter(u => E.TYPES[u.type].air).length, 0);
 });
+test('Airstrike shields, costs, range, research and gravity rift behavior', () => {
+  const g = blank(), base = station(g, 2, 2, 'alliance', 150, 3);
+  base.air = 3;
+  const fort = station(g, 4, 2, 'empire', 500, 3);
+  const preview = E.airStrikePreview(g, base.id, 'strategic', fort.c, fort.r);
+  assert(preview.shield > 0);
+  g.tech.alliance['air.guns'] = 5;
+  g.tech.alliance['air.bombing'] = 2;
+  assert(E.airStrikePreview(g, base.id, 'strategic', fort.c, fort.r).shield > preview.shield);
+  const cost = E.airStrikeCost(g, 'alliance', 'bomber');
+  g.tech.alliance['air.fuel'] = 3;
+  assert(E.airStrikeCost(g, 'alliance', 'bomber').credits < cost.credits);
+  assert.equal(E.airStrikeRange(g, 'alliance', 'fighter'), 5);
+  g.tech.alliance['air.carrier'] = 2;
+  assert.equal(E.airStrikeRange(g, 'alliance', 'fighter'), 8);
+  assert(E.airStrike(g, base.id, 'strategic', fort.c, fort.r).ok);
+  assert(fort.shield < 500);
+  const hostile = E.newUnit(g, 'corvette', 'empire', 8, 8);
+  assert.equal(E.airStrikePreview(g, base.id, 'fighter', hostile.c, hostile.r), null);
+});
+
 test('Every conquest start date and scenario starts legally and unfinished', () => {
   const modes = [...Object.keys(E.ERAS).map(k => 'conquest:' + k), ...Object.keys(E.SCENARIOS)];
   for (const mode of modes)
@@ -878,21 +889,16 @@ test('Disabled orders report a specific reason', () => {
     'Need 30 more credits and 5 more industry',
   );
 });
-test('HQ class abilities: Fire Control range and Carrier Operations hit-and-run', () => {
-  const g = blank(),
-    arty = E.newUnit(g, 'missile', 'alliance', 2, 2);
-  assert.equal(E.rangeOf(g, arty).max, 2);
+test('HQ artillery range and long-range sortie research operate correctly', () => {
+  const g = blank(), artillery = E.newUnit(g, 'missile', 'alliance', 2, 2);
+  assert.equal(E.rangeOf(g, artillery).max, 2);
   g.tech.alliance['artillery.fire'] = 2;
-  assert.equal(E.rangeOf(g, arty).max, 3);
-  assert.equal(E.airSupply(g, 'alliance'), 3);
+  assert.equal(E.rangeOf(g, artillery).max, 3);
+  assert.equal(E.airStrikeRange(g, 'alliance', 'fighter'), 5);
   g.tech.alliance['air.carrier'] = 2;
-  assert.equal(E.airSupply(g, 'alliance'), 5);
-  const wing = E.newUnit(g, 'fighter', 'alliance', 6, 6),
-    foe = E.newUnit(g, 'corvette', 'empire', 7, 6);
-  assert(E.attack(g, wing.id, foe.c, foe.r).ok);
-  assert(!wing.moved && wing.attacked);
-  assert(E.reachable(g, wing).size > 0);
+  assert.equal(E.airStrikeRange(g, 'alliance', 'fighter'), 8);
 });
+
 test('Medals are awarded for defeating an enemy admiral and for winning', () => {
   const g = blank(),
     a = E.newUnit(g, 'battleship', 'alliance', 2, 2, 3, 'yang'),
@@ -942,18 +948,16 @@ test('Hard and Challenge strengthen only the enemy, and tokens are paid only for
   assert.equal(again.total, 0);
   assert(again.repeat);
 });
-test('Air supply covers hexes within range of a friendly air base, and Carrier Operations widens it', () => {
-  const g = blank(),
-    s = station(g, 2, 2);
-  s.air = 0;
-  assert(!E.airSupplied(g, 'alliance', { c: 2, r: 3 }));
-  s.air = 1;
-  assert(E.airSupplied(g, 'alliance', { c: 4, r: 2 }));
-  assert(!E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
-  assert(!E.airSupplied(g, 'empire', { c: 2, r: 3 }));
-  g.tech.alliance['air.carrier'] = 1;
-  assert(E.airSupplied(g, 'alliance', { c: 7, r: 2 }));
+test('Old campaign saves convert permanent air wings into reimbursements', () => {
+  const g = blank(), air = E.newUnit(g, 'fighter', 'alliance', 2, 2);
+  g.rulesVersion = 11;
+  const before = g.economy.alliance.credits, price = E.price('fighter');
+  const migrated = E.migrateSave(g);
+  assert.equal(migrated.rulesVersion, 12);
+  assert(!migrated.units.some(u => E.TYPES[u.type].air));
+  assert.equal(migrated.economy.alliance.credits, before + price.credits);
 });
+
 test('Each side has a campaign of its own scenarios, every chapter legal for that side', () => {
   assert.equal(E.CAMPAIGNS.empire.length, 9);
   assert.equal(E.CAMPAIGNS.alliance.length, 9);
@@ -1104,8 +1108,8 @@ test('Conquest is a 51 × 29, 44-system galaxy with only the Iserlohn and Fezzan
     assert.notEqual(E.tile(g, c, 6).terrain, 'rift');
     assert.notEqual(E.tile(g, c, 22).terrain, 'rift');
   }
-  assert.equal(g.units.filter(u => u.side === 'empire').length, 18);
-  assert.equal(g.units.filter(u => u.side === 'alliance').length, 18);
+  assert.equal(g.units.filter(u => u.side === 'empire').length, 16);
+  assert.equal(g.units.filter(u => u.side === 'alliance').length, 16);
   const lip = E.createGame('empire', 'normal', 'lippstadt_e', 3);
   assert.equal(lip.mode, 'lippstadt_e');
   assert(lip.units.some(u => u.side === 'neutral'));

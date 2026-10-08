@@ -2441,3 +2441,21 @@ button.mini small {
   gap: 6px;
   margin-top: 4px;
 }
+
+/* Station-launched aerospace support: existing ship-art thumbnails, not board tokens. */
+.airstrike-panel { background: #122c3cc7; border-color: #73bcdf83; }
+.airstrike-options { display: grid; gap: 8px; margin: 12px 0; }
+.airstrike-option { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center;
+  gap: 9px; padding: 9px 7px; background: #1a36488c; border: 1px solid #547e8a63; }
+.airstrike-option.armed { border-color: #7bdcff; box-shadow: inset 0 0 14px #4ebdff25; }
+.airstrike-thumbnail { display: block; width: 58px; height: 58px; }
+.airstrike-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.airstrike-info b { font-size: 12px; color: #e5f7ff; }
+.airstrike-info small { font-size: 10px; line-height: 1.35; color: #b9cfda; }
+.airstrike-info .cost-line { display: flex; flex-wrap: wrap; gap: 7px; }
+.airstrike-option button { font-size: 11px; padding: 7px; min-width: 64px; }
+@media (max-width: 550px) {
+  .airstrike-option { grid-template-columns: 48px minmax(0, 1fr); }
+  .airstrike-thumbnail { width: 48px; height: 48px; }
+  .airstrike-option button { grid-column: 2; justify-self: start; }
+}

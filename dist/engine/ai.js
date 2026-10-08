@@ -351,8 +351,60 @@
     return events;
   }
 
+  function aiAirStrikes(g) {
+    const side = g.phase, economy = g.economy[side];
+    if (!economy || g.over) return [];
+    const bases = g.stations.filter(st => st.owner === side && (st.air || 0) > 0),
+      opposing = () => g.units.filter(u => u.hp > 0 && u.side !== side),
+      reports = [];
+    if (!bases.length) return reports;
+    const emergency = g.units.some(u => u.hp > 0 && u.side !== side &&
+      g.stations.some(st => st.owner === side && E.distance(u, st) <= 4));
+    const initial = { credits: economy.credits, industry: economy.industry },
+      reserveCredits = Math.floor(initial.credits * (emergency ? 0.75 : 0.8)),
+      reserveIndustry = Math.floor(initial.industry * (emergency ? 0.7 : 0.8));
+    // No hard sortie limit. Every loop consumes resources, removes targets or stops.
+    while (!g.over) {
+      const targets = [
+        ...opposing().map(u => ({ c: u.c, r: u.r })),
+        ...g.stations.filter(st => st.owner !== side && st.shield > 0).map(st => ({ c: st.c, r: st.r })),
+      ];
+      let best = null;
+      for (const station of bases) for (const [type, strike] of Object.entries(E.AIR_STRIKES)) {
+        if ((station.air || 0) < strike.level) continue;
+        const price = E.airStrikeCost(g, side, type);
+        if (economy.credits - price.credits < reserveCredits ||
+            economy.industry - price.industry < reserveIndustry) continue;
+        for (const point of targets) {
+          if (E.distance(station, point) > E.airStrikeRange(g, side, type)) continue;
+          const view = E.airStrikePreview(g, station.id, type, point.c, point.r);
+          if (!view) continue;
+          const unit = E.unitAt(g, point), defendedStation = E.stationAt(g, point);
+          const effectiveUnit = unit && unit.side !== side ? Math.min(unit.hp, view.unit) : 0,
+            effectiveShield = defendedStation && defendedStation.owner !== side ?
+              Math.min(defendedStation.shield, view.shield) : 0;
+          let priority = effectiveUnit + effectiveShield * 0.75;
+          if (unit && unit.side !== side && effectiveUnit >= unit.hp) priority += 25;
+          if (defendedStation && defendedStation.owner !== side && defendedStation.shield > 0)
+            priority += defendedStation.capital || defendedStation.fort ? 18 : 7;
+          if (unit?.admiral && unit.side !== side) priority += 10;
+          const efficiency = priority / Math.max(1, price.credits + price.industry * 2.2);
+          if (efficiency > 0.2 && (!best || efficiency > best.score))
+            best = { station, type, point, score: efficiency };
+        }
+      }
+      if (!best) break;
+      const fired = E.airStrike(g, best.station.id, best.type, best.point.c, best.point.r);
+      if (!fired.ok) break;
+      reports.push({ station: best.station.name, type: best.type, c: best.point.c, r: best.point.r,
+        damage: fired.unitDamage, shields: fired.shieldDamage });
+      (g.strikes ||= []).push(fired);
+    }
+    return reports;
+  }
+
   const PROD = {
-    mix: { 'Battle Line': 0.44, Escort: 0.22, Artillery: 0.22, Air: 0.12 },
+    mix: { 'Battle Line': 0.5, Escort: 0.25, Artillery: 0.25 },
     constructionIndustry: 0.4,
     constructionCredits: 0.18,
     emergencyRange: 4,
@@ -408,7 +460,6 @@
     // Counter-production: screens hunt artillery, fighters/screens answer air, frigates/artillery crack battle lines.
     mix.Escort += mind.counter * (ratio.Artillery * 0.55 + ratio.Air * 0.3 + ratio['Battle Line'] * 0.08);
     mix.Artillery += mind.counter * (ratio['Battle Line'] * 0.24 + (fortified ? 0.12 : 0));
-    mix.Air += mind.counter * (ratio.Air * 0.36 + (fortified ? 0.07 : 0));
     mix['Battle Line'] += mind.counter * (ratio.Escort * 0.1 + (defensive ? 0.08 : 0));
     return { mix: normalizeMix(mix), enemy, enemyRatio: ratio, fortified, enemies };
   }
@@ -568,9 +619,6 @@
       if (branch === 'Artillery') {
         score -= Math.max(0, 2 - nearestEnemy) * 35;
         if (progress > 0) score -= 8;
-      } else if (branch === 'Air') {
-        score += E.airSupplied(g, side, p) ? 20 : -50;
-        score += progress * 3;
       } else if (branch === 'Escort') score += progress * 5;
       else score += progress * 3;
       if (E.stationAt(g, p) === station) score += branch === 'Artillery' ? 8 : -2;
@@ -588,10 +636,10 @@
       global = context.global,
       need = context.need,
       desired = context.yard.kind === 'reserve'
-        ? { 'Battle Line': 1.2, Escort: 1.05, Artillery: 0.25, Air: 0.65 }
+        ? { 'Battle Line': 1.2, Escort: 1.05, Artillery: 0.25 }
         : need.deficit,
       lastBranch = context.planState.productionHistory?.[context.yard.front?.id || 'reserve'],
-      types = Object.keys(E.TYPES).filter(type => !E.TYPES[type].elite),
+      types = Object.keys(E.TYPES).filter(type => !E.TYPES[type].elite && !E.TYPES[type].air),
       candidates = [];
 
     for (const type of types) {
@@ -702,6 +750,8 @@
       if (!E.repairReason(g, u) && e.credits - E.repairCost(u, g) >= repairCreditFloor) E.repair(g, u.id);
     }
 
+    // Reserve most of the treasury for production; do not pre-empt emergency defenses.
+    const airstrikes = emergency.level >= 2 ? [] : aiAirStrikes(g);
     const flagPrice = E.price('flagship'),
       tier3 = bases.filter(s => s.tier >= 3),
       strategicSave = shouldSaveForDreadnought(g, side, plan, emergency, reserve);
@@ -744,7 +794,8 @@
       for (const s of safe) {
         const yp = yardPlans.get(s.id),
           need = yp?.front ? frontProductionNeed(g, side, yp.front) : compositionTarget(g, side, null),
-          airNeed = Number(need.deficit?.Air || 0);
+          airNeed = g.units.some(u => u.hp > 0 && u.side !== side && E.distance(u, s) <= 10)
+            || g.stations.some(v => v.owner !== side && E.distance(v, s) <= 9) ? 4 : 0;
         const options = ['shipyard', 'air', 'lab']
           .map(kind => ({
             kind,
@@ -854,6 +905,8 @@
       });
     }
 
+    // Emergency spending first: air support can only use funds remaining after new ships.
+    if (emergency.level >= 2 && !g.over) airstrikes.push(...aiAirStrikes(g));
     planState.procurement = {
       turn: g.turn,
       emergency: emergency.level,
@@ -876,6 +929,7 @@
       built,
       reinforced,
       upgraded,
+      airstrikes,
     };
 
     // New construction has an explicit assignment immediately; rebuilding keeps that sticky assignment while
