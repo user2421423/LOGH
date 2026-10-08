@@ -1,8 +1,9 @@
 name: Deploy game to GitHub Pages
 
 on:
+# Main is mirrored to the default branch; deploy only once, from the Pages-enabled branch.
   push:
-    branches: [claude/galactic-command-code-review-7oka9v, main]
+    branches: [claude/galactic-command-code-review-7oka9v]
   workflow_dispatch:
 
 permissions:
