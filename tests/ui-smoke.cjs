@@ -23,7 +23,8 @@ function node(id) {
       classList: { add() {}, remove() {}, toggle() {} },
       dataset: {},
       addEventListener() {},
-      querySelector() {
+      querySelector(selector) {
+        if (id === 'app' && selector === '#map' && this.innerHTML.includes('id="map"')) return node('map');
         return null;
       },
       querySelectorAll() {
@@ -47,6 +48,11 @@ const document = {
   getElementById: node,
   documentElement: node('root'),
   addEventListener: (k, fn) => (events[k] = fn),
+  createElement(tag) {
+    if (tag === 'canvas') return { width: 0, height: 0, getContext: () => drawContext };
+    if (tag === 'template') return { innerHTML: '', content: { querySelector: () => null } };
+    return node(tag);
+  },
   querySelectorAll() {
     return [];
   },
@@ -72,7 +78,9 @@ const env = {
 };
 env.window = env;
 const context = vm.createContext(env);
-for (const file of ['engine/admirals.js', 'engine/research.js', 'engine/galaxy.js', 'engine/campaign.js', 'engine.js', 'engine/orders.js', 'engine/ai.js', 'art.js', 'icons.js', 'audio.js', 'ui/orders.js', 'game.js'])
+const site = fs.readFileSync(require('node:path').join(__dirname, '../dist/index.html'), 'utf8');
+const files = [...site.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+for (const file of files)
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../dist', file), 'utf8'), context);
 const run = s => vm.runInContext(s, context);
 (async () => {

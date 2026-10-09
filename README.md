@@ -51,17 +51,24 @@ You can also try opening `dist/index.html` directly in your browser. Serving the
 ## Files
 
 - `dist/index.html` — entry page
-- `dist/engine.js` — core deterministic rules, combat, economy, saves, and public API
+- `dist/engine.js` — core deterministic combat, economy, movement and public API
 - `dist/engine/admirals.js` — admiral roster and starting ratings
 - `dist/engine/research.js` — HQ research trees and technology data
 - `dist/engine/galaxy.js` — Conquest eras and galaxy definitions
+- `dist/engine/ships.js` — ship classes and paid airstrike definitions
+- `dist/engine/map-setup.js` — Conquest and scenario construction (injected engine dependencies)
 - `dist/engine/campaign.js` — scenario and campaign definitions
 - `dist/engine/orders.js` — standing-course pathfinding and automatic movement
 - `dist/engine/ai.js` — theater/front planning, reserves, rallying, production and tactical AI
 - `dist/ui/orders.js` — standing-order targeting UI state
-- `dist/game.js` — main interface, battlefield rendering, dialogs and browser saves
+- `dist/game.js` — game startup, lifecycle and targeted UI composition
+- `dist/ui/battlefield.js` — viewport, animations, cached terrain rendering and map graphics
+- `dist/ui/controls.js` — pointer/keyboard controls and delegated UI actions
+- `dist/ui/panels.js` — fleet/station panels and selection dock
+- `dist/ui/dialogs.js` — campaign, HQ, research and admiral dialogs
+- `dist/ui/persistence.js` — browser save/load helpers
 - `dist/art.js` — artwork loading and sprite definitions
-- `dist/style.css`, `dist/battlefield.css` — interface styling
+- `dist/style.css`, `dist/battlefield.css`, `dist/ui/hud.css`, `dist/ui/hq.css` — base, battlefield, HUD and HQ styling
 - `dist/assets/empire-fleet.png` — white/gold Imperial ships
 - `dist/assets/alliance-fleet.png` — olive/teal Alliance ships
 - `dist/assets/fleet-atlas.png` — stations, fortresses, and capitals
@@ -80,6 +87,10 @@ Edit the files in `dist/`, then refresh the browser. To host the game elsewhere,
 ## Recent Conquest improvements
 
 Conquest fleets account for nearby support and hostile fire; artillery preserves effective firing positions. Enemy-turn playback can be set to 1×, 2× or 4× and skipped without skipping actual AI calculations. Off-screen map hexes and units are culled during rendering. Dead fleets are pruned between phases, and autosaves omit recomputable AI planning state.
+
+## Refactoring notes
+
+The static site now loads separate browser scripts for interface controls, dialogs, panels, persistence and battlefield rendering, plus external ship definitions and scenario setup. Canvas and input handlers survive routine DOM refreshes, and stable terrain is cached until the camera, art or map changes. No build step or dependency installation is needed. The lean 12-test suite and one UI smoke check are unchanged in size.
 
 ## Optional tests
 

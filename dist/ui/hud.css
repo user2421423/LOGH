@@ -1,0 +1,340 @@
+/* Compact resource, combat, and command HUD styling. */
+/* ---- WC4 iconography: resource tokens, stat glyphs, hull rings, undo ---- */
+.ico {
+  display: inline-block;
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.resource .res-icon {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 2px #000c);
+}
+.resource {
+  gap: 6px;
+}
+.label .ico {
+  width: 15px;
+  height: 15px;
+  margin-right: 3px;
+  vertical-align: -3px;
+}
+.cost-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.cost-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'Trebuchet MS', Arial, sans-serif;
+  font-weight: 700;
+}
+.cost-ico {
+  width: 17px;
+  height: 17px;
+  vertical-align: middle;
+}
+.unit-spec span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.unit-spec .ico {
+  width: 16px;
+  height: 16px;
+}
+.hp-ring {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+.hp-ring text {
+  font:
+    bold 10px 'Trebuchet MS',
+    Arial,
+    sans-serif;
+  fill: #eef3e6;
+}
+.hp-ring-lg {
+  width: 46px;
+  height: 46px;
+}
+.side .hp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-start;
+}
+.side .hp-row .mono {
+  margin-left: auto;
+}
+.dock-stats {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.dock-stats .stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font:
+    700 13px 'Trebuchet MS',
+    Arial,
+    sans-serif;
+  color: #eef0dc;
+}
+.dock-stats .stat .ico {
+  width: 18px;
+  height: 18px;
+}
+.undo-button {
+  background: linear-gradient(#2f6a58, #173d33) !important;
+  border-color: #6fe0b6 !important;
+  color: #e6fff4;
+}
+.undo-button:hover:not(:disabled) {
+  background: linear-gradient(#3b836d, #1d4b3f) !important;
+}
+.faction-flag.empire {
+  background: #16244f;
+  border-color: #e6c56a;
+}
+.faction-flag.alliance {
+  background: #5c1219;
+  border-color: #d3dbe2;
+}
+@media (max-width: 760px) {
+  .resource .res-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .resource {
+    gap: 3px;
+  }
+  .dock-stats {
+    gap: 6px;
+  }
+  .dock-stats .stat {
+    font-size: 11px;
+  }
+  .dock-stats .stat .ico {
+    width: 14px;
+    height: 14px;
+  }
+  .dock-stats .hp-ring {
+    width: 30px;
+    height: 30px;
+  }
+}
+@media (max-width: 500px) {
+  .resources {
+    gap: 7px;
+  }
+  .resource .res-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .resource b {
+    font-size: 12px;
+  }
+  .footer .undo-button .kbd {
+    display: none;
+  }
+}
+
+/* ---- Station buildings, fortress gun, scenarios, air wings ---- */
+.buildings {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+.building {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid #66766e70;
+  background: #132d3a70;
+}
+.building .level {
+  color: #e2ce8b;
+  letter-spacing: 2px;
+}
+.building > small {
+  grid-column: 1 / -1;
+  color: #aebfba;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.building button {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.fortress-gun {
+  background: #3b2a1cb8;
+  border-color: #e2b46f88;
+}
+.mode-note {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #bfcfcb;
+}
+.star-rating {
+  font-size: 34px;
+  letter-spacing: 6px;
+  color: #f2c94c;
+  text-shadow: 0 2px 6px #000a;
+  margin: 10px 0 4px;
+}
+.objective b {
+  color: #e2ce8b;
+  white-space: nowrap;
+}
+.air-art.empire {
+  color: #f2ecdc;
+}
+.air-art.alliance {
+  color: #8a9659;
+}
+.air-art svg,
+.air-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 4px #0008);
+}
+
+/* ---- Disabled-order reasons, branch research, admiral development ---- */
+button.blocked:disabled {
+  opacity: 0.82;
+  cursor: not-allowed;
+}
+.cost-item.short {
+  color: #ff5a4a;
+  font-weight: 800;
+}
+button small.why {
+  color: #f2b48a;
+  font-weight: 700;
+}
+/* A button's reason or cost sits on its own line under the label (side by side only in panel action rows). */
+button > small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  white-space: normal;
+}
+.actions button > small {
+  margin-top: 0;
+  text-align: right;
+}
+button.mini > small.why {
+  display: none;
+}
+.doctrine {
+  margin: 8px 0 0 18px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #9fb0ad;
+}
+.doctrine li.unlocked {
+  color: #e2ce8b;
+}
+.officer-line {
+  font-size: 11px !important;
+  color: #c9d2b8 !important;
+}
+.officers .officer {
+  min-height: 0;
+}
+.officer .xp {
+  margin: 10px 0;
+  position: relative;
+}
+.officer .xp small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #c2d4d1;
+}
+.officer .ratings,
+.officer .skills {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  position: relative;
+  font-size: 12px;
+}
+.officer .rating,
+.officer .skill {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.officer .pips {
+  color: #8fd3c3;
+  letter-spacing: 2px;
+}
+.officer .medals,
+.officer .officer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  position: relative;
+}
+.officer .officer-actions button {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+button.mini {
+  padding: 1px 7px;
+  min-width: 0;
+  line-height: 1.3;
+}
+button.mini small {
+  display: none;
+}
+.medal-case {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 12px 0;
+}
+.medal-case small {
+  color: #aebfba;
+  line-height: 1.6;
+}
+.medal-chip,
+.medal-slot {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid #8c8b6a;
+  background: #263632;
+  color: #f0e4b8;
+}
+.medal-slot:not(.filled) {
+  color: #8a9a96;
+  border-style: dashed;
+}
+
