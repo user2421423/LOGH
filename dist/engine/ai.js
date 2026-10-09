@@ -423,6 +423,8 @@
       }
     }
 
+    // Yang can enter ability range during this move; disrupt return fire before attacking.
+    if (u.admiral === 'yang' && !E.confuseReason(g, u)) E.confuse(g, id);
     for (let chain = 0; chain < 8 && !u.attacked && !g.over; chain++) {
       const shot = chooseTarget(g, u);
       if (!shot) break;
@@ -613,8 +615,9 @@
 
   function routeDistance(g, p, destination, unit = null) {
     if (!p || !destination) return 999;
-    const field = E.routeField ? E.routeField(g, destination, unit || { type: 'heavy' }) : null;
-    return field?.get(E.key(p)) ?? E.distance(p, destination);
+    const probe = { type: 'heavy', side: g.phase, ...(unit || {}) },
+      field = E.routeField ? E.routeField(g, destination, probe) : null;
+    return field ? field.get(E.key(p)) ?? Infinity : E.distance(p, destination);
   }
 
   function frontEnemyUnits(g, side, front, radius = 6) {
@@ -683,7 +686,11 @@
       level = 1;
       target = defensive.anchor;
     }
-    return { level, target, front: defensive || null };
+    const front = target
+      ? plan?.fronts?.find(f => f.type === 'defensive' &&
+          f.objectives.some(o => o.key === 'p' + target.id || (o.c === target.c && o.r === target.r)))
+      : defensive;
+    return { level, target, front: front || null };
   }
 
   function reserveStatus(g, side, plan) {
@@ -697,11 +704,12 @@
 
   function yardPlan(g, side, station, plan) {
     const fronts = plan?.fronts || [],
-      probe = { type: 'heavy' };
+      probe = { type: 'heavy', side };
     let best = null;
     for (const f of fronts) {
       const destination = f.rally || f.anchor,
         distance = routeDistance(g, station, destination, probe);
+      if (!Number.isFinite(distance)) continue;
       if (!best || distance < best.distance) best = { front: f, distance, destination };
     }
     const reserve = reserveStatus(g, side, plan),
@@ -783,13 +791,13 @@
     if (!spots.length) return null;
     const branch = branchOfType(type),
       enemies = alive(g, hostileSide(side)),
-      field = destination && E.routeField ? E.routeField(g, destination, { type }) : null,
-      stationRoute = field?.get(E.key(station)) ?? (destination ? E.distance(station, destination) : 0);
+      field = destination && E.routeField ? E.routeField(g, destination, { type, side }) : null,
+      stationRoute = field ? field.get(E.key(station)) ?? Infinity : destination ? E.distance(station, destination) : 0;
     let best = spots[0],
       bestScore = -Infinity;
     for (const p of spots) {
-      const route = field?.get(E.key(p)) ?? (destination ? E.distance(p, destination) : 0),
-        progress = stationRoute - route,
+      const route = field ? field.get(E.key(p)) ?? Infinity : destination ? E.distance(p, destination) : 0,
+        progress = Number.isFinite(stationRoute) && Number.isFinite(route) ? stationRoute - route : 0,
         danger = enemies.filter(u => E.distance(u, p) <= 1).length,
         nearestEnemy = enemies.length ? Math.min(...enemies.map(u => E.distance(u, p))) : 12;
       let score = progress * 14 - danger * 40;
@@ -968,17 +976,12 @@
         .slice()
         .sort((a, b) => (yardPlans.get(b.id)?.distance || 999) - (yardPlans.get(a.id)?.distance || 999));
       for (const s of safe) {
-        const yp = yardPlans.get(s.id),
-          need = yp?.front ? frontProductionNeed(g, side, yp.front) : compositionTarget(g, side, null),
-          airNeed = g.units.some(u => u.hp > 0 && u.side !== side && E.distance(u, s) <= 10)
-            || g.stations.some(v => v.owner !== side && E.distance(v, s) <= 9) ? 4 : 0;
-        const options = ['shipyard', 'air', 'lab']
+        const options = ['shipyard', 'lab']
           .map(kind => ({
             kind,
             level: E.buildingLevel(s, kind),
             cost: E.buildCost(s, kind),
             score:
-              (kind === 'air' ? airNeed * 12 : 0) +
               (kind === 'shipyard' && s.tier < 2 ? 30 : 0) +
               (kind === 'lab' ? 5 : 0) -
               E.buildingLevel(s, kind) * 3,
@@ -1026,8 +1029,9 @@
       const ya = yardPlans.get(a.id),
         yb = yardPlans.get(b.id);
       if (emergency.level) {
-        const da = emergency.target ? routeDistance(g, a, emergency.target) : ya?.distance || 999,
-          db = emergency.target ? routeDistance(g, b, emergency.target) : yb?.distance || 999;
+        const probe = { type: 'heavy', side },
+          da = emergency.target ? routeDistance(g, a, emergency.target, probe) : ya?.distance || 999,
+          db = emergency.target ? routeDistance(g, b, emergency.target, probe) : yb?.distance || 999;
         return da - db;
       }
       if (reserve.deficit > 0 && ya?.kind !== yb?.kind) return ya?.kind === 'reserve' ? -1 : 1;
@@ -1088,15 +1092,15 @@
       });
     }
 
-    // Invest in higher-grade air bases only AFTER purchasing all available fleets.
+    // Invest in air bases only AFTER purchasing all available fleets.
     // A new bomber/strategic base is valuable only if it can support actual nearby
     // operations. Keep enough cash and alloy to buy another frigate next turn.
     if (!emergency.level && !planState.saving && !upgraded.length && g.turn >= 3) {
       const nextFleet = E.price('frigate');
-      const upgradeBases = bases.filter(s => s.air > 0 && s.air < 3 &&
+      const upgradeBases = bases.filter(s => (s.air || 0) < 3 &&
         own().some(u => E.distance(u, s) <= 5))
         .map(st => {
-          const nextType = st.air === 1 ? 'bomber' : 'strategic';
+          const nextType = !st.air ? 'fighter' : st.air === 1 ? 'bomber' : 'strategic';
           const reach = E.airStrikeRange(g, side, nextType);
           const enemyFleet = enemyUnits.some(u => u.hp > 0 && E.distance(st, u) <= reach),
             enemyStation = g.stations.some(t => t.owner !== side && E.distance(st, t) <= reach &&

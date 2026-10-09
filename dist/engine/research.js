@@ -3,8 +3,8 @@
   'use strict';
   const BRANCHES = { Escort: 'escort', 'Battle Line': 'line', Artillery: 'artillery', Air: 'air' };
   const BRANCH_NAMES = { escort: 'Escort', line: 'Battle Line', artillery: 'Artillery', air: 'Aerospace' };
-  // Every rating an admiral holds: the four branches and Movement.
-  const RATING_NAMES = { ...BRANCH_NAMES, move: 'Movement' };
+  // Admirals command permanent fleets; Aerospace research applies to station sorties.
+  const RATING_NAMES = { escort: 'Escort', line: 'Battle Line', artillery: 'Artillery', move: 'Movement' };
   const TECH_TIERS = [0, 0, 2, 4, 7];
   const pct = v => `${Math.round(v * 100)}%`;
   const TECH_TREE = {

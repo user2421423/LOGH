@@ -3,7 +3,7 @@
   'use strict';
   (root.GalacticData ||= {}).createGameFactory = function createGameFactory(deps) {
     const { ERAS, SCENARIOS, DIFFICULTIES, TYPES, ADMIRALS, opponent, random, tile, adjacent, newUnit,
-      income, harden, maxHP, defaultOfficer, log } = deps;
+      income, harden, maxHP, defaultOfficer, log, bindObjectiveFleet } = deps;
   function createGame(player = 'alliance', difficulty = 'normal', mode = 'conquest', seed = 246801) {
     let era = null,
       scen = null;
@@ -316,6 +316,7 @@
         u.cmdRank = g.officers[u.admiral].rank;
         u.hp = maxHP(u);
       }
+    bindObjectiveFleet(g);
     g.startFleets = {
       empire: g.units.filter(u => u.side === 'empire').length,
       alliance: g.units.filter(u => u.side === 'alliance').length,

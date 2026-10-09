@@ -7,14 +7,16 @@
   // Route fields are reused heavily by the larger Conquest AI. Cache by game + destination + terrain mode,
   // and use a binary min-heap instead of sorting the whole queue after every expanded hex.
   const routeCache = new WeakMap();
-  function routeField(g, destination, unit = null) {
+  function routeField(g, destination, unit = null, legalMovement = false) {
     const dest = E.tile(g, destination?.c, destination?.r),
       field = new Map();
     // A shield-locked flank is not a valid destination. Shielded stations
     // themselves remain valid *goals* so fleets can route to and siege them.
     if (!dest || dest.terrain === 'rift' ||
         (E.corridorLocked(g, dest, unit?.side) && !E.stationAt(g, dest))) return field;
+    if (legalMovement && (!unit || !E.movementPassable(g, unit, dest))) return field;
     const ignoresTerrain = !!unit && (E.TYPES[unit.type]?.air || unit.admiral === 'yang'),
+      navigation = unit && E.TYPES[unit.type]?.branch === 'Escort' ? E.techLevel(g, unit.side, 'escort.nav') : 0,
       side = unit?.side,
       // Passage ownership and shields can change mid-turn. They must be part
       // of the cached route key or the AI will follow a stale blocked passage.
@@ -22,11 +24,13 @@
         ? g.stations.filter(s => s.name === 'Iserlohn' || s.name === 'Fezzan')
           .map(s => `${s.name}:${s.owner}:${s.shield > 0 ? 1 : 0}`).join(',')
         : '',
-      cacheKey = E.key(dest) + ':' + (ignoresTerrain ? 1 : 0) + ':' +
+      cacheKey = E.key(dest) + ':' + (ignoresTerrain ? 'all' : navigation) + ':' +
         (side || '?') + ':' + gateState;
     let cache = routeCache.get(g);
     if (!cache) routeCache.set(g, (cache = new Map()));
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    // Legal courses depend on current occupants and every station's ownership/shields.
+    // Recompute them; strategic terrain fields remain cached for the Conquest AI.
+    if (!legalMovement && cache.has(cacheKey)) return cache.get(cacheKey);
 
     const heap = [];
     const push = item => {
@@ -65,7 +69,10 @@
       if (cur.cost !== field.get(E.key(cur.p))) continue;
       for (const n of E.adjacent(g, cur.p)) {
         if (n.terrain === 'rift' || E.corridorLocked(g, n, side)) continue;
-        const step = ignoresTerrain ? 1 : n.terrain === 'nebula' || n.terrain === 'asteroid' ? 2 : 1,
+        if (legalMovement && !E.movementPassable(g, unit, n)) continue;
+        // Reverse edge n -> cur.p pays the cost of entering cur.p, not n.
+        const step = unit ? E.terrainCost(g, unit, cur.p)
+          : cur.p.terrain === 'nebula' || cur.p.terrain === 'asteroid' ? 2 : 1,
           cost = cur.cost + step,
           k = E.key(n);
         if (cost >= (field.get(k) ?? Infinity)) continue;
@@ -73,7 +80,7 @@
         push({ p: n, cost });
       }
     }
-    cache.set(cacheKey, field);
+    if (!legalMovement) cache.set(cacheKey, field);
     return field;
   }
 
@@ -81,6 +88,7 @@
     if (!unit || unit.hp <= 0) return 'Fleet not found.';
     if (g.over) return 'Operation over';
     if (unit.side !== g.player) return 'Only your fleets can receive standing orders.';
+    if (g.phase !== unit.side) return 'Enemy turn';
     const p = E.tile(g, c, r);
     if (!p) return 'That sector is outside the map.';
     if (p.terrain === 'rift') return 'A fleet cannot set course into a gravity rift.';
@@ -119,7 +127,7 @@
       delete unit.destination;
       return { ok: true, arrived: true, destination };
     }
-    const field = routeField(g, unit.destination, unit);
+    const field = routeField(g, unit.destination, unit, true);
     const here = field.get(E.key(unit));
     if (here == null) return { ok: false, reason: 'No navigable route.', blocked: true };
     const reachable = E.reachable(g, unit);

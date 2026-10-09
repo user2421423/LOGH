@@ -74,7 +74,7 @@
     },
     campaign: { name: 'Campaign Ribbon', desc: '+4% damage and 4% less damage taken.', earn: 'Win any operation.' },
   };
-  // Starting ratings (stars, up to 6 with command tokens): Escort, Battle Line, Artillery, Aerospace, plus Movement.
+  // Starting fleet ratings (stars, up to 6 with command tokens), plus Movement.
   const RATINGS = root.GalacticData.RATINGS;
   // Two kinds of admiral. Scenario commanders come with an operation, sit on their fleets with fixed stats
   // (g.officers) and are never upgraded. Your admirals (profile.roster) are bought once, upgraded in HQ, kept
@@ -93,7 +93,9 @@
     return {
       rank: clamp(Number.isInteger(rec.rank) ? rec.rank : base.rank, 0, RANKS.length - 1),
       ratings: Object.fromEntries(
-        Object.entries({ ...base.ratings, ...(rec.ratings || {}) }).map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
+        Object.entries({ ...base.ratings, ...(rec.ratings || {}) })
+          .filter(([b]) => RATING_NAMES[b])
+          .map(([b, n]) => [b, clamp(n | 0, 1, MAX_RATING)]),
       ),
       medals: (rec.medals || []).filter(m => MEDALS[m]),
     };
@@ -107,7 +109,7 @@
     }
     // Ratings added after a profile was made (such as Movement) start at the admiral's default.
     for (const [k, o] of Object.entries(profile.roster))
-      if (RATINGS[k]) o.ratings = { ...RATINGS[k], ...(o.ratings || {}) };
+      if (RATINGS[k]) withRatings(k, o);
     return profile.roster;
   }
   function owns(profile, k) {
@@ -120,8 +122,8 @@
   }
   // Saves made before a rating existed (such as Movement) pick up the admiral's default for it.
   function withRatings(k, o) {
-    if (o && Object.keys(RATINGS[k] || {}).some(b => o.ratings?.[b] == null))
-      o.ratings = { ...RATINGS[k], ...o.ratings };
+    if (o && (o.ratings?.air != null || Object.keys(RATINGS[k] || {}).some(b => o.ratings?.[b] == null)))
+      o.ratings = cleanOfficer(k, o).ratings;
     return o;
   }
   // The record behind a fleet's admiral: your admiral for personal fleets, the scenario commander otherwise.
@@ -528,6 +530,25 @@
         (1 + (u.hpTech || 0)),
     );
   }
+  // Displayable fleet ratings include permanent upgrades, veterancy and officer bonuses.
+  // Morale, position and target-specific damage modifiers are shown by combat previews.
+  function fleetStats(g, u) {
+    const t = TYPES[u.type];
+    return {
+      hp: maxHP({ ...u, hpTech: unitTech(g, u, 'hull') }),
+      attack: Math.round(t.attack * (1 + 0.45 * (u.stack - 1)) *
+        (1 + 0.07 * Math.min(5, u.xp || 0)) * (1 + unitTech(g, u, 'guns')) * officerAttack(g, u)),
+      armor: t.armor + unitTech(g, u, 'armor'),
+      move: movement(g, u),
+      range: rangeOf(g, u),
+    };
+  }
+  function bindObjectiveFleet(g) {
+    const o = g.objective;
+    if (!o?.admiral || !['kill', 'survive'].includes(o.type) || Object.hasOwn(o, 'fleetId')) return;
+    const side = o.type === 'survive' ? g.player : opponent(g.player);
+    o.fleetId = g.units.find(u => !u.personal && u.side === side && u.admiral === o.admiral)?.id ?? null;
+  }
   // Saves from earlier rules versions are not carried forward.
   function migrateSave(g) {
     if (!g || g.version !== 2 || ![11, 12].includes(g.rulesVersion) || !Array.isArray(g.units)) return null;
@@ -555,6 +576,9 @@
         if (p && p.terrain === 'rift') p.terrain = 'space';
       }
     }
+    bindObjectiveFleet(g);
+    for (const [k, o] of Object.entries(g.officers || {})) if (ADMIRALS[k]) g.officers[k] = cleanOfficer(k, o);
+    for (const [k, o] of Object.entries(g.roster || {})) if (ADMIRALS[k]) g.roster[k] = cleanOfficer(k, o);
     g.units = g.units.filter(u => u.hp > 0);
     if (g.ai) for (const side of ['empire','alliance']) if (g.ai[side]) {
       delete g.ai[side]._plan; delete g.ai[side]._planTurn;
@@ -613,6 +637,12 @@
   function isReady(g, u) {
     return !g.over && g.phase === u.side && u.hp > 0 && u.morale > -3;
   }
+  function movementPassable(g, u, p) {
+    if (!p || p.terrain === 'rift' || corridorLocked(g, p, u.side)) return false;
+    const occ = unitAt(g, p), st = stationAt(g, p);
+    return (!occ || occ.side === u.side) &&
+      (!st || st.owner === u.side || (st.shield <= 0 && canCapture(u)));
+  }
   function reachable(g, u) {
     const found = new Map(),
       reposition = u.repositionTurn === g.turn ? u.reposition || 0 : 0;
@@ -626,11 +656,8 @@
       const { p, cost } = queue.shift();
       if (cost > costs.get(key(p))) continue;
       for (const n of adjacent(g, p)) {
-        if (n.terrain === 'rift' || corridorLocked(g, n, u.side)) continue;
-        const occ = unitAt(g, n),
-          st = stationAt(g, n);
-        if (occ && occ.side !== u.side) continue;
-        if (st && st.owner !== u.side && (st.shield > 0 || !canCapture(u))) continue;
+        if (!movementPassable(g, u, n)) continue;
+        const occ = unitAt(g, n);
         const nc = cost + terrainCost(g, u, n);
         if (nc > budget || nc >= (costs.get(key(n)) ?? Infinity)) continue;
         costs.set(key(n), nc);
@@ -918,10 +945,12 @@
         )
       : 0;
     // Air wings only draw return fire from escorts (point defense) and fighters.
+    const counterDefender = d && a.admiral === 'oberstein'
+      ? { ...d, morale: Math.max(moraleFloor(g, d), d.morale - 1) } : d;
     const counter =
       !!d &&
       !t.noCounter &&
-      d.morale > -3 &&
+      counterDefender.morale > -3 &&
       inRange(d, a, g) &&
       hostileTarget(g, d, a) &&
       (!t.air || TYPES[d.type].branch === 'Escort' || !!TYPES[d.type].antiAir);
@@ -937,7 +966,7 @@
     return {
       unit: unitDmg,
       shield: shieldDmg,
-      counter: counter ? power(g, d, a, stationAt(g, a), true) : 0,
+      counter: counter ? power(g, counterDefender, a, stationAt(g, a), true) : 0,
       counterAllowed: counter,
       crit,
       critMult: (t.critMult || 1.55) + (a.admiral === 'lutz' ? 0.25 : 0),
@@ -1041,14 +1070,14 @@
     funds(g, station.owner).industry -= view.cost.industry;
     if (target && unitDamage) target.hp = Math.max(0, target.hp - unitDamage);
     if (fort) fort.shield = Math.max(0, fort.shield - shieldDamage);
-    if (target && target.hp <= 0) kill(g, target, null);
+    if (target && target.hp <= 0) kill(g, target, null, station.owner);
     log(g, `${station.name} launches ${AIR_STRIKES[type].name}: ${unitDamage} hull / ${shieldDamage} station damage.`, station.owner);
     checkVictory(g);
     return { ok: true, kind: 'air', type, side: station.owner, from: view.from, to: view.to,
       damage: unitDamage, unitDamage, shieldDamage, cost: view.cost,
       destroyed: !!target && target.hp <= 0, hit: unitDamage ? [{ c, r, damage: unitDamage }] : [] };
   }
-  function kill(g, v, attacker) {
+  function kill(g, v, attacker, side = attacker?.side) {
     if (v.hp > 0) return;
     v.hp = 0;
     if (attacker) {
@@ -1056,13 +1085,14 @@
         const k = attacker.admiral,
           tally = (g.missionKills ||= {});
         tally[k] = (tally[k] || 0) + 1;
-        if (v.admiral) award(g, attacker.side, 'valor', `${ADMIRALS[k].short} defeated ${ADMIRALS[v.admiral].short}`);
         if (tally[k] === 5) award(g, attacker.side, 'marksman', `${ADMIRALS[k].short} destroyed 5 fleets`);
       }
       attacker.kills++;
       attacker.xp = Math.min(5, attacker.xp + 1);
       attacker.morale = clamp(attacker.morale + 1, -3, 1);
     }
+    if (v.admiral && side && side !== v.side)
+      award(g, side, 'valor', `${FACTIONS[side].short} defeated ${ADMIRALS[v.admiral].short}`);
     if (v.admiral) log(g, `${ADMIRALS[v.admiral].short}'s command fleet is lost.`, v.side);
   }
   function attack(g, id, c, r) {
@@ -1080,6 +1110,10 @@
       crit = random(g) < pr.crit,
       mult = (0.92 + random(g) * 0.16) * (crit ? pr.critMult : 1),
       hit = [];
+    // Freeze the entire salvo before movement flags, retaliation or kill rewards change its source.
+    const splashHits = pr.splash ? g.units
+      .filter(v => v.hp > 0 && v.side !== a.side && v.id !== d?.id && distance(v, p) === 1)
+      .map(v => ({ v, damage: Math.round(power(g, a, v, stationAt(g, v)) * pr.splash) })) : [];
     // Remember whether movement was still unused before the shot. A successful breakthrough
     // preserves that movement instead of spending it; it never restores movement already used.
     const hadMovement = !a.moved;
@@ -1114,28 +1148,25 @@
       }
     }
     let retaliation = 0;
-    if (d && d.hp > 0 && pr.counterAllowed) {
-      retaliation = Math.round(pr.counter * (0.94 + random(g) * 0.12));
+    if (d && d.hp > 0 && d.morale > -3 && pr.counterAllowed) {
+      const counterPower = a.admiral === 'oberstein' ? power(g, d, a, stationAt(g, a), true) : pr.counter;
+      retaliation = Math.round(counterPower * (0.94 + random(g) * 0.12));
       a.hp = Math.max(0, a.hp - retaliation);
       if (a.admiral === 'reuenthal') {
         d.hp = Math.max(0, d.hp - Math.round(retaliation * 0.2));
       }
       kill(g, a, d);
     }
-    if (pr.splash) {
-      for (const v of g.units) {
-        if (v.hp <= 0 || v.side === a.side || v.id === d?.id || distance(v, p) !== 1) continue;
-        const amount = Math.round(power(g, a, v, stationAt(g, v)) * pr.splash);
-        v.hp = Math.max(0, v.hp - amount);
-        v.morale = Math.max(moraleFloor(g, v), v.morale - 1);
-        hit.push({ id: v.id, c: v.c, r: v.r, damage: amount });
-        kill(g, v, a);
-      }
+    for (const { v, damage } of splashHits) {
+      v.hp = Math.max(0, v.hp - damage);
+      v.morale = Math.max(moraleFloor(g, v), v.morale - 1);
+      hit.push({ id: v.id, c: v.c, r: v.r, damage });
+      kill(g, v, a);
     }
     const destroyed = !!d && d.hp <= 0;
     let pursuitTriggered = false;
-    if (destroyed) {
-      kill(g, d, a);
+    if (destroyed) kill(g, d, a);
+    if (a.hp > 0 && (destroyed || splashHits.some(({ v }) => v.hp <= 0))) {
       if (a.admiral === 'reinhard' && a.inspireUsedTurn !== g.turn) {
         a.inspireUsedTurn = g.turn;
         for (const v of g.units) {
@@ -1380,6 +1411,8 @@
     u.personal = true;
     u.cmdRank = g.roster[admiral].rank;
     u.hp += maxHP(u) - old;
+    for (const v of g.units) if (v.hp > 0 && v.side === u.side)
+      v.morale = Math.max(v.morale, moraleFloor(g, v));
     log(g, `${a.short} assumes command of ${TYPES[u.type].short}.`, u.side);
     return { ok: true };
   }
@@ -1418,6 +1451,7 @@
       desired = Math.max(moraleFloor(g, u), desired);
       if (u.morale < desired) u.morale++;
       else if (u.morale > desired) u.morale--;
+      u.morale = Math.max(u.morale, moraleFloor(g, u));
       if (nearby >= 2) u.morale = Math.min(u.morale, desired);
       // Patrichev reassures fleets within 2 hexes: one extra morale step and 5% hull.
       if (g.units.some(m => m.hp > 0 && m.side === side && m.admiral === 'patrichev' && distance(m, u) <= 2)) {
@@ -1504,9 +1538,9 @@
         const amount = Math.round(fortressDamage(g, v, s.owner) * 0.5);
         v.hp = Math.max(0, v.hp - amount);
         hit.push({ id: v.id, c: v.c, r: v.r, damage: amount });
-        kill(g, v, null);
+        kill(g, v, null, s.owner);
       }
-    kill(g, foe, null);
+    kill(g, foe, null, s.owner);
     checkVictory(g);
     return { ok: true, name, from: { c: s.c, r: s.r }, to: { c, r }, id: foe.id, damage, destroyed, hit };
   }
@@ -1528,7 +1562,7 @@
       else if (!g.stations.some(s => s.owner === side) && !g.units.some(u => u.hp > 0 && u.side === side))
         g.over = { winner: opponent(side), reason: 'The last enemy fleets and stations have fallen.' };
     }
-    const armistice = g.cols > 20 ? 80 : 50;
+    const armistice = conquestTurnLimit(g);
     if (g.turn > armistice && !g.over) {
       const a = g.stations.filter(s => s.owner === g.player).length,
         b = g.stations.filter(s => s.owner === opponent(g.player)).length;
@@ -1540,6 +1574,7 @@
     return g.over;
   }
   function scenarioVictory(g) {
+    bindObjectiveFleet(g);
     const o = g.objective,
       def = SCENARIOS[g.mode],
       P = g.player,
@@ -1555,9 +1590,9 @@
     } else if (o.type === 'destroy') {
       if (!alive(foe).length) win(def.win, byTurn());
     } else if (o.type === 'kill') {
-      if (!g.units.some(u => u.hp > 0 && u.admiral === o.admiral)) win(def.win, byTurn());
+      if (!g.units.some(u => u.hp > 0 && u.id === o.fleetId)) win(def.win, byTurn());
     } else if (o.type === 'survive') {
-      if (o.admiral && !g.units.some(u => u.hp > 0 && u.admiral === o.admiral))
+      if (o.admiral && !g.units.some(u => u.hp > 0 && u.id === o.fleetId))
         lose(`${ADMIRALS[o.admiral].short}'s flagship has been destroyed.`);
       else if (g.turn > o.turns) {
         const kept = alive(P).length / Math.max(1, g.startFleets?.[P] || 1);
@@ -1587,6 +1622,9 @@
     if (o.type === 'survive')
       return `${o.admiral ? `Keep ${ADMIRALS[o.admiral].name} alive` : 'Keep a fleet alive'} through turn ${o.turns}.${stars}`;
     return `Hold ${o.stations.join(' and ')} through turn ${o.turns}.${stars}`;
+  }
+  function conquestTurnLimit(g) {
+    return g.cols > 20 ? 80 : 50;
   }
   function modeTitle(g) {
     return g.mode === 'conquest' ? ERAS[g.era || 'frontier'].name : SCENARIOS[g.mode].name;
@@ -1680,7 +1718,7 @@
   // mode: 'conquest' or 'conquest:<era>' for a Conquest start date; a scenario id (or 'scenario:<id>') otherwise.
   const createGame = root.GalacticData.createGameFactory({
     ERAS, SCENARIOS, DIFFICULTIES, TYPES, ADMIRALS, opponent, random, tile, adjacent, newUnit,
-    income, harden, maxHP, defaultOfficer, log,
+    income, harden, maxHP, defaultOfficer, log, bindObjectiveFleet,
   });
   // Enemy high command, run once at the start of each AI turn before its fleets act:
   // repair, save for dreadnoughts, upgrade rear shipyards, reinforce, then build stacked fleets. No fleet cap.
@@ -1717,6 +1755,7 @@
     SCENARIOS,
     CAMPAIGNS,
     objectiveText,
+    conquestTurnLimit,
     modeTitle,
     TYPES,
     ADMIRALS,
@@ -1789,9 +1828,12 @@
     random,
     log,
     maxHP,
+    fleetStats,
     migrateSave,
     newUnit,
     movement,
+    movementPassable,
+    terrainCost,
     reachable,
     hasOrders,
     targets,

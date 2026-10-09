@@ -2,7 +2,9 @@
 const PROFILE_KEY = 'galactic-command-officers';
 function loadProfile() {
   try {
-    return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {};
+    const profile = JSON.parse(localStorage.getItem(PROFILE_KEY)) || {};
+    E.roster(profile); // Normalize legacy officer records, including retired Aerospace stars.
+    return profile;
   } catch (e) {
     return {};
   }
@@ -23,6 +25,8 @@ function save() {
   } catch (e) {
     saveOk = false;
     toast('This browser could not save progress. Keep this tab open.');
+  } finally {
+    updateTurnStatus();
   }
 }
 function getSave() {

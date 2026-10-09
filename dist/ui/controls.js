@@ -24,13 +24,17 @@ function attachMap() {
         s = E.stationAt(game, hover),
         own = selectedUnit(),
         fort = selectedStation(),
-        pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null;
+        pr = own && targetCache.has(E.key(hover)) ? E.preview(game, own.id, hover.c, hover.r) : null,
+        sortie = fort && airOrder?.stationId === fort.id && targetCache.has(E.key(hover))
+          ? E.airStrikePreview(game, fort.id, airOrder.type, hover.c, hover.r) : null;
       $('map-caption').textContent =
         OrdersUI.active() != null
           ? 'Set course: click a navigable sector · Esc cancels'
           : supplyCache && readyCache.has(E.key(hover)) && !supplyCache.has(E.key(hover)) && own?.admiral !== 'konev'
           ? `⚠ Outside air supply · −10% hull at the start of each turn here · nearest coverage ${E.airSupply(game, own.side)} hexes from a friendly air base`
-          : fort && u && targetCache.has(E.key(hover))
+          : sortie
+            ? `${E.AIR_STRIKES[airOrder.type].name} · ~${sortie.unit} hull / ${sortie.shield} shield damage · ${sortie.cost.credits} credits / ${sortie.cost.industry} industry`
+          : fort && !airOrder && u && targetCache.has(E.key(hover))
             ? `Click to fire ${E.fortressName(fort)} at ${E.TYPES[u.type].short} · ~${E.fortressDamage(game, u, fort.owner)} damage`
             : pr
               ? `Click to attack ${u ? E.TYPES[u.type].short : s.name} · ~${pr.unit || pr.shield} damage · ${pr.counterAllowed ? pr.counter + ' counter-fire' : 'no counter-fire'}`
@@ -64,6 +68,15 @@ function attachMap() {
 }
 
 let helpBack = 'game';
+// Close buttons and Escape follow the same navigation path through HQ and setup.
+function dismissDialog(action = 'close') {
+  if (action === 'help-close' && helpBack === 'start') startMenu();
+  else if (action === 'research-close' && researchBack === 'start') startMenu();
+  else if (action === 'research-close' && researchBack === 'result') resultDialog();
+  else if (action === 'general-close' && hqBack === 'start') generalsDialog();
+  else if (action === 'generals-close' && hqBack === 'start') startMenu();
+  else closeModal();
+}
 document.addEventListener('change', e => {
   const id = e.target.id;
   if (id === 'mode-select' && e.target.tagName === 'SELECT') {
@@ -118,6 +131,7 @@ document.addEventListener('click', e => {
   if (d.airType) {
     const station = game.stations.find(s => s.id === +d.airStation), strike = E.AIR_STRIKES[d.airType];
     if (!station || !strike || station.owner !== game.player || !interactive() || (station.air || 0) < strike.level) return;
+    cancelTargeting();
     airOrder = { stationId: station.id, type: d.airType };
     stationView = 'air';
     detailOpen = true;
@@ -142,6 +156,7 @@ document.addEventListener('click', e => {
   if (d.recruit) {
     const r = E.recruit(game, shop.station, d.recruit, E.TYPES[d.recruit].elite ? 1 : shop.stack);
     if (r.ok) {
+      cancelTargeting();
       selection = { kind: 'unit', id: r.unit.id };
       closeModal();
       refreshAndSave();
@@ -229,6 +244,7 @@ document.addEventListener('click', e => {
     case 'air-sorties': {
       const station = selectedStation();
       if (!station || station.owner !== game.player || !interactive()) break;
+      cancelTargeting();
       stationView = 'air';
       detailOpen = true;
       updateSelection();
@@ -236,18 +252,18 @@ document.addEventListener('click', e => {
     }
     case 'station-overview':
       stationView = 'overview';
-      airOrder = null;
+      cancelTargeting();
       detailOpen = true;
       updateSelection();
       break;
     case 'cancel-air':
-      airOrder = null;
+      cancelTargeting();
       updateSelection();
       break;
     case 'close-panel':
       detailOpen = false;
       stationView = 'overview';
-      airOrder = null;
+      cancelTargeting();
       updateSelection();
       break;
     case 'details':
@@ -281,7 +297,7 @@ document.addEventListener('click', e => {
         aiToken++;
         hqBack = 'game';
         game = E.applyProfile(s, loadProfile());
-        airOrder = null;
+        cancelTargeting();
         stationView = 'overview';
         selection = null;
         undoStack = [];
@@ -297,15 +313,14 @@ document.addEventListener('click', e => {
       startMenu();
       break;
     case 'close':
-      closeModal();
+      dismissDialog(d.action);
       break;
     case 'help':
       helpBack = $('mode-select') ? 'start' : 'game';
       helpDialog();
       break;
     case 'help-close':
-      if (helpBack === 'start') startMenu();
-      else closeModal();
+      dismissDialog(d.action);
       break;
     case 'menu':
       menuDialog();
@@ -329,13 +344,10 @@ document.addEventListener('click', e => {
       researchDialog();
       break;
     case 'research-close':
-      if (researchBack === 'start') startMenu();
-      else if (researchBack === 'result') resultDialog();
-      else closeModal();
+      dismissDialog(d.action);
       break;
     case 'general-close':
-      if (hqBack === 'start') generalsDialog();
-      else closeModal();
+      dismissDialog(d.action);
       break;
     case 'generals':
       generalsDialog(hqBack === 'game' ? game.player : generalsSide);
@@ -345,8 +357,7 @@ document.addEventListener('click', e => {
       generalsDialog(setup.side);
       break;
     case 'generals-close':
-      if (hqBack === 'start') startMenu();
-      else closeModal();
+      dismissDialog(d.action);
       break;
     case 'admirals':
     case 'assign':
@@ -384,6 +395,7 @@ document.addEventListener('click', e => {
     case 'course': {
       const u = selectedUnit();
       if (u && u.side === game.player && interactive()) {
+        cancelTargeting();
         OrdersUI.begin(u.id);
         updateSelection();
         canvas?.focus({ preventScroll: true });
@@ -418,6 +430,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset?.general) {
     e.preventDefault();
     generalDialog(e.target.dataset.general, e.target.dataset.personal === '1');
@@ -437,8 +450,8 @@ document.addEventListener('keydown', e => {
       }
     }
     if (e.key === 'Escape' && !$('mode-select')) {
-      if (helpBack === 'start' && modal.querySelector('[aria-label="Field manual"]')) startMenu();
-      else closeModal();
+      const close = modal.querySelector('button.close[data-action]');
+      dismissDialog(close?.dataset.action || 'close');
     }
     return;
   }
@@ -455,6 +468,7 @@ document.addEventListener('keydown', e => {
     const u = selectedUnit();
     if (u && u.side === game.player && interactive()) {
       e.preventDefault();
+      cancelTargeting();
       OrdersUI.begin(u.id);
       updateSelection();
       toast('Set course: click a navigable sector. Esc cancels.');

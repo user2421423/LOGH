@@ -59,11 +59,15 @@ function closeModal() {
   modal.innerHTML = '';
   canvas?.focus({ preventScroll: true });
 }
+function cancelTargeting() {
+  OrdersUI.cancel();
+  airOrder = null;
+}
 function newGame() {
   aiToken++;
   hqBack = 'game';
   game = E.applyProfile(E.createGame(setup.side, setup.difficulty, setup.mode, Date.now() >>> 0), loadProfile());
-  airOrder = null;
+  cancelTargeting();
   stationView = 'overview';
   selection = { kind: 'unit', id: ownUnits().find(u => u.admiral)?.id };
   undoStack = [];
@@ -76,6 +80,7 @@ function newGame() {
   toast('Select a fleet: green hexes move it, red hexes attack immediately.');
 }
 function startMenu() {
+  cancelTargeting();
   const saved = getSave();
   modal.innerHTML = `<div class="overlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-label="Campaign setup"><div class="eyebrow">Legend of the Galactic Heroes · WC4-inspired tactics</div><h1>One galaxy.<br>Every hex contested.</h1><p>Build a fleet. Appoint your admirals. Break the enemy line with coordinated firepower—and take the stations that keep the war alive.</p><div class="choice-grid"><button class="faction empire ${setup.side === 'empire' ? 'active' : ''}" data-faction="empire">${ART.portrait('reinhard', 'faction-portrait')}<span class="label gold">The golden lion</span><h3>Galactic Empire</h3><p>Reinhard, Mittermeyer, Reuenthal, and Kircheis. Decisive offensives and rapid breakthroughs.</p><span class="select-mark">${setup.side === 'empire' ? '✓ Command selected' : 'Select the Empire'}</span></button><button class="faction alliance ${setup.side === 'alliance' ? 'active' : ''}" data-faction="alliance">${ART.portrait('yang', 'faction-portrait')}<span class="label cyan">The magician’s fleet</span><h3>Free Planets Alliance</h3><p>Yang, Attenborough, Fischer, and Schönkopf. Counterattacks, maneuver, and boarding operations.</p><span class="select-mark">${setup.side === 'alliance' ? '✓ Command selected' : 'Select the Alliance'}</span></button></div>${campaignScreen()}${conquestRow()}<div class="setup-row"><div><label for="difficulty-select">Difficulty</label><select class="select" id="difficulty-select">${Object.entries(
     E.DIFFICULTIES,
@@ -86,7 +91,7 @@ function startMenu() {
     )
     .join(
       '',
-    )}</select><p class="mode-note">${E.DIFFICULTIES[setup.difficulty]?.desc || ''}</p></div><div class="hq-summary"><span class="label">Command HQ</span><b>${ICONS.use('token', 'cost-ico')} ${loadProfile().tokens || 0} tokens</b><small>${loadProfile().wins || 0} victories · ${Object.values(loadProfile().research || {}).reduce((a, l) => a + l, 0)} research levels</small><span class="hq-buttons"><button class="small" data-action="research">HQ research</button><button class="small" data-action="generals-start">Admirals</button></span></div></div><div class="badge-row"><span class="badge">13 fleet classes</span><span class="badge">${Object.keys(E.ADMIRALS).length} admirals · ${Object.values(E.ADMIRALS).filter(a => a.recruit).length} to recruit</span><span class="badge">${Object.keys(E.TECH_NODES).length} HQ technologies</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
+    )}</select><p class="mode-note">${E.DIFFICULTIES[setup.difficulty]?.desc || ''}</p></div><div class="hq-summary"><span class="label">Command HQ</span><b>${ICONS.use('token', 'cost-ico')} ${loadProfile().tokens || 0} tokens</b><small>${loadProfile().wins || 0} victories · ${Object.values(loadProfile().research || {}).reduce((a, l) => a + l, 0)} research levels</small><span class="hq-buttons"><button class="small" data-action="research">HQ research</button><button class="small" data-action="generals-start">Admirals</button></span></div></div><div class="badge-row"><span class="badge">${Object.values(E.TYPES).filter(t => !t.air).length} fleet classes · ${Object.keys(E.AIR_STRIKES).length} sortie types</span><span class="badge">${Object.keys(E.ADMIRALS).length} admirals · ${Object.values(E.ADMIRALS).filter(a => a.recruit).length} to recruit</span><span class="badge">${Object.keys(E.TECH_NODES).length} HQ technologies</span><span class="badge">1–3-stack fleets</span></div><div class="dialog-footer"><div>${saved ? '<button data-action="continue">Continue saved game</button>' : ''}<button class="ghost" data-action="help">Field manual</button></div><small>Unofficial fan game. Alternate-history scenarios.<br>Saved in this browser. A new operation replaces your hex-campaign save.</small></div></section></div>`;
   focusDialog();
 }
 function bestStars() {
@@ -217,7 +222,7 @@ function render() {
 function selectUnit(id, center = false) {
   const u = game.units.find(v => v.id === id && v.hp > 0);
   if (!u) return;
-  airOrder = null;
+  cancelTargeting();
   stationView = 'overview';
   selection = { kind: 'unit', id };
   updateSelection();
@@ -226,6 +231,7 @@ function selectUnit(id, center = false) {
 function selectStation(id, center = false) {
   const s = game.stations.find(v => v.id === id);
   if (!s) return;
+  OrdersUI.cancel();
   if (selection?.kind !== 'station' || selection.id !== id) {
     airOrder = null;
     stationView = 'overview';
@@ -295,6 +301,7 @@ function clearSelectedCourse() {
 }
 function undoMove() {
   if (!interactive() || !undoStack.length) return;
+  cancelTargeting();
   const { snapshot, unitId } = undoStack.pop();
   game = JSON.parse(snapshot);
   effects = effects.filter(e => e.kind !== 'move');
@@ -314,7 +321,7 @@ async function endTurn(force = false) {
     return;
   }
   closeModal();
-  airOrder = null;
+  cancelTargeting();
   stationView = 'overview';
   undoStack = [];
   skipEnemyPlayback = false;
@@ -401,7 +408,8 @@ function activateHex(p) {
   if (OrdersUI.active() != null) {
     const id = OrdersUI.active(),
       unit = game.units.find(u => u.id === id && u.hp > 0);
-    if (!unit || unit.side !== game.player) {
+    if (!unit || unit.side !== game.player || !interactive() ||
+        selection?.kind !== 'unit' || selection.id !== id) {
       OrdersUI.cancel();
       toast('Standing order cancelled.');
       updateSelection();
@@ -466,6 +474,7 @@ function activateHex(p) {
       }
     }
   }
+  cancelTargeting();
   if (hit) selectUnit(hit.id);
   else if (station) selectStation(station.id);
   else {
