@@ -29,7 +29,9 @@ let game = E.createGame('empire'),
   targetCache = new Set();
 let detailOpen = false,
   saveOk = true,
-  shake = 0;
+  shake = 0,
+  enemyPlayback = 2,
+  skipEnemyPlayback = false;
 let airOrder = null,
   stationView = 'overview'; // Independent station overview / aerospace command pages
 const R = 43,
@@ -68,7 +70,7 @@ function save() {
   if (game.phase !== game.player) return;
   try {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(E.exportProfile(game, loadProfile())));
-    localStorage.setItem('galactic-command-hex-v2', JSON.stringify(game));
+    localStorage.setItem('galactic-command-hex-v2', JSON.stringify(game, (k, val) => k === '_plan' || k === '_planTurn' ? undefined : val));
     saveOk = true;
   } catch (e) {
     saveOk = false;
@@ -225,7 +227,7 @@ function render() {
   const e = game.economy[game.player],
     inc = E.income(game, game.player),
     stations = game.stations.filter(s => s.owner === game.player).length;
-  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research. Banked research becomes command tokens when you win (5 research = 1 token)', e.science, inc.science)}${resource('token', 'Tokens', 'Command tokens · spent on HQ research, earned by winning operations', loadProfile().tokens || 0)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research">Research</button><button class="small" data-action="admirals" ${!interactive() ? `disabled title="${phaseReason()}"` : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${E.modeTitle(game)}</h2></div><p class="objective">${E.objectiveText(game)}${game.objective && game.mode !== 'conquest' ? ` <b>Turn ${game.turn} / ${game.objective.turns}</b>` : ''}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. G sets a standing course; C clears it. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · G: set standing course · C: clear course · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet · <span class="kbd">G</span> course · <span class="kbd">C</span> clear course</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="${phaseReason() || (undoStack.length ? 'Return the last moved fleet to where it started (Z)' : 'No move to undo')}">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
+  app.innerHTML = `<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">⬡</span><div><h1>Galactic Command</h1><small>LEGEND OF THE GALACTIC HEROES</small></div></div><div class="resources">${resource('credits', 'Credits', 'Credits', e.credits, inc.credits)}${resource('industry', 'Industry', 'Alloy · Shipyard Industry', e.industry, inc.industry)}${resource('research', 'Research', 'Data Chips · Research. Banked research becomes command tokens when you win (5 research = 1 token)', e.science, inc.science)}${resource('token', 'Tokens', 'Command tokens · spent on HQ research, earned by winning operations', loadProfile().tokens || 0)}<div class="resource"><span class="label">Stations</span><b>${stations} <small>/ ${game.stations.length}</small></b></div></div><nav class="top-actions" aria-label="Command menus"><button class="small" data-action="research">Research</button><button class="small" data-action="admirals" ${!interactive() ? `disabled title="${phaseReason()}"` : ''}>Admirals</button><button class="small ghost" data-action="archive">Units</button><button class="small ghost" data-action="enemy-speed" title="Enemy playback speed">AI ${enemyPlayback}×</button><button class="small ghost" data-action="skip-enemy" title="Finish enemy turn without animation waits">Skip AI</button><button class="small ghost sound-toggle" data-action="sound" aria-pressed="${SFX.enabled}" aria-label="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}" title="${SFX.enabled ? 'Mute sound' : 'Unmute sound'}">${SFX.enabled ? '🔊' : '🔇'}</button><button class="small ghost" data-action="help" aria-label="Field manual">?</button><button class="small ghost" data-action="menu" ${game.phase !== game.player ? 'disabled' : ''}>Menu</button></nav></header><div class="workbench"><main class="theater"><div class="theater-head"><div><span class="label" style="color:${E.FACTIONS[game.phase].color}">Turn ${String(game.turn).padStart(2, '0')} · ${E.FACTIONS[game.phase].short} phase</span><h2>${E.modeTitle(game)}</h2></div><p class="objective">${E.objectiveText(game)}${game.objective && game.mode !== 'conquest' ? ` <b>Turn ${game.turn} / ${game.objective.turns}</b>` : ''}</p></div><div class="map-wrap"><canvas id="map" tabindex="0" aria-label="Hex battlefield. Select your fleet using the fleet selector or N. Arrow keys move the hex cursor; Enter selects. Enter moves to a green hex or attacks a red hex. Z undoes the last move. G sets a standing course; C clears it. Drag to pan; plus and minus zoom."></canvas><div class="map-banner" id="map-banner">${game.phase !== game.player ? 'Enemy fleets are maneuvering…' : 'Select a fleet to reveal its movement and firing range.'}</div><div class="map-tools"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="fit">Fit</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div><div class="map-legend"><span style="color:var(--gold)"><i class="legend-dot"></i>Empire</span><span style="color:var(--cyan)"><i class="legend-dot"></i>Alliance</span><span style="color:#b8a9cf"><i class="legend-dot"></i>Nebula</span><span>◇ Station</span><span>× Gravity rift</span></div></div><div class="map-caption"><span id="map-caption">Green hex: move · Red hex: attack · G: set standing course · C: clear course · Undo takes back a move before firing</span><span>Drag to pan · Scroll to zoom · <span class="kbd">N</span> next fleet · <span class="kbd">G</span> course · <span class="kbd">C</span> clear course</span></div></main><aside class="side" id="side"></aside><div class="selection-dock" id="selection-dock"></div></div><footer class="footer"><div class="turn-status" id="turn-status"></div><div class="footer-actions"><button class="small" data-action="details">Fleet orders</button><button class="small undo-button" data-action="undo" ${!interactive() || !undoStack.length ? 'disabled' : ''} title="${phaseReason() || (undoStack.length ? 'Return the last moved fleet to where it started (Z)' : 'No move to undo')}">↶ Undo move <span class="kbd">Z</span></button><button class="small" data-action="next" ${!interactive() ? 'disabled' : ''}>Next fleet <span class="kbd">N</span></button><button class="primary end" data-action="end" ${!interactive() ? 'disabled' : ''}>${game.phase === game.player ? 'End turn' : 'Enemy turn…'}</button></div></footer>`;
   canvas = $('map');
   ctx = canvas.getContext('2d');
   attachMap();
@@ -540,7 +542,7 @@ function undoMove() {
   toast('Move undone.');
 }
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const pause = ms => new Promise(resolve => setTimeout(resolve, reducedMotion() ? 15 : ms));
+const pause = ms => new Promise(resolve => setTimeout(resolve, skipEnemyPlayback || reducedMotion() ? 0 : Math.round(ms / enemyPlayback)));
 async function endTurn(force = false) {
   if (!interactive()) return;
   const ready = ownUnits().filter(u => E.hasOrders(game, u)).length;
@@ -553,6 +555,7 @@ async function endTurn(force = false) {
   airOrder = null;
   stationView = 'overview';
   undoStack = [];
+  skipEnemyPlayback = false;
   save();
   const token = ++aiToken;
   const enemy = E.opponent(game.player);
@@ -572,6 +575,7 @@ async function endTurn(force = false) {
     const orders = E.aiOrder(game, id);
     moralePopups(before);
     for (const o of orders) {
+      if (skipEnemyPlayback) continue;
       if (o.kind === 'attack') addCombatEffects(o, u);
       else {
         SFX.play(E.TYPES[u.type].air ? 'flyby' : 'move', enemy);
@@ -586,12 +590,14 @@ async function endTurn(force = false) {
         });
       }
     }
-    if (orders.length) {
+    if (orders.length && !skipEnemyPlayback) {
       updateSelection();
       await pause(orders.some(o => o.kind === 'attack') ? 420 : 150);
     }
+    if (skipEnemyPlayback && ids.indexOf(id) % 16 === 0) await pause(0);
   }
   if (token !== aiToken) return;
+  skipEnemyPlayback = false;
   game.turn++;
   before = unitSnapshot();
   E.beginTurn(game, game.player, true);
@@ -634,7 +640,7 @@ function claimReward() {
   undoStack = [];
   saveProfile(p);
   try {
-    localStorage.setItem('galactic-command-hex-v2', JSON.stringify(game));
+    localStorage.setItem('galactic-command-hex-v2', JSON.stringify(game, (k, val) => k === '_plan' || k === '_planTurn' ? undefined : val));
   } catch (e) {}
 }
 function resultDialog() {
@@ -1264,6 +1270,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
+  if (d.action === 'enemy-speed') { enemyPlayback = enemyPlayback === 1 ? 2 : enemyPlayback === 2 ? 4 : 1; render(); return; }
+  if (d.action === 'skip-enemy') { skipEnemyPlayback = true; effects = []; toast('Completing enemy turn…'); return; }
   if (d.campaign) {
     (setup.chapter ||= {})[setup.side] = d.campaign;
     startMenu();
@@ -2008,7 +2016,10 @@ function draw(time, dt) {
   ctx.translate(offset.x + jolt.x, offset.y + jolt.y);
   ctx.scale(scale, scale);
   ctx.lineWidth = 0.65 / scale;
-  for (const t of game.tiles) {
+  const inView = p => p.x * scale + offset.x >= -R*3*scale && p.x * scale + offset.x <= w+R*3*scale &&
+    p.y*scale+offset.y >= -R*3*scale && p.y*scale+offset.y <= h+R*3*scale;
+  const visibleTiles = game.tiles.filter(t => inView(hexCenter(t)));
+  for (const t of visibleTiles) {
     const p = hexCenter(t);
     hexPath(p.x, p.y, R);
     ctx.fillStyle =
@@ -2024,7 +2035,7 @@ function draw(time, dt) {
     ctx.stroke();
   }
   // Territorial borders remain visible when the tactical grid is subtle.
-  for (const t of game.tiles) {
+  for (const t of visibleTiles) {
     if (t.terrain === 'rift') continue;
     const p = hexCenter(t);
     for (const n of E.adjacent(game, t)) {
@@ -2045,7 +2056,7 @@ function draw(time, dt) {
     }
   }
   // Painted terrain props are actual raster assets, kept separate from hit regions.
-  for (const t of game.tiles) {
+  for (const t of visibleTiles) {
     const p = hexCenter(t);
     if (t.terrain === 'nebula') {
       ctx.globalAlpha = 0.65;
@@ -2122,6 +2133,7 @@ function draw(time, dt) {
     ctx.restore();
   }
   for (const s of game.stations) {
+    if (!inView(hexCenter(s))) continue;
     const p = hexCenter(s),
       col = E.FACTIONS[s.owner].color,
       garrison = E.unitAt(game, s),
@@ -2159,7 +2171,7 @@ function draw(time, dt) {
     ctx.restore();
   }
   // WC4-style tokens drawn back to front: base plate, hull ring, ships, stack bars and admiral pins.
-  for (const u of game.units.filter(u => u.hp > 0).sort((a, b) => a.r - b.r || a.c - b.c)) {
+  for (const u of game.units.filter(u => u.hp > 0 && inView(animatedPosition(u))).sort((a, b) => a.r - b.r || a.c - b.c)) {
     const p = animatedPosition(u),
       t = E.TYPES[u.type],
       col = E.FACTIONS[u.side].color,
@@ -2210,7 +2222,7 @@ function draw(time, dt) {
     ctx.restore();
   }
   for (const u of game.units)
-    if (u.hp > 0 && u.admiral)
+    if (u.hp > 0 && u.admiral && inView(animatedPosition(u)))
       drawAdmiralPin(u, animatedPosition(u), scale, selection?.kind === 'unit' && selection.id === u.id);
   for (const k of targetCache) {
     const [c, r] = k.split(',').map(Number);

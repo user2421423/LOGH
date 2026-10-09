@@ -156,6 +156,7 @@ test('AI completes turns legally without resource underflow or stacked hexes', (
     for (let turn = 0; turn < 8 && !g.over; turn++) {
       for (const side of ['alliance', 'empire']) {
         E.beginTurn(g, side);
+        assert(g.units.every(u => u.hp > 0), 'defeated fleets should be purged between phases');
         E.aiProduction(g);
         for (const u of [...g.units]) if (u.side === side && u.hp > 0) E.aiOrder(g, u.id);
         const seen = new Set();
@@ -168,6 +169,10 @@ test('AI completes turns legally without resource underflow or stacked hexes', (
       }
       g.turn++;
     }
+    const saved = JSON.parse(JSON.stringify(g, (k, value) =>
+      k === '_plan' || k === '_planTurn' ? undefined : value));
+    const migrated = E.migrateSave(saved);
+    assert(migrated && !migrated.ai?.alliance?._plan, 'save should omit temporary AI plans');
     console.log(mode + ': turn ' + g.turn + ', ' + g.units.filter(u => u.hp > 0).length + ' fleets, ' + g.log[0].text);
   }
 });

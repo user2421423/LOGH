@@ -104,6 +104,8 @@
       units = alive(g, side),
       objectives = frontObjectives(g, side).sort((a, b) => b.value - a.value),
       totalStrength = units.reduce((n, u) => n + unitStrength(u), 0);
+    const liveIds = new Set(units.map(u => String(u.id)));
+    for (const id of Object.keys(assignments)) if (!liveIds.has(id)) delete assignments[id];
 
     let fronts = clusterObjectives(g, objectives);
     for (const f of fronts) {
@@ -374,6 +376,15 @@
       u.c = old.c;
       u.r = old.r;
       if (shot) score += shot.score * 0.55;
+      // Maintain supporting formations and account for concentrated hostile fire.
+      if (nearestEnemy <= 5) {
+        const cover = allies.filter(v => v.hp > 0 && E.distance(v, p) <= 2).length;
+        score += Math.min(3, cover) * 10;
+        if (!cover) score -= u.admiral ? 90 : 35;
+        const hostileFire = foes.filter(v => E.distance(v, p) <= 2)
+          .reduce((sum,v) => sum + (E.TYPES[v.type]?.attack || 0), 0);
+        score -= hostileFire / Math.max(100,u.hp) * (u.admiral ? 75 : 28);
+      }
       if (score > bestScore) {
         bestScore = score;
         best = p;
@@ -395,6 +406,11 @@
             .filter(s => s.owner !== u.side)
             .sort((a, b) => E.distance(u, a) - E.distance(u, b))[0];
 
+    // A gun already able to fire should not give up its range to advance.
+    if (E.TYPES[u.type].branch === 'Artillery' && !u.attacked && E.targets(g,u).length) {
+      const shot = chooseTarget(g,u);
+      if (shot) { const fired = E.attack(g,id,shot.p.c,shot.p.r); if(fired.ok) events.push({kind:'attack',...fired,id}); }
+    }
     if (!u.moved && !u.attacked) {
       const p = bestMove(g, u, destination, plan || {});
       if (p) {

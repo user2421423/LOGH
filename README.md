@@ -77,6 +77,10 @@ You can also try opening `dist/index.html` directly in your browser. Serving the
 
 Edit the files in `dist/`, then refresh the browser. To host the game elsewhere, upload the entire contents of `dist/` while preserving the `assets/` folder. The `.openai/hosting.json` project ID refers to the original Site; it is not needed by other static hosts.
 
+## Recent Conquest improvements
+
+Conquest fleets account for nearby support and hostile fire; artillery preserves effective firing positions. Enemy-turn playback can be set to 1×, 2× or 4× and skipped without skipping actual AI calculations. Off-screen map hexes and units are culled during rendering. Dead fleets are pruned between phases, and autosaves omit recomputable AI planning state.
+
 ## Optional tests
 
 The lean safety net contains **12 engine/AI tests and one UI smoke script**. Detailed feature-by-feature regression cases were removed to keep maintenance simple. With Node.js installed, run from this folder:

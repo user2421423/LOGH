@@ -830,6 +830,10 @@
         if (p && p.terrain === 'rift') p.terrain = 'space';
       }
     }
+    g.units = g.units.filter(u => u.hp > 0);
+    if (g.ai) for (const side of ['empire','alliance']) if (g.ai[side]) {
+      delete g.ai[side]._plan; delete g.ai[side]._planTurn;
+    }
     return g;
   }
   function newUnit(g, type, side, c, r, stack = 1, admiral = null, ready = true) {
@@ -1665,6 +1669,7 @@
     return { ok: true, affected: victims.length };
   }
   function beginTurn(g, side, collect = true) {
+    g.units = g.units.filter(u => u.hp > 0);
     g.phase = side;
     if (collect) {
       const inc = income(g, side),
